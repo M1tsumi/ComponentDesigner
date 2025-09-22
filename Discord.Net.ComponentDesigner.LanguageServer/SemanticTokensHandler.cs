@@ -1,0 +1,75 @@
+﻿using Discord.ComponentDesigner.LanguageServer.CX;
+using Discord.CX.Parser;
+using MediatR;
+using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+
+namespace Discord.ComponentDesigner.LanguageServer;
+
+public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
+{
+    private readonly ILogger<SemanticTokensHandler> _logger;
+
+    public SemanticTokensHandler(ILogger<SemanticTokensHandler> logger)
+    {
+        _logger = logger;
+    }
+    
+    protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(
+        SemanticTokensCapability capability,
+        ClientCapabilities clientCapabilities
+    ) => new()
+    {
+        Legend = new SemanticTokensLegend()
+        {
+            TokenTypes = new(
+                Enum.GetNames<CXTokenKind>()
+                    .Select(x => new SemanticTokenType(x))
+            )
+        },
+        Full = true
+    };
+
+    protected override Task Tokenize(
+        SemanticTokensBuilder builder,
+        ITextDocumentIdentifierParams identifier,
+        CancellationToken cancellationToken
+    )
+    {
+        _logger.LogInformation("Got tokenize request for {}", identifier.TextDocument.Uri);
+        
+        if (!ComponentDocument.TryGet(identifier.TextDocument.Uri, out var document))
+            return Task.CompletedTask;
+
+        var cx = document.GetCX(cancellationToken);
+
+        foreach (var token in cx.Tokens)
+        {
+            var startInfo = cx.Source.Lines.GetSourceLocation(token.Span.Start);
+            var endInfo = cx.Source.Lines.GetSourceLocation(token.Span.End);
+
+            builder.Push(
+                new Range(
+                    startInfo.Line,
+                    startInfo.Column,
+                    endInfo.Line,
+                    endInfo.Column
+                ),
+                (int)token.Kind,
+                0
+            );
+            
+            _logger.LogInformation("Token[{}]: {} -> {}", token.Kind, startInfo, endInfo);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(
+        ITextDocumentIdentifierParams @params,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
+}
