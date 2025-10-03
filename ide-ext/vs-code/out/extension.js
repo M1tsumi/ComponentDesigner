@@ -15,7 +15,7 @@ const vscode = require("vscode");
 const languageClientNode = require("vscode-languageclient/node");
 const path = require("path");
 const fs = require("fs");
-const languageServerPath = "server/Discord.Net.ComponentDesigner.LanguageServer";
+const languageServerPath = "server/Discord.Net.ComponentDesigner.LanguageServer.exe";
 let configuration = vscode.workspace.getConfiguration();
 let outputChannel = vscode.window.createOutputChannel("DiscordNet Components (CX)");
 function activateLanguageServer(context, dotnetPath) {
@@ -78,7 +78,6 @@ function activate(context) {
         });
         context.subscriptions.push(disposable);
         outputChannel.appendLine("activiating...");
-        console.log("Hello from CX");
         let path = yield activateDotNet();
         activateLanguageServer(context, path);
         outputChannel.appendLine("CX extension has been activated");

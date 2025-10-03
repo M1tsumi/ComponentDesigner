@@ -2,7 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using Discord.CX.Nodes.Components;
+using Discord.CX.Nodes.Components.Custom;
+using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes;
 
@@ -11,7 +15,9 @@ public abstract class ComponentNode<TState> : ComponentNode
 {
     public abstract string Render(TState state, ComponentContext context);
 
-    public virtual void UpdateState(ref TState state) { }
+    public virtual void UpdateState(ref TState state)
+    {
+    }
 
     public sealed override void UpdateState(ref ComponentState state)
         => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state));
@@ -24,7 +30,9 @@ public abstract class ComponentNode<TState> : ComponentNode
     public sealed override string Render(ComponentState state, ComponentContext context)
         => Render((TState)state, context);
 
-    public virtual void Validate(TState state, ComponentContext context) { }
+    public virtual void Validate(TState state, ComponentContext context)
+    {
+    }
 
     public sealed override void Validate(ComponentState state, ComponentContext context)
         => Validate((TState)state, context);
@@ -43,11 +51,8 @@ public abstract class ComponentNode
     {
         // validate properties
         foreach (var property in Properties)
-        foreach (var validator in property.Validators)
         {
             var propertyValue = state.GetProperty(property);
-
-            validator(context, propertyValue);
 
             if (!property.IsOptional && !propertyValue.HasValue)
             {
@@ -57,6 +62,11 @@ public abstract class ComponentNode
                     Name,
                     property.Name
                 );
+            }
+
+            foreach (var validator in property.Validators)
+            {
+                validator(context, propertyValue);
             }
         }
 
@@ -95,7 +105,9 @@ public abstract class ComponentNode
 
     public abstract string Render(ComponentState state, ComponentContext context);
 
-    public virtual void UpdateState(ref ComponentState state) { }
+    public virtual void UpdateState(ref ComponentState state)
+    {
+    }
 
     public virtual ComponentState? Create(ICXNode source, List<CXNode> children)
     {
@@ -104,7 +116,7 @@ public abstract class ComponentNode
             children.AddRange(element.Children);
         }
 
-        return new ComponentState() {Source = source};
+        return new ComponentState() { Source = source };
     }
 
 
@@ -115,7 +127,11 @@ public abstract class ComponentNode
         _nodes = typeof(ComponentNode)
             .Assembly
             .GetTypes()
-            .Where(x => !x.IsAbstract && typeof(ComponentNode).IsAssignableFrom(x))
+            .Where(x =>
+                !x.IsAbstract &&
+                typeof(ComponentNode).IsAssignableFrom(x) &&
+                x.GetConstructor(Type.EmptyTypes) is not null
+            )
             .Select(x => (ComponentNode)Activator.CreateInstance(x)!)
             .SelectMany(x => x
                 .Aliases
@@ -129,4 +145,55 @@ public abstract class ComponentNode
 
     public static bool TryGetNode(string name, out ComponentNode node)
         => _nodes.TryGetValue(name, out node);
+
+    public static bool TryGetProviderNode(
+        SemanticModel cxSemanticModel,
+        int position,
+        string name,
+        out ComponentNode node)
+    {
+        foreach (var candidate in cxSemanticModel.LookupSymbols(position, name: name))
+        {
+            if (candidate is INamedTypeSymbol typeSymbol)
+            {
+                var providerInterface = typeSymbol
+                    .AllInterfaces
+                    .FirstOrDefault(x =>
+                        x.IsGenericType &&
+                        x.ConstructedFrom.Equals(
+                            cxSemanticModel.Compilation.GetKnownTypes().ICXProviderType,
+                            SymbolEqualityComparer.Default
+                        )
+                    );
+
+                if (providerInterface is null ||
+                    providerInterface.TypeArguments[0] is not INamedTypeSymbol stateSymbol) continue;
+
+                node = new ProviderComponentNode(stateSymbol, typeSymbol, cxSemanticModel.Compilation);
+                return true;
+            }
+
+            if (candidate is IMethodSymbol methodSymbol)
+            {
+                if (!methodSymbol.IsStatic) continue;
+
+                if (methodSymbol.DeclaredAccessibility is not Accessibility.Public and not Accessibility.Internal)
+                    continue;
+
+                if (
+                    !cxSemanticModel.Compilation.HasImplicitConversion(
+                        methodSymbol.ReturnType,
+                        cxSemanticModel.Compilation.GetKnownTypes().IMessageComponentBuilderType
+                    )
+                ) continue;
+
+                node = new FunctionalComponentNode(methodSymbol);
+                return true;
+            }
+        }
+
+
+        node = null!;
+        return false;
+    }
 }

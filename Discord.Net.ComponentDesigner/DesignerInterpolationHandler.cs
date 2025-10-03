@@ -23,6 +23,16 @@ public struct DesignerInterpolationHandler
     {
         _interpolatedValues[_index++] = value;
     }
+    
+    public void AppendFormatted(Delegate value)
+    {
+        _interpolatedValues[_index++] = value;
+    }
+    
+    public void AppendFormatted(Action value)
+    {
+        _interpolatedValues[_index++] = value;
+    }
 
     public object? GetValue(int index) => _interpolatedValues[index];
     public T? GetValue<T>(int index) => (T?)_interpolatedValues[index];

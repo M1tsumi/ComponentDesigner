@@ -109,7 +109,7 @@ public readonly struct CXGraph
             oldGraph.HasValue &&
             reusedNodes.Contains(cxNode) &&
             oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing)
-        ) return map[cxNode] = existing with {Parent = parent};
+        ) return map[cxNode] = existing with { Parent = parent };
 
         switch (cxNode)
         {
@@ -143,7 +143,15 @@ public readonly struct CXGraph
             }
             case CXElement element:
             {
-                if (!ComponentNode.TryGetNode(element.Identifier, out var componentNode))
+                if (
+                    !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
+                    !ComponentNode.TryGetProviderNode(
+                        manager.Compilation.GetSemanticModel(manager.SyntaxTree),
+                        manager.ArgumentExpressionSyntax.SpanStart,
+                        element.Identifier,
+                        out componentNode
+                    )
+                )
                 {
                     diagnostics.Add(
                         Diagnostic.Create(

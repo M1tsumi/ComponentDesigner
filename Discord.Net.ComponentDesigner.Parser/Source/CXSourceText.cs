@@ -30,12 +30,23 @@ public abstract partial class CXSourceText
 
     public TextLineCollection Lines => _lines ??= ComputeLines();
     private TextLineCollection? _lines;
+    
+    public CXSourceReader CreateReader(TextSpan? span = null, TextSpan[]? interpolations = null,
+        int? wrappingQuoteCount = null)
+        => new(
+            this,
+            span ?? new(0, Length),
+            interpolations ?? [],
+            wrappingQuoteCount ?? 3
+        );
 
     public virtual CXSourceText GetSubText(TextSpan span)
     {
         if (span.Length == 0) return new StringSource(string.Empty);
 
         if (span.Length == Length && span.Start == 0) return this;
+
+        if (span.End > Length) throw new ArgumentOutOfRangeException(nameof(span));
 
         return new SubText(this, span);
     }
@@ -72,7 +83,7 @@ public abstract partial class CXSourceText
 
             if (change.Span.Start > pos)
             {
-                var sub = GetSubText(new(pos, change.Span.Start));
+                var sub = GetSubText(new(pos, change.Span.Start - pos));
                 CompositeText.AddSegments(segments, sub);
             }
 
@@ -90,7 +101,7 @@ public abstract partial class CXSourceText
 
         if (pos < Length)
         {
-            var subText = GetSubText(new(pos, Length));
+            var subText = GetSubText(new(pos, Length - pos));
             CompositeText.AddSegments(segments, subText);
         }
 

@@ -20,6 +20,8 @@ public sealed record CXGraphManager(
     CXDoc Document
 )
 {
+    public const bool FORCE_NO_INCREMENTAL = true;
+
     public SyntaxTree SyntaxTree => InvocationSyntax.SyntaxTree;
     public InterceptableLocation InterceptLocation => Target.InterceptLocation;
     public InvocationExpressionSyntax InvocationSyntax => Target.InvocationSyntax;
@@ -101,7 +103,7 @@ public sealed record CXGraphManager(
          *     our emitted source.
          */
 
-        var result = this with {Key = key, Target = target};
+        var result = this with { Key = key, Target = target };
 
         var newCXWithoutInterpolations = GetCXWithoutInterpolations(
             target.ArgumentExpressionSyntax.SpanStart,
@@ -120,25 +122,27 @@ public sealed record CXGraphManager(
 
     private void DoReparse(Target target, CXGraphManager old, ref CXGraphManager result, CancellationToken token)
     {
-        var changes = target
-            .SyntaxTree
-            .GetChanges(old.SyntaxTree)
-            .Where(x => CXDesignerSpan.IntersectsWith(x.Span))
-            .ToArray();
-
         var reader = new CXSourceReader(
-            old.Document.Source.WithChanges(changes),
+            new CXSourceText.StringSource(target.CXDesigner),
             target.CXDesignerSpan,
             target.Interpolations.Select(x => x.Span).ToArray(),
             target.CXQuoteCount
         );
 
-        var document = Document.IncrementalParse(
-            reader,
-            changes,
-            out var parseResult,
-            token
-        );
+        var parseResult = IncrementalParseResult.Empty;
+
+        var document = FORCE_NO_INCREMENTAL
+            ? CXParser.Parse(reader, token)
+            : Document.IncrementalParse(
+                reader,
+                target
+                    .SyntaxTree
+                    .GetChanges(old.SyntaxTree)
+                    .Where(x => CXDesignerSpan.IntersectsWith(x.Span))
+                    .ToArray(),
+                out parseResult,
+                token
+            );
 
         result = result with
         {
@@ -168,7 +172,7 @@ public sealed record CXGraphManager(
             return new(InterceptLocation, string.Empty, [..diagnostics]);
         }
 
-        var context = new ComponentContext(Graph) {Diagnostics = diagnostics};
+        var context = new ComponentContext(Graph) { Diagnostics = diagnostics };
 
         Graph.Validate(context);
 

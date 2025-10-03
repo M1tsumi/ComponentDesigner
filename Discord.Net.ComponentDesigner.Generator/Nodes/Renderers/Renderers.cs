@@ -17,6 +17,43 @@ public static class Renderers
             return string.Empty;
         };
     }
+    
+    public static PropertyRenderer CreateRenderer(ITypeSymbol type)
+    {
+        if (type.SpecialType == SpecialType.System_String)
+            return Renderers.String;
+
+        // TODO: more ways to extract renderers
+
+        return (context, propValue) =>
+        {
+            switch (propValue.Value)
+            {
+                case CXValue.Interpolation interpolation:
+                    var info = context.GetInterpolationInfo(interpolation);
+                    if (
+                        !context.Compilation.HasImplicitConversion(
+                            info.Symbol,
+                            type
+                        )
+                    )
+                    {
+                        context.AddDiagnostic(
+                            Diagnostics.TypeMismatch,
+                            interpolation,
+                            info.Symbol,
+                            type
+                        );
+                    }
+
+                    return context.GetDesignerValue(
+                        interpolation,
+                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    );
+                default: return "default";
+            }
+        };
+    }
 
     private static bool IsLoneInterpolatedLiteral(
         ComponentContext context,

@@ -260,12 +260,17 @@ public sealed class SourceGenerator : IIncrementalGenerator
                     content = interpolated.Contents.ToString();
                     interpolations = interpolated.Contents
                         .OfType<InterpolationSyntax>()
-                        .Select((x, i) => new DesignerInterpolationInfo(
-                            i,
-                            x.FullSpan,
-                            semanticModel.GetTypeInfo(x.Expression, token).Type,
-                            semanticModel.GetConstantValue(x.Expression, token)
-                        ))
+                        .Select((x, i) =>
+                        {
+                            var typeInfo = semanticModel.GetTypeInfo(x.Expression, token);
+
+                            return new DesignerInterpolationInfo(
+                                i,
+                                x.FullSpan,
+                                typeInfo.Type ?? typeInfo.ConvertedType,
+                                semanticModel.GetConstantValue(x.Expression, token)
+                            );
+                        })
                         .ToArray();
                     span = interpolated.Contents.Span;
                     quoteCount = interpolated.StringEndToken.Span.Length;

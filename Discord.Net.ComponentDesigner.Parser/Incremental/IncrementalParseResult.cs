@@ -8,4 +8,7 @@ public readonly record struct IncrementalParseResult(
     IReadOnlyList<ICXNode> NewNodes,
     IReadOnlyList<TextChange> Changes,
     TextChangeRange AppliedRange
-);
+)
+{
+    public static readonly IncrementalParseResult Empty = new IncrementalParseResult([], [], [], default);
+}

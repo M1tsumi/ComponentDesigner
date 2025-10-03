@@ -5,7 +5,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 const languageServerPath: string =
-  "server/Discord.Net.ComponentDesigner.LanguageServer";
+  "server/Discord.Net.ComponentDesigner.LanguageServer.exe";
 
 let configuration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration();
 
@@ -84,7 +84,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(disposable);
   
   outputChannel.appendLine("activiating...");
-  console.log("Hello from CX");
 
   let path: string = await activateDotNet();
   activateLanguageServer(context, path);

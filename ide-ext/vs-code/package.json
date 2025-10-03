@@ -19,9 +19,15 @@
     "semanticTokenScopes": [
       {
         "scopes": {
-          "Identifier": [
-            "entity.name.tag.html"
-          ]
+          "Identifier": ["entity.name.tag.html"],
+          "LessThan": ["punctuation.definition.tag.begin.html"],
+          "GreaterThan": ["punctuation.definition.tag.end.html"],
+          "ForwardSlashGreaterThan": ["punctuation.definition.tag.end.html"],
+          "LessThanForwardSlash": ["punctuation.definition.tag.begin.html"],
+          "Equals": ["punctuation.separator.key-value.html"],
+          "Text": ["text.html.derivative"],
+          "StringLiteralStart": ["punctuation.definition.string.begin.html"],
+          "StringLiteralEnd": ["punctuation.definition.string.end.html"]
         }
       }
     ],

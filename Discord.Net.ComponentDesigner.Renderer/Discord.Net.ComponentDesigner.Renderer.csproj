@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Discord</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Discord.Net.WebSocket" Version="3.18.0" />
+    </ItemGroup>
+
+</Project>

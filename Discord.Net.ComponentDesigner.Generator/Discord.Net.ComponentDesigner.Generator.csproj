@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" />
+        <ProjectReference Include="..\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" PrivateAssets="all" />
     </ItemGroup>
 
 </Project>

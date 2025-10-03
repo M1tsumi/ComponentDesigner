@@ -19,6 +19,16 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    public INamedTypeSymbol? CXPropertyAttributeType
+        => GetOrResolveType("Discord.CXPropertyAttribute", ref _CXPropertyAttributeType);
+    
+    private Optional<INamedTypeSymbol?> _CXPropertyAttributeType;
+    
+    public INamedTypeSymbol? ICXProviderType
+        => GetOrResolveType("Discord.ICXProvider`1", ref _ICXProviderType);
+
+    private Optional<INamedTypeSymbol?> _ICXProviderType;
+
     public INamedTypeSymbol? ICXElementType
         => GetOrResolveType("InlineComponent.ICXElement", ref _ICXElementType);
 
@@ -414,7 +424,7 @@ public class KnownTypes
 
     public bool IsImmutableDictionaryType(ITypeSymbol type, out string? factoryTypeFullName)
     {
-        if (type is not INamedTypeSymbol {IsGenericType: true, ConstructedFrom: { } genericTypeDef})
+        if (type is not INamedTypeSymbol { IsGenericType: true, ConstructedFrom: { } genericTypeDef })
         {
             factoryTypeFullName = null;
             return false;
@@ -511,7 +521,6 @@ public class KnownTypes
         }
     }
 }
-
 
 public static class KnownTypesExtensions
 {

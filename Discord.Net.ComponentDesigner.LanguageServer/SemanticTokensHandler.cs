@@ -11,13 +11,20 @@ namespace Discord.ComponentDesigner.LanguageServer;
 
 public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 {
+    private enum Modifiers
+    {
+        None,
+        Attribute = 1,
+        Element = 2
+    }
+
     private readonly ILogger<SemanticTokensHandler> _logger;
 
     public SemanticTokensHandler(ILogger<SemanticTokensHandler> logger)
     {
         _logger = logger;
     }
-    
+
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(
         SemanticTokensCapability capability,
         ClientCapabilities clientCapabilities
@@ -28,6 +35,10 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             TokenTypes = new(
                 Enum.GetNames<CXTokenKind>()
                     .Select(x => new SemanticTokenType(x))
+            ),
+            TokenModifiers = new(
+                Enum.GetNames<Modifiers>()
+                    .Select(x => new SemanticTokenModifier(x))
             )
         },
         Full = true
@@ -39,8 +50,8 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         CancellationToken cancellationToken
     )
     {
-        _logger.LogInformation("Got tokenize request for {}", identifier.TextDocument.Uri);
-        
+        _logger.LogInformation("Got tokenize request for {Id}", identifier.TextDocument.Uri);
+
         if (!ComponentDocument.TryGet(identifier.TextDocument.Uri, out var document))
             return Task.CompletedTask;
 
@@ -51,6 +62,12 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             var startInfo = cx.Source.Lines.GetSourceLocation(token.Span.Start);
             var endInfo = cx.Source.Lines.GetSourceLocation(token.Span.End);
 
+            var modifiers = token.Kind switch
+            {
+                CXTokenKind.Identifier when token.Parent is CXAttribute => Modifiers.Attribute,
+                _ => Modifiers.None
+            };
+            
             builder.Push(
                 new Range(
                     startInfo.Line,
@@ -59,10 +76,10 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     endInfo.Column
                 ),
                 (int)token.Kind,
-                0
+                (int)modifiers
             );
-            
-            _logger.LogInformation("Token[{}]: {} -> {}", token.Kind, startInfo, endInfo);
+
+            _logger.LogInformation("Token[{Kind}:{Mod}]: {Start} -> {End}", token.Kind, modifiers, startInfo, endInfo);
         }
 
         return Task.CompletedTask;

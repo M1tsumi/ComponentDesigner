@@ -1,21 +1,56 @@
-﻿using Discord.CX.Parser;
+﻿using Discord;
+using Discord.CX.Parser;
+using static Discord.ComponentDesigner;
+using CXElement = Discord.CXElement;
 
-var x = Parse("<butto />");
+var user = new User("test", null);
 
+var x = cx(
+    $"""
+     <container>
+         <TestProvider User={user}/>
+         <TestFunc />
+     </container>
+     """
+);
 
-Console.WriteLine(x);
-
-CXDoc Parse(string source, CXDoc? other = null)
+public static IMessageComponentBuilder TestFunc(int foo)
 {
-    var source = other is not null
-        ? 
-    
-    var reader = new CXSourceReader(
-        new CXSourceText.StringSource(source),
-        new(0, source.Length),
-        [],
-        3
-    );
-
-    return CXParser.Parse(reader);
+    return null!;
 }
+
+class TestState
+{
+    [CXProperty] public User User { get; set; }
+}
+
+class TestProvider : ICXProvider<TestState>
+{
+    public static IMessageComponentBuilder Render(TestState state)
+        => (new UserHeader() { User = state.User }).Render();
+}
+
+class UserHeader : CXElement
+{
+    public required User User { get; init; }
+
+    public override IMessageComponentBuilder Render()
+    {
+        var header = cx($"<text>{User.Name}</text>");
+
+        if (User.Avatar is null) return header;
+
+        return cx(
+            $"""
+             <section>
+                 {header}
+                 <accessory>
+                     <thumbnail url={User.Avatar}/>
+                 </accessory>
+             </section>
+             """
+        );
+    }
+}
+
+record User(string Name, string? Avatar);

@@ -56,7 +56,7 @@ public abstract partial class CXNode : ICXNode
                 switch (_slots[i].Value)
                 {
                     case CXToken token: return _firstTerminal = token;
-                    case CXNode {FirstTerminal: { } firstTerminal}: return _firstTerminal = firstTerminal;
+                    case CXNode { FirstTerminal: { } firstTerminal }: return _firstTerminal = firstTerminal;
                     default: continue;
                 }
             }
@@ -74,7 +74,7 @@ public abstract partial class CXNode : ICXNode
                 switch (_slots[i].Value)
                 {
                     case CXToken token: return _lastTerminal = token;
-                    case CXNode {LastTerminal: { } lastTerminal}: return _lastTerminal = lastTerminal;
+                    case CXNode { LastTerminal: { } lastTerminal }: return _lastTerminal = lastTerminal;
                     default: continue;
                 }
             }
@@ -93,6 +93,37 @@ public abstract partial class CXNode : ICXNode
                 ..(x.Value as CXNode)?.Descendants ?? []
             ])
         ]);
+
+    public IEnumerable<CXNode> Ancestors
+    {
+        get
+        {
+            var current = Parent;
+
+            while (current is not null)
+            {
+                yield return current;
+                current = current.Parent;
+            }
+        }
+    }
+
+    public int Key
+    {
+        get
+        {
+            var result = 0;
+
+            var current = this;
+            foreach (var ancestor in Ancestors)
+            {
+                result = (result * 397) ^ ancestor.GetIndexOfSlot(current);
+                current = ancestor;
+            }
+
+            return result;
+        }
+    }
 
     public TextSpan FullSpan => new(Offset, Width);
 

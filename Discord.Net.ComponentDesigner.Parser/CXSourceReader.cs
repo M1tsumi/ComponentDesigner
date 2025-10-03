@@ -7,11 +7,11 @@ public sealed class CXSourceReader
 {
     public char this[int index]
         => SourceSpan.Contains(index)
-            ? Source[NormalizePosition(index)]
+            ? Source[Normalize(index)]
             : CXLexer.NULL_CHAR;
     
     public string this[TextSpan span]
-        => Source[NormalizePosition(span)];
+        => Source[Normalize(span)];
 
     public bool IsEOF => Position >= SourceSpan.End;
 
@@ -55,11 +55,11 @@ public sealed class CXSourceReader
         return false;
     }
 
-    private int NormalizePosition(int position)
+    public int Normalize(int position)
         => position - SourceSpan.Start;
 
-    private TextSpan NormalizePosition(TextSpan span)
-        => new(NormalizePosition(span.Start), span.Length);
+    public TextSpan Normalize(TextSpan span)
+        => new(Normalize(span.Start), span.Length);
 
     public void Advance(int count = 1)
     {
@@ -74,8 +74,8 @@ public sealed class CXSourceReader
         var upper = Math.Min(SourceSpan.End, Position + count);
 
         return Source[TextSpan.FromBounds(
-            NormalizePosition(Position),
-            NormalizePosition(upper))
+            Normalize(Position),
+            Normalize(upper))
         ];
     }
 }
