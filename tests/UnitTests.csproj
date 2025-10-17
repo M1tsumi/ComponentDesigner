@@ -21,9 +21,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj" />
-      <ProjectReference Include="..\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" />
-      <ProjectReference Include="..\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj" />
+      <ProjectReference Include="..\src\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj" />
+      <ProjectReference Include="..\src\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" />
+      <ProjectReference Include="..\src\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj" />
     </ItemGroup>
 
 </Project>

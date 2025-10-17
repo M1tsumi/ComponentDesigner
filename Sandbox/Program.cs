@@ -4,9 +4,7 @@ using static Discord.ComponentDesigner;
 
 var x = cx(
     """
-    <row>
-        <button customId="SomeId"/>
-    </row>
+    <button customId="SomeId" label="foo"/>
     """
 );
 

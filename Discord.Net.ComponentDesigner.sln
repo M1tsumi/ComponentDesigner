@@ -1,18 +1,18 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner", "Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj", "{92D3E48B-039D-48FC-9B85-C5429202D16F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner", "src\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj", "{92D3E48B-039D-48FC-9B85-C5429202D16F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.Parser", "Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj", "{8C3767CC-4CC9-42A3-8798-8FF10EDDB7E1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.Parser", "src\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj", "{8C3767CC-4CC9-42A3-8798-8FF10EDDB7E1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.Generator", "Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj", "{E5A1D032-F6EB-4066-80EB-D1E4B80CB11C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.Generator", "src\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj", "{E5A1D032-F6EB-4066-80EB-D1E4B80CB11C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.LanguageServer", "Discord.Net.ComponentDesigner.LanguageServer\Discord.Net.ComponentDesigner.LanguageServer.csproj", "{43290F70-5CED-46E3-AFBE-C7B89E345022}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Net.ComponentDesigner.LanguageServer", "src\Discord.Net.ComponentDesigner.LanguageServer\Discord.Net.ComponentDesigner.LanguageServer.csproj", "{43290F70-5CED-46E3-AFBE-C7B89E345022}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "Sandbox\Sandbox.csproj", "{3892EA16-52F8-4120-9E8E-5E29D486F3B3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{96AB69A4-5452-4074-A31B-B467BCC1325C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{460851AC-1EFE-43D7-BCF1-396248CFB58D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "tests\UnitTests.csproj", "{460851AC-1EFE-43D7-BCF1-396248CFB58D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{BAF4B1FB-35F5-4024-8911-C17D85994182}"
 EndProject

@@ -25,6 +25,11 @@ public class KnownTypes
     
     public Optional<INamedTypeSymbol?> _MediaGalleryComponentType;
     
+    public INamedTypeSymbol? CXMessageComponentType
+        => GetOrResolveType("Discord.CXMessageComponent", ref _CXMessageComponentType);
+    
+    public Optional<INamedTypeSymbol?> _CXMessageComponentType;
+    
     public INamedTypeSymbol? SectionComponentType
         => GetOrResolveType("Discord.SectionComponent", ref _SectionComponentType);
     

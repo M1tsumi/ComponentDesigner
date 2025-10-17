@@ -91,11 +91,11 @@ public sealed class SourceGenerator : IIncrementalGenerator
                   {{interceptor.CX.NormalizeIndentation()}}
                   */
                   [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.InterceptLocation.Version}}, data: "{{interceptor.InterceptLocation.Data}}")]
-                  public static global::Discord.MessageComponent _{{Math.Abs(interceptor.GetHashCode())}}(
+                  public static global::Discord.CXMessageComponent _{{Math.Abs(interceptor.GetHashCode())}}(
                       {{parameter}}
-                  ) => new global::Discord.ComponentBuilderV2(
+                  ) => new global::Discord.CXMessageComponent(
                       {{interceptor.Source.WithNewlinePadding(4)}}
-                  ).Build();
+                  );
                   """
             );
         }

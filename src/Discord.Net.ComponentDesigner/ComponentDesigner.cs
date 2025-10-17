@@ -6,12 +6,12 @@ namespace Discord;
 public static class ComponentDesigner
 {
     // ReSharper disable once InconsistentNaming
-    public static MessageComponent cx(
+    public static CXMessageComponent cx(
         [StringSyntax("html")] DesignerInterpolationHandler designer
     ) => throw new InvalidOperationException();
 
     // ReSharper disable once InconsistentNaming
-    public static MessageComponent cx(
+    public static CXMessageComponent cx(
         [StringSyntax("html")] string cx
     ) => throw new InvalidOperationException();
 }

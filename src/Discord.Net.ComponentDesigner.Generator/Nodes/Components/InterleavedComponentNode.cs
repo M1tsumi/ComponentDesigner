@@ -14,13 +14,15 @@ public enum InterleavedKind
 
     MessageComponentBuilder = 1,
     MessageComponent = 2,
+    CXMessageComponent = 3,
 
     CollectionOf = 1 << 2,
 
-    ComponentMask = MessageComponentBuilder | MessageComponent,
+    ComponentMask = MessageComponentBuilder | MessageComponent | CXMessageComponent,
     
     CollectionOfBuilders = MessageComponentBuilder | CollectionOf,
     CollectionOfComponents = MessageComponent | CollectionOf,
+    CollectionOfCXComponents = CXMessageComponent | CollectionOf,
 }
 
 public sealed class InterleavedComponentNode : ComponentNode
@@ -78,6 +80,15 @@ public sealed class InterleavedComponentNode : ComponentNode
         if (
             compilation.HasImplicitConversion(
                 current,
+                compilation.GetKnownTypes().CXMessageComponentType
+            )
+        )
+        {
+            kind |= InterleavedKind.CXMessageComponent;
+        }
+        else if (
+            compilation.HasImplicitConversion(
+                current,
                 compilation.GetKnownTypes().IMessageComponentBuilderType
             )
         )
@@ -122,10 +133,13 @@ public sealed class InterleavedComponentNode : ComponentNode
             
             case InterleavedKind.CollectionOfBuilders: return $"..{source}";
             
+            case InterleavedKind.CXMessageComponent:
             case InterleavedKind.MessageComponent: return $"..({source}).Components.Select(x => x.ToBuilder())";
             
+            case InterleavedKind.CollectionOfCXComponents:
             case InterleavedKind.CollectionOfComponents:
                 return $"..({source}).SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
+            
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
