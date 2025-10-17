@@ -6,10 +6,11 @@ namespace Discord.CX.Parser;
 
 public sealed class CXElement : CXNode
 {
-    public string Identifier => ElementStartNameToken.Value;
+    public bool IsFragment => ElementStartNameToken is null && ElementEndNameToken is null;
+    public string Identifier => ElementStartNameToken?.Value ?? string.Empty;
 
     public CXToken ElementStartOpenToken { get; }
-    public CXToken ElementStartNameToken { get; }
+    public CXToken? ElementStartNameToken { get; }
     public CXCollection<CXAttribute> Attributes { get; }
 
     public CXToken ElementStartCloseToken { get; }
@@ -22,7 +23,7 @@ public sealed class CXElement : CXNode
 
     public CXElement(
         CXToken elementStartOpenToken,
-        CXToken elementStartNameToken,
+        CXToken? elementStartNameToken,
         CXCollection<CXAttribute> attributes,
         CXToken elementStartCloseToken,
         CXCollection<CXNode> children,

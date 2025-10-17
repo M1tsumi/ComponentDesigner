@@ -12,11 +12,17 @@ namespace Discord.CX;
 
 public readonly struct CXGraph
 {
+
+    public bool HasErrors => Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
+    public IReadOnlyList<Diagnostic> Diagnostics
+        => [.._diagnostics, ..RootNodes.SelectMany(x => x.Diagnostics)];
+    
     public readonly CXGraphManager Manager;
     public readonly ImmutableArray<Node> RootNodes;
-    public readonly ImmutableArray<Diagnostic> Diagnostics;
     public readonly IReadOnlyDictionary<ICXNode, Node> NodeMap;
 
+    private readonly ImmutableArray<Diagnostic> _diagnostics;
+    
     public CXGraph(
         CXGraphManager manager,
         ImmutableArray<Node> rootNodes,
@@ -26,7 +32,7 @@ public readonly struct CXGraph
     {
         Manager = manager;
         RootNodes = rootNodes;
-        Diagnostics = diagnostics;
+        _diagnostics = diagnostics;
         NodeMap = nodeMap;
     }
 
@@ -52,18 +58,20 @@ public readonly struct CXGraph
 
         var rootNodes = ImmutableArray.CreateBuilder<Node>();
 
-        foreach (var cxNode in document.RootElements)
+        foreach (var cxNode in document.RootNodes)
         {
-            var node = CreateNode(
-                manager,
-                cxNode,
-                null,
-                parseResult.ReusedNodes,
-                this,
-                map, diagnostics
+            rootNodes.AddRange(
+                CreateNodes(
+                    manager,
+                    cxNode,
+                    null,
+                    parseResult.ReusedNodes,
+                    this,
+                    map,
+                    diagnostics,
+                    parseResult
+                )
             );
-
-            if (node is not null) rootNodes.Add(node);
         }
 
         return new(manager, rootNodes.ToImmutable(), diagnostics.ToImmutable(), map);
@@ -77,39 +85,45 @@ public readonly struct CXGraph
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
         var rootNodes = manager.Document
-            .RootElements
-            .Select(x =>
-                CreateNode(
+            .RootNodes
+            .SelectMany(x =>
+                CreateNodes(
                     manager,
                     x,
                     null,
                     [],
                     null,
                     map,
-                    diagnostics
+                    diagnostics,
+                    null
                 )
             )
-            .Where(x => x is not null)
             .ToImmutableArray();
 
         return new(manager, rootNodes!, diagnostics.ToImmutable(), map);
     }
 
-    private static Node? CreateNode(
+    private static IEnumerable<Node> CreateNodes(
         CXGraphManager manager,
         CXNode cxNode,
         Node? parent,
         IReadOnlyList<ICXNode> reusedNodes,
         CXGraph? oldGraph,
         Dictionary<ICXNode, Node> map,
-        ImmutableArray<Diagnostic>.Builder diagnostics
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        IncrementalParseResult? incrementalParseResult
     )
     {
         if (
             oldGraph.HasValue &&
+            incrementalParseResult.HasValue &&
             reusedNodes.Contains(cxNode) &&
             oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing)
-        ) return map[cxNode] = existing with { Parent = parent };
+        )
+        {
+            var node = map[cxNode] = existing.Reuse(parent, incrementalParseResult.Value, manager);
+            return [node];
+        }
 
         switch (cxNode)
         {
@@ -118,31 +132,48 @@ public readonly struct CXGraph
                 var info = manager.InterpolationInfos[interpolation.InterpolationIndex];
 
                 if (
-                    manager.Compilation.HasImplicitConversion(
+                    InterleavedComponentNode.TryCreate(
                         info.Symbol,
-                        manager.Compilation.GetKnownTypes()
-                            .IMessageComponentBuilderType
+                        manager.Compilation,
+                        out var inner
                     )
                 )
                 {
-                    var inner = ComponentNode.GetComponentNode<InterleavedComponentNode>();
-
                     var state = inner.Create(interpolation, []);
 
-                    if (state is null) return null;
+                    if (state is null) return [];
 
-                    return map[interpolation] = new(
-                        inner,
-                        state,
-                        parent,
-                        []
-                    );
+                    return
+                    [
+                        map[interpolation] = new(
+                            inner,
+                            state,
+                            [],
+                            parent
+                        )
+                    ];
                 }
 
-                return null;
+                return [];
             }
             case CXElement element:
             {
+                if (element.IsFragment)
+                {
+                    return element.Children.SelectMany(x =>
+                        CreateNodes(
+                            manager,
+                            x,
+                            parent,
+                            reusedNodes,
+                            oldGraph,
+                            map,
+                            diagnostics,
+                            incrementalParseResult
+                        )
+                    );
+                }
+
                 if (
                     !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
                     !ComponentNode.TryGetProviderNode(
@@ -161,41 +192,41 @@ public readonly struct CXGraph
                         )
                     );
 
-                    return null;
+                    return [];
                 }
 
                 var children = new List<CXNode>();
 
                 var state = componentNode.Create(element, children);
 
-                if (state is null) return null;
+                if (state is null) return [];
 
                 var nodeChildren = new List<Node>();
                 var node = map[element] = state.OwningNode = new(
                     componentNode,
                     state,
-                    parent,
-                    nodeChildren
+                    nodeChildren,
+                    parent
                 );
 
                 nodeChildren.AddRange(
                     children
-                        .Select(x => CreateNode(
+                        .SelectMany(x => CreateNodes(
                                 manager,
                                 x,
                                 node,
                                 reusedNodes,
                                 oldGraph,
                                 map,
-                                diagnostics
+                                diagnostics,
+                                incrementalParseResult
                             )
                         )
-                        .Where(x => x is not null)!
                 );
 
-                return node;
+                return [node];
             }
-            default: return null;
+            default: return [];
         }
     }
 
@@ -207,22 +238,118 @@ public readonly struct CXGraph
     public string Render(ComponentContext context)
         => string.Join(",\n", RootNodes.Select(x => x.Render(context)));
 
-    public sealed record Node(
-        ComponentNode Inner,
-        ComponentState State,
-        Node? Parent,
-        IReadOnlyList<Node> Children
-    )
+    public sealed class Node
     {
+        public ComponentNode Inner { get; }
+        public ComponentState State { get; }
+        public IReadOnlyList<Node> Children { get; }
+        public Node? Parent { get; }
+
+        public IReadOnlyList<Diagnostic> Diagnostics
+            => [.._diagnostics, ..Children.SelectMany(x => x.Diagnostics)];
+
+        public bool Incremental { get; }
+
+        private readonly List<Diagnostic> _diagnostics;
         private string? _render;
 
+        public Node(
+            ComponentNode inner,
+            ComponentState state,
+            IReadOnlyList<Node> children,
+            Node? parent = null,
+            IReadOnlyList<Diagnostic>? diagnostics = null,
+            bool incremental = false,
+            string? render = null
+        )
+        {
+            Inner = inner;
+            State = state;
+            Children = children;
+            Parent = parent;
+            _diagnostics = [..diagnostics ?? []];
+            _render = render;
+            Incremental = incremental;
+        }
+
         public string Render(ComponentContext context)
-            => _render ??= Inner.Render(State, context);
+        {
+            if (_render is not null) return _render;
+
+            using (context.CreateDiagnosticScope(_diagnostics))
+            {
+                return _render = Inner.Render(State, context);
+            }
+        }
 
         public void Validate(ComponentContext context)
         {
-            Inner.Validate(State, context);
-            foreach (var child in Children) child.Validate(context);
+            using (context.CreateDiagnosticScope(_diagnostics))
+            {
+                Inner.Validate(State, context);
+                foreach (var child in Children) child.Validate(context);
+            }
+        }
+
+        public Node Reuse(Node? parent, IncrementalParseResult parseResult, CXGraphManager manager)
+        {
+            var diagnostics = new List<Diagnostic>(Diagnostics);
+
+            if (diagnostics.Count > 0)
+            {
+                var offset = 0;
+                var changeQueue = new Queue<TextChange>(parseResult.Changes);
+                for (var i = 0; i < diagnostics.Count; i++)
+                {
+                    var diagnostic = diagnostics[i];
+                    var diagnosticSpan = diagnostic.Location.SourceSpan;
+
+                    while (changeQueue.Count > 0)
+                    {
+                        TextChangeRange change = changeQueue.Peek();
+
+                        if (change.Span.Start < diagnosticSpan.Start)
+                        {
+                            offset += (change.NewLength - change.Span.Length);
+                            changeQueue.Dequeue();
+                        }
+                    }
+
+                    if (offset is not 0)
+                    {
+                        // we love roslyn making 'WithLocation' internal *smile*
+                        diagnostics[i] = Diagnostic.Create(
+                            diagnostic.Descriptor.Id,
+                            diagnostic.Descriptor.Category,
+                            diagnostic.GetMessage(),
+                            diagnostic.Severity,
+                            diagnostic.Descriptor.DefaultSeverity,
+                            diagnostic.Descriptor.IsEnabledByDefault,
+                            diagnostic.WarningLevel,
+                            diagnostic.Descriptor.Title,
+                            diagnostic.Descriptor.Description,
+                            diagnostic.Descriptor.HelpLinkUri,
+                            GetLocation(
+                                manager,
+                                new TextSpan(diagnosticSpan.Start + offset, diagnosticSpan.Length)
+                            ),
+                            null,
+                            diagnostic.Descriptor.CustomTags,
+                            diagnostic.Properties
+                        );
+                    }
+                }
+            }
+
+            return new(
+                Inner,
+                State,
+                Children,
+                parent,
+                diagnostics,
+                true,
+                _render
+            );
         }
     }
 }

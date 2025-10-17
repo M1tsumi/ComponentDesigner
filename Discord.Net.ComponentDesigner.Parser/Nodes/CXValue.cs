@@ -8,22 +8,33 @@ public abstract class CXValue : CXNode
 {
     public sealed class Invalid : CXValue;
 
-    public sealed class StringLiteral : CXValue
+    public class Multipart : CXValue
     {
         public bool HasInterpolations => Tokens.Any(x => x.Kind is CXTokenKind.Interpolation);
-        public CXToken StartToken { get; }
         public CXCollection<CXToken> Tokens { get; }
+
+        public Multipart(CXCollection<CXToken> tokens)
+        {
+            Slot(Tokens = tokens);
+        }
+    }
+    
+    public sealed class StringLiteral : Multipart
+    {
+        public CXToken StartToken { get; }
         public CXToken EndToken { get; }
 
         public StringLiteral(
             CXToken start,
             CXCollection<CXToken> tokens,
             CXToken end
-        )
+        ) : base(tokens)
         {
             Slot(StartToken = start);
-            Slot(Tokens = tokens);
             Slot(EndToken = end);
+            
+            // hack: we flip the slot order due to inheritance with the constructor
+            SwapSlots(0, 1);
         }
     }
 

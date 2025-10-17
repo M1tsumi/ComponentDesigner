@@ -15,30 +15,29 @@ public sealed class CXDoc : CXNode
 
     public IReadOnlyList<CXToken> Tokens { get; }
 
-    public IReadOnlyList<CXElement> RootElements { get; private set; }
+    public IReadOnlyList<CXNode> RootNodes { get; private set; }
 
     public readonly CXToken[] InterpolationTokens;
 
     public CXDoc(
         CXParser parser,
-        IReadOnlyList<CXElement> rootElements
+        IReadOnlyList<CXNode> rootNodes
     )
     {
         Parser = parser;
         Tokens = parser.Tokens;
-        Slot(RootElements = rootElements);
+        Slot(RootNodes = rootNodes);
         InterpolationTokens = parser.Lexer.InterpolationMap;
     }
 
+    public int GetInterpolationIndex(CXToken token)
+    {
+        if (token.Kind is not CXTokenKind.Interpolation) return -1;
+        return Array.IndexOf(InterpolationTokens, token);
+    }
     public bool TryGetInterpolationIndex(CXToken token, out int index)
     {
-        if (token.Kind is not CXTokenKind.Interpolation)
-        {
-            index = -1;
-            return false;
-        }
-
-        index = Array.IndexOf(InterpolationTokens, token);
+        index = GetInterpolationIndex(token);
         return index != -1;
     }
 

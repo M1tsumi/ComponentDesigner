@@ -82,7 +82,7 @@ public static class Validators
                         Check(constantValue.Length);
                     break;
 
-                case CXValue.StringLiteral literal:
+                case CXValue.Multipart literal:
                     int? length = null;
 
                     foreach (var token in literal.Tokens)

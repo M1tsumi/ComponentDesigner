@@ -6,13 +6,15 @@ namespace Discord.CX.Nodes.Components.Custom;
 public class FunctionalComponentNode : ComponentNode
 {
     private readonly IMethodSymbol _method;
+    private readonly InterleavedKind _kind;
     public override string Name => $"<functional {_method.ToDisplayString()}>";
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
 
-    public FunctionalComponentNode(IMethodSymbol method)
+    public FunctionalComponentNode(IMethodSymbol method, InterleavedKind kind)
     {
         _method = method;
+        _kind = kind;
 
         var properties = new List<ComponentProperty>();
 
@@ -30,8 +32,15 @@ public class FunctionalComponentNode : ComponentNode
 
     private string MethodReference =>
         $"{_method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{_method.Name}";
-    
+
     public override string Render(ComponentState state, ComponentContext context)
-        =>
-            $"{MethodReference}({state.RenderProperties(this, context)})";
+        => InterleavedComponentNode.ExtrapolateKindToBuilders(
+            _kind,
+            $"{MethodReference}({
+                state.RenderProperties(this, context)
+                    .WithNewlinePadding(4)
+                    .PrefixIfSome(4)
+                    .WrapIfSome("\n")
+            })"
+        );
 }

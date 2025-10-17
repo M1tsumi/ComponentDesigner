@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
+using Discord.CX.Nodes.Components;
 
 namespace Discord.CX.Nodes;
 
@@ -12,12 +14,9 @@ public static class Renderers
 {
     public static PropertyRenderer CreateDefault(ComponentProperty property)
     {
-        return (context, value) =>
-        {
-            return string.Empty;
-        };
+        return (context, value) => { return string.Empty; };
     }
-    
+
     public static PropertyRenderer CreateRenderer(ITypeSymbol type)
     {
         if (type.SpecialType == SpecialType.System_String)
@@ -57,11 +56,11 @@ public static class Renderers
 
     private static bool IsLoneInterpolatedLiteral(
         ComponentContext context,
-        CXValue.StringLiteral literal,
+        CXValue.Multipart literal,
         out DesignerInterpolationInfo info)
     {
         if (
-            literal is {HasInterpolations: true, Tokens.Count: 1} &&
+            literal is { HasInterpolations: true, Tokens.Count: 1 } &&
             literal.Document.TryGetInterpolationIndex(literal.Tokens[0], out var index)
         )
         {
@@ -73,8 +72,53 @@ public static class Renderers
         return false;
     }
 
+    public static string ComponentAsProperty(ComponentContext context, ComponentPropertyValue propertyValue)
+    {
+        switch (propertyValue.Value)
+        {
+            case CXValue.Interpolation interpolation:
+                // ensure its a component builder
+                var info = context.GetInterpolationInfo(interpolation);
+
+                if (
+                    !InterleavedComponentNode.IsValidInterleavedType(
+                        info.Symbol,
+                        context.Compilation
+                    )
+                )
+                {
+                    context.AddDiagnostic(
+                        Diagnostics.TypeMismatch,
+                        interpolation,
+                        info.Symbol,
+                        $"{context.KnownTypes.IMessageComponentBuilderType} | {context.KnownTypes.MessageComponentType}"
+                    );
+
+                    return string.Empty;
+                }
+
+                return context.GetDesignerValue(
+                    info,
+                    context.KnownTypes.IMessageComponentBuilderType!
+                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                );
+            default:
+                if (propertyValue.Value is not null)
+                {
+                    context.AddDiagnostic(
+                        Diagnostics.InvalidPropertyValueSyntax,
+                        propertyValue.Value,
+                        "interpolation"
+                    );
+                }
+
+                return string.Empty;
+        }
+    }
+
     public static string UnfurledMediaItem(ComponentContext context, ComponentPropertyValue propertyValue)
-        => $"new {context.KnownTypes.UnfurledMediaItemPropertiesType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({String(context, propertyValue)})";
+        =>
+            $"new {context.KnownTypes.UnfurledMediaItemPropertiesType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({String(context, propertyValue)})";
 
     public static string Integer(ComponentContext context, ComponentPropertyValue propertyValue)
     {
@@ -86,7 +130,7 @@ public static class Renderers
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
 
-            case CXValue.StringLiteral literal:
+            case CXValue.Multipart literal:
                 if (!literal.HasInterpolations)
                     return FromText(literal.Tokens.ToString().Trim());
 
@@ -133,13 +177,12 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return FromText(scalar, scalar.Value.Trim().ToLowerInvariant());
 
-            case CXValue.StringLiteral stringLiteral:
+            case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
                     return FromText(stringLiteral, stringLiteral.Tokens.ToString().Trim().ToLowerInvariant());
 
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
-
 
                 return $"bool.Parse({context.GetDesignerValue(info)})";
             default: return "default";
@@ -267,7 +310,7 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return UseLibraryParser(scalar.Value);
 
-            case CXValue.StringLiteral stringLiteral:
+            case CXValue.Multipart stringLiteral:
                 return UseLibraryParser(RenderStringLiteral(stringLiteral));
             default: return "default";
         }
@@ -317,7 +360,7 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return FromText(scalar.Value.Trim());
 
-            case CXValue.StringLiteral stringLiteral:
+            case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
                     return FromText(stringLiteral.Tokens.ToString().Trim());
 
@@ -348,13 +391,13 @@ public static class Renderers
                     return ToCSharpString(constant);
 
                 return context.GetDesignerValue(interpolation);
-            case CXValue.StringLiteral literal: return RenderStringLiteral(literal);
+            case CXValue.Multipart literal: return RenderStringLiteral(literal);
             case CXValue.Scalar scalar:
                 return ToCSharpString(scalar.Value.Trim());
         }
     }
 
-    private static string RenderStringLiteral(CXValue.StringLiteral literal)
+    private static string RenderStringLiteral(CXValue.Multipart literal)
     {
         var sb = new StringBuilder();
 
@@ -552,7 +595,7 @@ public static class Renderers
                     return FromText(scalar.Value.Trim());
                 case CXValue.Interpolation interpolation:
                     return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
-                case CXValue.StringLiteral literal:
+                case CXValue.Multipart literal:
                     if (!literal.HasInterpolations)
                         return FromText(literal.Tokens.ToString().Trim().ToLowerInvariant());
 
@@ -579,12 +622,13 @@ public static class Renderers
                     );
                 }
 
-                if (info.Constant.Value?.ToString() is {} str)
+                if (info.Constant.Value?.ToString() is { } str)
                 {
                     return FromText(str.Trim().ToLowerInvariant());
                 }
 
-                return $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
+                return
+                    $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
             }
 
             string FromText(string text)
@@ -624,19 +668,38 @@ public static class Renderers
                 );
 
             case CXValue.Scalar scalar:
+                LightlyValidateEmote(scalar.Value, scalar);
                 return UseLibraryParser(ToCSharpString(scalar.Value));
 
-            case CXValue.StringLiteral stringLiteral:
+            case CXValue.Multipart stringLiteral:
+                if(!stringLiteral.HasInterpolations)
+                    LightlyValidateEmote(stringLiteral.Tokens.ToString(), stringLiteral.Tokens);
+                
                 return UseLibraryParser(RenderStringLiteral(stringLiteral));
 
             default: return "null";
         }
 
+        void LightlyValidateEmote(string emote, ICXNode node)
+        {
+            if (!IsDiscordEmote.IsMatch(emote) && !IsEmoji.IsMatch(emote))
+            {
+                context.AddDiagnostic(
+                    Diagnostics.PossibleInvalidEmote,
+                    node,
+                    emote
+                );
+            }
+        }
+
         static string UseLibraryParser(string source)
             => $"""
-                global::Discord.Emoji.TryPase({source}, out var emoji)
+                global::Discord.Emoji.TryParse({source}, out var emoji)
                     ? (global::Discord.IEmote)emoji
                     : global::Discord.Emote.Parse({source})
                 """;
     }
+    
+    private static readonly Regex IsEmoji = new Regex(@"^(?>(?>[\uD800-\uDBFF][\uDC00-\uDFFF]\p{M}*){1,5}|\p{So})$", RegexOptions.Compiled);
+    private static readonly Regex IsDiscordEmote = new Regex(@"^<(?>a|):.+:\d+>$", RegexOptions.Compiled);
 }

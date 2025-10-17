@@ -268,6 +268,14 @@ public abstract partial class CXNode : ICXNode
         return -1;
     }
 
+    protected void SwapSlots(int index1, int index2)
+    {
+        var a = _slots[index1];
+        var b = _slots[index2];
+        _slots[index1] = new(index1, b.Value);
+        _slots[index2] = new(index2, a.Value);
+    }
+
     private int ComputeOffset()
     {
         if (Parent is null)

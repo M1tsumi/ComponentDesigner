@@ -7,7 +7,6 @@ namespace Discord.CX.Nodes.Components;
 
 public sealed class ButtonComponentNode : ComponentNode
 {
-
     public const string BUTTON_STYLE_ENUM = "Discord.ButtonStyle";
 
     public override string Name => "button";
@@ -20,6 +19,7 @@ public sealed class ButtonComponentNode : ComponentNode
     public ComponentProperty CustomId { get; }
     public ComponentProperty SkuId { get; }
     public ComponentProperty Url { get; }
+    public ComponentProperty Disabled { get; }
 
     public ButtonComponentNode()
     {
@@ -42,8 +42,8 @@ public sealed class ButtonComponentNode : ComponentNode
                 "emoji",
                 isOptional: true,
                 aliases: ["emote"],
-                validators: [Validators.Emote],
-                renderer: Renderers.Emoji
+                renderer: Renderers.Emoji,
+                dotnetParameterName: "emote"
             ),
             CustomId = new(
                 "customId",
@@ -63,6 +63,12 @@ public sealed class ButtonComponentNode : ComponentNode
                 isOptional: true,
                 validators: [Validators.Range(upper: Constants.BUTTON_URL_MAX_LENGTH)],
                 renderer: Renderers.String
+            ),
+            Disabled = new(
+                "disabled",
+                isOptional: true,
+                renderer: Renderers.Boolean,
+                dotnetParameterName: "isDisabled"
             )
         ];
     }
@@ -71,7 +77,7 @@ public sealed class ButtonComponentNode : ComponentNode
     {
         var state = base.Create(source, children);
 
-        if (source is CXElement {Children.Count: 1} element && element.Children[0] is CXValue value)
+        if (source is CXElement { Children.Count: 1 } element && element.Children[0] is CXValue value)
             state?.SubstitutePropertyValue(Label, value);
 
         return state;
@@ -173,23 +179,33 @@ public sealed class ButtonComponentNode : ComponentNode
                     }
 
                     break;
-                default: CheckForCustomIdAndUrl(); break;
+                default: ValidateStandardButtonRules(); break;
             }
         }
         else
         {
-            CheckForCustomIdAndUrl();
+            ValidateStandardButtonRules();
         }
 
         base.Validate(state, context);
 
-        void CheckForCustomIdAndUrl()
+        void ValidateStandardButtonRules()
         {
             if (!state.GetProperty(Url)!.IsSpecified && !state.GetProperty(CustomId)!.IsSpecified)
             {
                 context.AddDiagnostic(
                     Diagnostic.Create(
                         Diagnostics.ButtonCustomIdOrUrlMissing,
+                        context.GetLocation(state.Source)
+                    )
+                );
+            }
+
+            if (state.GetProperty(CustomId).IsSpecified && !label.HasValue && !state.GetProperty(Emoji).HasValue)
+            {
+                context.AddDiagnostic(
+                    Diagnostic.Create(
+                        Diagnostics.ButtonMustHaveALabelOrEmoji,
                         context.GetLocation(state.Source)
                     )
                 );

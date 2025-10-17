@@ -1,17 +1,31 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Discord.CX.Parser;
+using Microsoft.CodeAnalysis;
 
 namespace Discord.CX;
 
 public static partial class Diagnostics
 {
-    public static readonly DiagnosticDescriptor ParseError = new(
-        "DCP001",
-        "CX Parsing error",
-        "{0}",
-        "Component Parser (CX)",
-        DiagnosticSeverity.Error,
-        true
-    );
+    public static Diagnostic CreateParsingDiagnostic(CXDiagnostic diagnostic, Location location)
+        => Diagnostic.Create(
+            new DiagnosticDescriptor(
+                $"DCP{diagnostic.Code.ToString().PadLeft(3, '0')}",
+                diagnostic.Message,
+                string.Empty,
+                "CX Parser",
+                diagnostic.Severity,
+                true
+            ),
+            location
+        );
+    
+    // public static readonly DiagnosticDescriptor ParseError = new(
+    //     "DCP001",
+    //     "CX Parsing error",
+    //     "{0}",
+    //     "Component Parser (CX)",
+    //     DiagnosticSeverity.Error,
+    //     true
+    // );
 
     public static readonly DiagnosticDescriptor InvalidEnumVariant = new(
         "DC0001",
@@ -244,6 +258,33 @@ public static partial class Diagnostics
         "An action row can only contain 1 select menu OR at most 5 buttons",
         "Components",
         DiagnosticSeverity.Error,
+        true
+    );
+
+    public static readonly DiagnosticDescriptor InvalidPropertyValueSyntax = new(
+        "DC0027",
+        "Invalid syntax",
+        "Expected '{}' as the property value",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor ButtonMustHaveALabelOrEmoji = new(
+        "DC0028",
+        "A button must have a label or emoji",
+        "A button must have a label or emoji",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor PossibleInvalidEmote = new(
+        "DC0029",
+        "Possible invalid emote",
+        "'{0}' doesn't look like a unicode emoji or a custom emote",
+        "Components",
+        DiagnosticSeverity.Warning,
         true
     );
 }

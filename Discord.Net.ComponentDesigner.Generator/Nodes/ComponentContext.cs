@@ -1,4 +1,5 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
@@ -8,20 +9,39 @@ namespace Discord.CX.Nodes;
 
 public sealed class ComponentContext
 {
+    private sealed record DiagnosticScope(
+        List<Diagnostic> Bag,
+        DiagnosticScope? Parent,
+        ComponentContext Context
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (Parent is null) return;
+            Context._scope = Parent;
+        }
+    }
+    
     public KnownTypes KnownTypes => Compilation.GetKnownTypes();
     public Compilation Compilation => _graph.Manager.Compilation;
 
-    public bool HasErrors => Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
+    public bool HasErrors => GlobalDiagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
 
-    public List<Diagnostic> Diagnostics { get; init; } = [];
+    public List<Diagnostic> GlobalDiagnostics { get; init; } = [];
 
     private readonly CXGraph _graph;
+
+    private DiagnosticScope _scope;
 
     public ComponentContext(CXGraph graph)
     {
         _graph = graph;
+        _scope = new(GlobalDiagnostics, null, this);
     }
 
+    public IDisposable CreateDiagnosticScope(List<Diagnostic> bag)
+        => _scope = new(bag, _scope, this);
+    
     public string GetDesignerValue(CXValue.Interpolation interpolation, string? type = null)
         => GetDesignerValue(interpolation.InterpolationIndex, type);
 
@@ -51,6 +71,6 @@ public sealed class ComponentContext
 
     public void AddDiagnostic(Diagnostic diagnostics)
     {
-        Diagnostics.Add(diagnostics);
+        _scope.Bag.Add(diagnostics);
     }
 }

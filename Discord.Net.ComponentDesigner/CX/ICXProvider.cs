@@ -1,6 +1,6 @@
 ﻿namespace Discord;
 
-public interface ICXProvider<in TState>
+public interface ICXProvider<in TProps> where TProps : IEquatable<TProps>
 {
-    static abstract IMessageComponentBuilder Render(TState state);
+    static abstract IMessageComponentBuilder Render(TProps state);
 }

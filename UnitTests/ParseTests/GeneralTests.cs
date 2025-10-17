@@ -14,12 +14,11 @@ public class GeneralTests
             
             var user = new User("test", null);
 
+            var y = "abc";
+            
             var x = cx(
                 $"""
-                 <container>
-                     <TestProvider User={user}/>
-                     <Bar />
-                 </container>
+                 <text>#{y}</text>
                  """
             );
             

@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.Linq;
+using Discord.CX.Parser;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -11,11 +12,27 @@ public sealed class SectionComponentNode : ComponentNode
 
     public override bool HasChildren => true;
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; } = [ComponentProperty.Id];
+    public ComponentProperty Accessory { get; }
+    public override IReadOnlyList<ComponentProperty> Properties { get; }
+
+    public SectionComponentNode()
+    {
+        Properties =
+        [
+            ComponentProperty.Id,
+            Accessory = new(
+                "accessory",
+                isOptional: true,
+                renderer: Renderers.ComponentAsProperty
+            )
+        ];
+    }
 
     public override void Validate(ComponentState state, ComponentContext context)
     {
-        if (!state.HasChildren)
+        var accessoryPropertyValue = state.GetProperty(Accessory);
+        
+        if (!state.HasChildren && !accessoryPropertyValue.HasValue)
         {
             context.AddDiagnostic(
                 Diagnostics.EmptySection,
@@ -29,24 +46,37 @@ public sealed class SectionComponentNode : ComponentNode
         var accessoryCount = state.Children.Count(x => x.Inner is AccessoryComponentNode);
         var nonAccessoryCount = state.Children.Count - accessoryCount;
 
-        switch (accessoryCount)
+        if (accessoryPropertyValue.HasValue)
         {
-            case 0:
+            foreach (var accessory in state.Children.Where(x => x.Inner is AccessoryComponentNode))
+            {
                 context.AddDiagnostic(
-                    Diagnostics.MissingAccessory,
-                    state.Source
+                    Diagnostics.TooManyAccessories,
+                    accessory.State.Source
                 );
-                break;
-            case > 1:
-                foreach (var accessory in state.Children.Where(x => x.Inner is AccessoryComponentNode).Skip(1))
-                {
+            }
+        }
+        else
+        {
+            switch (accessoryCount)
+            {
+                case 0:
                     context.AddDiagnostic(
-                        Diagnostics.TooManyAccessories,
-                        accessory.State.Source
+                        Diagnostics.MissingAccessory,
+                        state.Source
                     );
-                }
+                    break;
+                case > 1:
+                    foreach (var accessory in state.Children.Where(x => x.Inner is AccessoryComponentNode).Skip(1))
+                    {
+                        context.AddDiagnostic(
+                            Diagnostics.TooManyAccessories,
+                            accessory.State.Source
+                        );
+                    }
 
-                break;
+                    break;
+            }
         }
 
         switch (nonAccessoryCount)
@@ -65,6 +95,7 @@ public sealed class SectionComponentNode : ComponentNode
                         child.State.Source
                     );
                 }
+
                 break;
         }
 
@@ -86,13 +117,19 @@ public sealed class SectionComponentNode : ComponentNode
 
     public override string Render(ComponentState state, ComponentContext context)
     {
-        var accessory = state.Children
-            .FirstOrDefault(x => x.Inner is AccessoryComponentNode);
+        var accessoryPropertyValue = state.GetProperty(Accessory);
+
+        var renderedAccessory = accessoryPropertyValue.HasValue
+            ? Accessory.Renderer(context, accessoryPropertyValue)
+            : state
+                .Children
+                .FirstOrDefault(x => x.Inner is AccessoryComponentNode)
+                ?.Render(context);
 
         return
             $"""
              new {context.KnownTypes.SectionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
-                 accessory: {accessory?.Render(context).WithNewlinePadding(4) ?? "null"},
+                 accessory: {renderedAccessory?.WithNewlinePadding(4) ?? "null"},
                  components:
                  [
                      {
@@ -101,7 +138,7 @@ public sealed class SectionComponentNode : ComponentNode
                              .WithNewlinePadding(4)
                      }
                  ]
-             ){state.RenderInitializer(this, context).PrefixIfSome("\n")}
+             ){state.RenderInitializer(this, context, x => x == Accessory).PrefixIfSome("\n")}
              """;
     }
 }

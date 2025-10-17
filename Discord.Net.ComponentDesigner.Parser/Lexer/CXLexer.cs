@@ -98,6 +98,8 @@ public sealed class CXLexer
                 if (interpolationSpan.Start > Reader.Position) break;
             }
 
+            if (interpolationSpan.Start <= Reader.Position) return null;
+            
             return interpolationSpan;
         }
     }
@@ -180,7 +182,7 @@ public sealed class CXLexer
         GetTrivia(isTrailing: true, ref info.TrailingTriviaLength);
 
         info.End = Reader.Position;
-
+        
         var fullSpan = TextSpan.FromBounds(info.Start, info.End);
 
         var token = new CXToken(
@@ -236,7 +238,7 @@ public sealed class CXLexer
                 info.Kind = CXTokenKind.GreaterThan;
                 Reader.Advance();
                 return;
-            case EQUALS_CHAR when Mode == LexMode.Attribute:
+            case EQUALS_CHAR:
                 info.Kind = CXTokenKind.Equals;
                 Reader.Advance();
                 return;
@@ -300,17 +302,13 @@ public sealed class CXLexer
             return;
         }
 
-        var interpolationUpperBounds = InterpolationBoundary;
 
-        if (Reader.Position >= interpolationUpperBounds)
+        if (TryScanInterpolation(ref info))
         {
-            if (!TryScanInterpolation(ref info))
-            {
-                // TODO: handle
-            }
-
             return;
         }
+        
+        var interpolationUpperBounds = InterpolationBoundary;
 
         if (
             ForcedEscapedQuotes
@@ -460,10 +458,18 @@ public sealed class CXLexer
 
             if (current is LESS_THAN_CHAR && IsCurrentlyAtCommentStart())
             {
-                while (!Reader.IsEOF && !IsCurrentlAtCommentEnd() && !CancellationToken.IsCancellationRequested)
+                while (!Reader.IsEOF && !IsCurrentlyAtCommentEnd() && !CancellationToken.IsCancellationRequested)
                 {
                     trivia++;
                     Reader.Advance();
+                }
+
+                if (IsCurrentlyAtCommentEnd())
+                {
+                    trivia += COMMENT_END.Length;
+                    Reader.Advance(COMMENT_END.Length);
+                    
+                    goto start;
                 }
             }
 
@@ -474,7 +480,7 @@ public sealed class CXLexer
     private bool IsCurrentlyAtCommentStart()
         => Reader.Peek(COMMENT_START.Length) == COMMENT_START;
 
-    private bool IsCurrentlAtCommentEnd()
+    private bool IsCurrentlyAtCommentEnd()
         => Reader.Peek(COMMENT_END.Length) == COMMENT_END;
 
     private static bool IsWhitespace(char ch)

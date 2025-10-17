@@ -1,4 +1,5 @@
-﻿using Discord.CX.Parser;
+﻿using System.Diagnostics;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 
@@ -14,6 +15,24 @@ public class IncrementalTests
             new TextChange(new(1, 0), " ")
         );
     }
+
+    [Fact]
+    public void LargeIncrementalFullRanges()
+    {
+        FullRangeIncremental(
+            """
+            <container>
+                <text>Hello, World!</text>
+                <button id="12" name="value" />
+                <section>
+                    <text>## Foo</text>
+                    <accessory><thumbnail url="example" /></accessory>
+                </section>
+            </container>
+            """
+        );
+    }
+    
     
     [Fact]
     public void IncrementalButton()
@@ -31,6 +50,49 @@ public class IncrementalTests
         {
         }
     }
+    
+    public void FullRangeIncremental(string cx)
+    {
+        var source = new CXSourceText.StringSource(cx);
+        var reader = source.CreateReader();
+        var doc = CXParser.Parse(reader);
+
+        Assert.False(doc.HasErrors);
+        
+        foreach (var node in doc.GetFlatGraph())
+        {
+            // removing the entire graph wont do anything
+            if (node is CXDoc || node.Width == doc.Width) continue;
+            
+            // empty nodes won't change anything
+            if(node.Width is 0) continue;
+            
+            // dont remove attribute values
+            if(node is CXValue && node.Parent is CXAttribute) continue;
+            
+            // dont remove individual tokens
+            if(node is CXToken) continue;
+            
+            // remove the node from the text and try parsing again
+            var subSource = new CXSourceText.StringSource(
+                source.Text.Substring(0, node.FullSpan.Start) +
+                source.Text.Substring(node.FullSpan.End)
+            );
+            var subReader = subSource.CreateReader();
+
+            var newDoc = doc.IncrementalParse(
+                subReader,
+                [
+                    new TextChange(node.FullSpan, string.Empty)
+                ],
+                out var incrementalParseResult
+            );
+            
+            // ensure we have no errors
+            Assert.False(newDoc.HasErrors);
+        }
+    }
+    
 
     private (CXDoc, CXDoc, IncrementalParseResult) IncrementalRanges(string source, params IReadOnlyList<TextChange> changes)
     {

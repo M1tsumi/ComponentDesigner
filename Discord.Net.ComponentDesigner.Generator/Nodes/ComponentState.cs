@@ -38,16 +38,16 @@ public class ComponentState
     public void SubstitutePropertyValue(ComponentProperty property, CXValue value)
     {
         if (!_properties.TryGetValue(property, out var existing))
-            _properties[property] = new(property, null) {Value = value};
+            _properties[property] = new(property, null) { Value = value };
         else
-            _properties[property] = _properties[property] with {Value = value};
+            _properties[property] = _properties[property] with { Value = value };
     }
 
     public string RenderProperties(
         ComponentNode node,
         ComponentContext context,
-        bool asInitializers = false
-    )
+        bool asInitializers = false,
+        Predicate<ComponentProperty>? ignorePredicate = null)
     {
         // TODO: correct handling?
         if (Source is not CXElement element) return string.Empty;
@@ -56,24 +56,30 @@ public class ComponentState
 
         foreach (var property in node.Properties)
         {
+            if (ignorePredicate?.Invoke(property) is true) continue;
+
             var propertyValue = GetProperty(property);
 
             if (propertyValue?.Value is null) continue;
 
             var prefix = asInitializers
                 ? $"{property.DotnetPropertyName} = "
-                : $"{property.DotnetPropertyName}: ";
+                : $"{property.DotnetParameterName}: ";
 
             values.Add($"{prefix}{property.Renderer(context, propertyValue)}");
         }
 
-        var joiner = asInitializers ? "," : string.Empty;
+        var joiner = asInitializers ? string.Empty : ",";
         return string.Join($"{joiner}\n", values);
     }
 
-    public string RenderInitializer(ComponentNode node, ComponentContext context)
+    public string RenderInitializer(
+        ComponentNode node,
+        ComponentContext context,
+        Predicate<ComponentProperty>? ignorePredicate = null
+    )
     {
-        var props = RenderProperties(node, context, asInitializers: true);
+        var props = RenderProperties(node, context, asInitializers: true, ignorePredicate);
 
         if (string.IsNullOrWhiteSpace(props)) return string.Empty;
 

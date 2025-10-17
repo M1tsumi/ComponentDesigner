@@ -18,7 +18,7 @@ public sealed record Target(
     InterceptableLocation InterceptLocation,
     InvocationExpressionSyntax InvocationSyntax,
     ExpressionSyntax ArgumentExpressionSyntax,
-    IOperation Operation,
+    IInvocationOperation Operation,
     Compilation Compilation,
     string? ParentKey,
     string CXDesigner,
@@ -68,21 +68,34 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
         var sb = new StringBuilder();
 
-        foreach (var interceptor in interceptors)
+        for (var i = 0; i < interceptors.Length; i++)
         {
+            var interceptor = interceptors[i];
             foreach (var diagnostic in interceptor.Diagnostics)
             {
                 context.ReportDiagnostic(diagnostic);
             }
 
+            if (i > 0)
+                sb.AppendLine();
+
+            var parameter = interceptor.UsesDesigner
+                ? $"global::{Constants.COMPONENT_DESIGNER_QUALIFIED_NAME} designer"
+                : "global::System.String cx";
+            
             sb.AppendLine(
                 $$"""
-                  [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.Location.Version}}, data: "{{interceptor.Location.Data}}")]
-                  public static global::Discord.ComponentBuilderV2 _{{Math.Abs(interceptor.GetHashCode())}}(
-                      global::{{Constants.COMPONENT_DESIGNER_QUALIFIED_NAME}} designer
-                  ) => new(
+                  /*
+                  {{interceptor.Location}}
+                  
+                  {{interceptor.CX.NormalizeIndentation()}}
+                  */
+                  [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.InterceptLocation.Version}}, data: "{{interceptor.InterceptLocation.Data}}")]
+                  public static global::Discord.MessageComponent _{{Math.Abs(interceptor.GetHashCode())}}(
+                      {{parameter}}
+                  ) => new global::Discord.ComponentBuilderV2(
                       {{interceptor.Source.WithNewlinePadding(4)}}
-                  );
+                  ).Build();
                   """
             );
         }
@@ -310,22 +323,22 @@ public sealed class SourceGenerator : IIncrementalGenerator
         }
 
         bool TryGetValidDesignerCall(
-            out IOperation operation,
+            out IInvocationOperation operation,
             out InvocationExpressionSyntax invocationSyntax,
             out InterceptableLocation interceptLocation,
             out ExpressionSyntax argumentExpressionSyntax
         )
         {
-            operation = semanticModel.GetOperation(node, token)!;
+            var localOperation = semanticModel.GetOperation(node, token)!;
             interceptLocation = null!;
             argumentExpressionSyntax = null!;
             invocationSyntax = null!;
 
             checkOperation:
-            switch (operation)
+            switch (localOperation)
             {
                 case IInvalidOperation invalid:
-                    operation = invalid.ChildOperations.OfType<IInvocationOperation>().FirstOrDefault()!;
+                    localOperation = invalid.ChildOperations.OfType<IInvocationOperation>().FirstOrDefault()!;
                     goto checkOperation;
                 case IInvocationOperation invocation:
                     if (
@@ -334,10 +347,18 @@ public sealed class SourceGenerator : IIncrementalGenerator
                             .ContainingType
                             .ToDisplayString()
                         is "Discord.ComponentDesigner"
-                    ) break;
+                    )
+                    {
+                        operation = invocation;
+                        break;
+                    }
                     goto default;
 
-                default: return false;
+                default:
+                {
+                    operation = null!;
+                    return false;
+                }
             }
 
             if (node is not InvocationExpressionSyntax syntax) return false;

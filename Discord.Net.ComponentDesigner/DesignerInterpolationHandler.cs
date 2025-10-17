@@ -16,7 +16,7 @@ public struct DesignerInterpolationHandler
 
     public void AppendLiteral(string s)
     {
-
+        _interpolatedValues[_index++] = s;
     }
 
     public void AppendFormatted<T>(T value)
@@ -24,16 +24,6 @@ public struct DesignerInterpolationHandler
         _interpolatedValues[_index++] = value;
     }
     
-    public void AppendFormatted(Delegate value)
-    {
-        _interpolatedValues[_index++] = value;
-    }
-    
-    public void AppendFormatted(Action value)
-    {
-        _interpolatedValues[_index++] = value;
-    }
-
     public object? GetValue(int index) => _interpolatedValues[index];
     public T? GetValue<T>(int index) => (T?)_interpolatedValues[index];
     public string? GetValueAsString(int index) => _interpolatedValues[index]?.ToString();

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace Discord.CX;
 
@@ -18,14 +19,34 @@ public static class StringUtils
 
     public static string PrefixIfSome(this string str, int count, char prefixChar = ' ')
         => string.IsNullOrWhiteSpace(str) ? str : $"{new string(prefixChar, count)}{str}";
+
     public static string PrefixIfSome(this string str, string prefix)
         => string.IsNullOrWhiteSpace(str) ? str : $"{prefix}{str}";
 
     public static string PostfixIfSome(this string str, int count, char prefixChar = ' ')
         => string.IsNullOrWhiteSpace(str) ? str : $"{str}{new string(prefixChar, count)}";
+
     public static string PostfixIfSome(this string str, string postfix)
         => string.IsNullOrWhiteSpace(str) ? str : $"{str}{postfix}";
 
     public static string Map(this string str, Func<string, string> mapper)
         => string.IsNullOrWhiteSpace(str) ? str : mapper(str);
+
+    public static string NormalizeIndentation(this string str)
+    {
+        var lines = str.Split('\n');
+
+        var minSpacing = lines.Min(x =>
+            string.IsNullOrWhiteSpace(x) ? int.MaxValue : x.TakeWhile(char.IsWhiteSpace).Count()
+        );
+
+        if (minSpacing is 0 or int.MaxValue) return str;
+
+        return string.Join(
+            "\n",
+            lines.Select(x =>
+                x.Length > minSpacing ? x.Substring(minSpacing) : x
+            )
+        );
+    }
 }

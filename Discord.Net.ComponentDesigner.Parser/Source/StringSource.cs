@@ -5,6 +5,8 @@ namespace Discord.CX.Parser;
 
 partial class CXSourceText
 {
+    public static CXSourceText From(string code) => new StringSource(code);
+    
     public sealed class StringSource(string text) : CXSourceText
     {
         public string Text { get; } = text;

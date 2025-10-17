@@ -8,6 +8,8 @@ public interface ICXCollection : ICXNode
 {
     int Count { get; }
     ICXNode this[int index] { get; }
+
+    IReadOnlyList<ICXNode> ToList();
 }
 
 public sealed class CXCollection<T> :
@@ -17,7 +19,6 @@ public sealed class CXCollection<T> :
     where T : class, ICXNode
 {
     public T this[int index] => _items[index];
-
     public int Count => _items.Count;
 
     private readonly List<T> _items;
@@ -33,4 +34,6 @@ public sealed class CXCollection<T> :
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable) _items).GetEnumerator();
     ICXNode ICXCollection.this[int index] => this[index];
     int ICXCollection.Count => Count;
+    
+    IReadOnlyList<ICXNode> ICXCollection.ToList() => _items;
 }

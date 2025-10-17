@@ -43,4 +43,5 @@ public sealed class CXSource
 
         return Value.Substring(start, span.Length);
     }
+
 }

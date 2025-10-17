@@ -5,12 +5,12 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <InterceptorsNamespaces>$(InterceptorsNamespaces);InlineComponent</InterceptorsNamespaces>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj" OutputItemType="Analyzer" />
         <ProjectReference Include="..\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" OutputItemType="Analyzer"/>
-        <ProjectReference Include="..\Discord.Net.ComponentDesigner.Renderer\Discord.Net.ComponentDesigner.Renderer.csproj" />
         <ProjectReference Include="..\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj"/>
     </ItemGroup>
 

@@ -11,6 +11,7 @@ namespace Discord.CX.Parser;
 public sealed class CXParser
 {
     public CXToken CurrentToken => Lex(_tokenIndex);
+    public CXToken NextToken => Lex(_tokenIndex + 1);
 
     public ICXNode? CurrentNode
         => (_currentBlendedNode ??= GetCurrentBlendedNode())?.Value;
@@ -60,20 +61,48 @@ public sealed class CXParser
 
     public static CXDoc Parse(CXSourceReader reader, CancellationToken token = default)
     {
-        var elements = new List<CXElement>();
-
         var parser = new CXParser(reader, token: token);
 
-        while (parser.CurrentToken.Kind is not CXTokenKind.EOF and not CXTokenKind.Invalid)
-        {
-            var element = parser.ParseElement();
-            elements.Add(element);
-            token.ThrowIfCancellationRequested();
+        return new CXDoc(parser, [..parser.ParseRootNodes()]);
+    }
 
-            if (element.Width is 0) break;
+    internal IEnumerable<CXNode> ParseRootNodes()
+    {
+        while (CurrentToken.Kind is not CXTokenKind.EOF and not CXTokenKind.Invalid)
+        {
+            var node = ParseRootNode();
+            yield return node;
+            CancellationToken.ThrowIfCancellationRequested();
+            if (node.Width is 0) yield break;
+        }
+    }
+
+    internal CXNode ParseRootNode()
+    {
+        if (IsIncremental && CurrentNode is CXNode && EatNode() is { } node) return node;
+
+        using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
+
+        switch (CurrentToken.Kind)
+        {
+            case CXTokenKind.LessThan: return ParseElement();
+            default:
+                using (Lexer.SetMode(CXLexer.LexMode.ElementValue))
+                {
+                    if (TryParseElementChild([], out var child))
+                        return child;
+                }
+
+                break;
         }
 
-        return new CXDoc(parser, elements);
+        return new CXValue.Invalid()
+        {
+            Diagnostics =
+            [
+                CXDiagnostic.InvalidRootElement(CurrentToken)
+            ]
+        };
     }
 
     internal CXElement ParseElement()
@@ -90,7 +119,27 @@ public sealed class CXParser
 
         var start = Expect(CXTokenKind.LessThan);
 
-        var identifier = ParseIdentifier();
+        // for element identifiers, we allow fragments, which can have attributes.
+
+        CXToken? identifier;
+
+        using (Lexer.SetMode(CXLexer.LexMode.Identifier))
+        {
+            if (
+                (CurrentToken.Kind is CXTokenKind.Identifier && NextToken.Kind is CXTokenKind.Equals) ||
+                CurrentToken.Kind is CXTokenKind.GreaterThan
+            )
+            {
+                // this is a fragment
+                identifier = null;
+            }
+            else
+            {
+                // just expect an identifier
+                identifier = Expect(CXTokenKind.Identifier);
+            }
+        }
+
 
         var attributes = ParseAttributes();
 
@@ -116,7 +165,7 @@ public sealed class CXParser
                     endStart,
                     endIdent,
                     endClose
-                ) {Diagnostics = diagnostics};
+                ) { Diagnostics = diagnostics };
             default:
             case CXTokenKind.ForwardSlashGreaterThan:
                 return new CXElement(
@@ -130,18 +179,33 @@ public sealed class CXParser
 
         void ParseClosingElement(
             out CXToken elementEndStart,
-            out CXToken elementEndIdent,
+            out CXToken? elementEndIdent,
             out CXToken elementEndClose)
         {
             var sentinel = _tokenIndex;
 
             elementEndStart = Expect(CXTokenKind.LessThanForwardSlash);
-            elementEndIdent = ParseIdentifier();
+
+            if (identifier is null)
+            {
+                // it's a fragment, don't expect a name
+                elementEndIdent = null;
+            }
+            else
+            {
+                elementEndIdent = ParseIdentifier();
+            }
+
             elementEndClose = Expect(CXTokenKind.GreaterThan);
 
-            if (elementEndIdent.Value != identifier.Value)
+
+            if (
+                identifier is not null &&
+                elementEndIdent is not null &&
+                identifier.IsMissing && elementEndIdent.Value != identifier.Value
+            )
             {
-                diagnostics.Add(CreateError("Missing closing tag", identifier.Span));
+                diagnostics.Add(CXDiagnostic.MissingElementClosingTag(identifier, identifier.Span));
                 // rollback
                 _tokenIndex = sentinel;
             }
@@ -170,49 +234,71 @@ public sealed class CXParser
                 CancellationToken.ThrowIfCancellationRequested();
             }
 
-            return new CXCollection<CXNode>(children) {Diagnostics = diagnostics};
+            return new CXCollection<CXNode>(children) { Diagnostics = diagnostics };
+        }
+    }
+
+    internal bool TryParseElementChild(List<CXDiagnostic> diagnostics, out CXNode node)
+    {
+        if (IsIncremental && CurrentNode is CXValue or CXElement)
+        {
+            node = EatNode()!;
+            return true;
         }
 
-        bool TryParseElementChild(List<CXDiagnostic> diagnostics, out CXNode node)
-        {
-            if (IsIncremental && CurrentNode is CXValue or CXElement)
-            {
-                node = EatNode()!;
-                return true;
-            }
+        var parts = new List<CXToken>();
 
+        while (CurrentToken.Kind is not CXTokenKind.EOF or CXTokenKind.Invalid)
+        {
             switch (CurrentToken.Kind)
             {
                 case CXTokenKind.Interpolation:
-                    node = new CXValue.Interpolation(
-                        Eat(),
-                        Lexer.InterpolationIndex!.Value
-                    );
-                    return true;
+                    parts.Add(Eat());
+                    continue;
                 case CXTokenKind.Text:
-                    node = new CXValue.Scalar(Eat());
-                    return true;
+                    parts.Add(Eat());
+                    continue;
                 case CXTokenKind.LessThan:
-                    // new element
-                    node = ParseElement();
+                    node = parts.Count > 0 ? BuildParts() : ParseElement();
                     return true;
-
                 case CXTokenKind.LessThanForwardSlash:
                 case CXTokenKind.EOF:
-                case CXTokenKind.Invalid:
-                    node = null!;
-                    return false;
-
+                case CXTokenKind.Invalid: goto end;
                 default:
-                    diagnostics.Add(
-                        new CXDiagnostic(
-                            DiagnosticSeverity.Error,
-                            $"Unexpected element child type '{CurrentToken.Kind}'",
-                            CurrentToken.Span
-                        )
-                    );
+                    if (parts.Count is 0)
+                    {
+                        diagnostics.Add(CXDiagnostic.InvalidElementChildToken(CurrentToken));
+                    }
+
                     goto case CXTokenKind.Invalid;
             }
+        }
+        
+        end:
+
+        if (parts.Count > 0)
+        {
+            node = BuildParts();
+            return true;
+        }
+        
+        node = null!;
+        return false;
+
+        CXValue BuildParts()
+        {
+            if (parts.Count is 0) return new CXValue.Invalid();
+
+            if (parts.Count is 1)
+                return parts[0] switch
+                {
+                    { Kind: CXTokenKind.Interpolation } token
+                        => new CXValue.Interpolation(token, Lexer.InterpolationMap.IndexOf(token)),
+                    { Kind: CXTokenKind.Text } token => new CXValue.Scalar(token),
+                    _ => throw new InvalidOperationException($"Unknown single value kind '{parts[0].Kind}'")
+                };
+
+            return new CXValue.Multipart(new(parts));
         }
     }
 
@@ -291,11 +377,7 @@ public sealed class CXParser
                 {
                     Diagnostics =
                     [
-                        new CXDiagnostic(
-                            DiagnosticSeverity.Error,
-                            $"Unexpected attribute valid start, expected interpolation or string literal, got '{CurrentToken.Kind}'",
-                            CurrentToken.Span
-                        )
+                        CXDiagnostic.InvalidAttributeValue(CurrentToken)
                     ]
                 };
         }
@@ -319,7 +401,7 @@ public sealed class CXParser
 
         using var _ = Lexer.SetMode(CXLexer.LexMode.StringLiteral);
 
-        // we grab the last char to ensure it's a quote incase its actually escaped
+        // we grab the last char to ensure it's a quote in case its actually escaped
         Lexer.QuoteChar = start.Value[start.Value.Length - 1];
 
         while (CurrentToken.Kind is not CXTokenKind.StringLiteralEnd)
@@ -337,11 +419,7 @@ public sealed class CXParser
 
                 default:
                     diagnostics.Add(
-                        new CXDiagnostic(
-                            DiagnosticSeverity.Error,
-                            $"Unexpected string literal token '{CurrentToken.Kind}'",
-                            CurrentToken.Span
-                        )
+                        CXDiagnostic.InvalidStringLiteralToken(CurrentToken)
                     );
                     goto end;
             }
@@ -354,7 +432,22 @@ public sealed class CXParser
             start,
             new CXCollection<CXToken>(tokens),
             end
-        ) {Diagnostics = diagnostics};
+        ) { Diagnostics = diagnostics };
+    }
+
+    internal bool TryScanElementIdentifier(out CXToken? identifier)
+    {
+        using (Lexer.SetMode(CXLexer.LexMode.Identifier))
+        {
+            if (CurrentToken.Kind is CXTokenKind.Identifier && NextToken.Kind is not CXTokenKind.Equals)
+            {
+                identifier = Eat();
+                return true;
+            }
+        }
+
+        identifier = null;
+        return false;
     }
 
     internal CXToken ParseIdentifier()
@@ -401,15 +494,12 @@ public sealed class CXParser
 
                 return new CXToken(
                     kinds[0],
-                    new TextSpan(current.Span.Start, 0),
+                    new TextSpan(current.Span.Start, 1),
                     0,
                     0,
                     Flags: CXTokenFlags.Missing,
                     FullValue: string.Empty,
-                    CreateError(
-                        $"Unexpected token, expected one of '{string.Join(", ", kinds.ToArray())}', got '{current.Kind}'",
-                        current.Span
-                    )
+                    CXDiagnostic.UnexpectedToken(current, kinds.ToArray())
                 );
         }
     }
@@ -422,12 +512,12 @@ public sealed class CXParser
         {
             return new CXToken(
                 kind,
-                new TextSpan(token.Span.Start, 0),
+                new TextSpan(token.Span.Start, 1),
                 0,
                 0,
                 Flags: CXTokenFlags.Missing,
                 FullValue: string.Empty,
-                CreateError($"Unexpected token, expected '{kind}', got '{token.Kind}'", token.Span)
+                CXDiagnostic.UnexpectedToken(token, kind)
             );
         }
 
@@ -437,7 +527,9 @@ public sealed class CXParser
 
     private BlendedNode? GetCurrentBlendedNode()
         => Blender?.NextNode(
-            _tokenIndex is 0 ? Blender.StartingCursor : _blendedNodes[_tokenIndex - 1].Cursor
+            _tokenIndex is 0
+                ? Blender.StartingCursor
+                : _blendedNodes[Math.Min(_tokenIndex - 1, _blendedNodes.Count - 1)].Cursor
         );
 
     private CXNode? EatNode()
@@ -445,8 +537,7 @@ public sealed class CXParser
         if (_currentBlendedNode?.Value is not CXNode node) return null;
 
         _blendedNodes.Add(_currentBlendedNode!.Value);
-
-        _tokenIndex += 2; // add two since we want to cause a re-lex of the blender
+        _tokenIndex++;
 
         _currentBlendedNode = null;
 
@@ -473,6 +564,13 @@ public sealed class CXParser
 
         CXToken FetchBlended()
         {
+            // remove any non-token nodes
+            while (_blendedNodes.Count > 0 && _blendedNodes[_blendedNodes.Count - 1].Value is CXNode)
+            {
+                _blendedNodes.RemoveAt(_blendedNodes.Count - 1);
+                index--;
+            }
+
             while (_blendedNodes.Count <= index)
             {
                 CancellationToken.ThrowIfCancellationRequested();
@@ -486,23 +584,10 @@ public sealed class CXParser
                 _blendedNodes.Add(node);
                 _currentBlendedNode = null;
 
-                if (node.Value is CXToken {Kind: CXTokenKind.EOF} eof) return eof;
+                if (node.Value is CXToken { Kind: CXTokenKind.EOF } eof) return eof;
             }
 
             return (CXToken)_blendedNodes[index].Value;
         }
     }
-
-    private CXDiagnostic CreateError(string message)
-        => CreateError(message, new(Reader.Position, 1));
-
-    private CXDiagnostic CreateError(string message, TextSpan span)
-        => CreateDiagnostic(DiagnosticSeverity.Error, message, span);
-
-    private static CXDiagnostic CreateDiagnostic(DiagnosticSeverity severity, string message, TextSpan span)
-        => new(
-            severity,
-            message,
-            span
-        );
 }

@@ -150,7 +150,8 @@ public abstract class ComponentNode
         SemanticModel cxSemanticModel,
         int position,
         string name,
-        out ComponentNode node)
+        out ComponentNode node
+    )
     {
         foreach (var candidate in cxSemanticModel.LookupSymbols(position, name: name))
         {
@@ -175,19 +176,23 @@ public abstract class ComponentNode
 
             if (candidate is IMethodSymbol methodSymbol)
             {
-                if (!methodSymbol.IsStatic) continue;
+                if (!methodSymbol.IsStatic)
+                {
+                    continue;
+                }
 
                 if (methodSymbol.DeclaredAccessibility is not Accessibility.Public and not Accessibility.Internal)
                     continue;
 
                 if (
-                    !cxSemanticModel.Compilation.HasImplicitConversion(
+                    !InterleavedComponentNode.IsValidInterleavedType(
                         methodSymbol.ReturnType,
-                        cxSemanticModel.Compilation.GetKnownTypes().IMessageComponentBuilderType
+                        cxSemanticModel.Compilation,
+                        out var kind
                     )
                 ) continue;
 
-                node = new FunctionalComponentNode(methodSymbol);
+                node = new FunctionalComponentNode(methodSymbol, kind);
                 return true;
             }
         }

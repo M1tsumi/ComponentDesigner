@@ -6,14 +6,17 @@ using System.Linq;
 namespace Discord.CX;
 
 public readonly record struct RenderedInterceptor(
-    InterceptableLocation Location,
+    InterceptableLocation InterceptLocation,
+    Location Location,
+    string CX,
     string Source,
-    ImmutableArray<Diagnostic> Diagnostics
+    ImmutableArray<Diagnostic> Diagnostics,
+    bool UsesDesigner
 )
 {
     public bool Equals(RenderedInterceptor other)
-        => Location.Data == other.Location.Data &&
-           Location.Version == other.Location.Version &&
+        => InterceptLocation.Data == other.InterceptLocation.Data &&
+           InterceptLocation.Version == other.InterceptLocation.Version &&
            Source == other.Source &&
            Diagnostics.SequenceEqual(other.Diagnostics);
 
@@ -21,7 +24,7 @@ public readonly record struct RenderedInterceptor(
     {
         unchecked
         {
-            var hashCode = Location.GetHashCode();
+            var hashCode = InterceptLocation.GetHashCode();
             hashCode = (hashCode * 397) ^ Source.GetHashCode();
             hashCode = (hashCode * 397) ^ Diagnostics.Aggregate(0, (a, b) => (a * 397) ^ b.GetHashCode());
             return hashCode;

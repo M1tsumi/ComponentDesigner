@@ -19,6 +19,42 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    
+    public INamedTypeSymbol? MediaGalleryComponentType
+        => GetOrResolveType("Discord.MediaGalleryComponent", ref _MediaGalleryComponentType);
+    
+    public Optional<INamedTypeSymbol?> _MediaGalleryComponentType;
+    
+    public INamedTypeSymbol? SectionComponentType
+        => GetOrResolveType("Discord.SectionComponent", ref _SectionComponentType);
+    
+    public Optional<INamedTypeSymbol?> _SectionComponentType;
+    
+    public INamedTypeSymbol? SeparatorComponentType
+        => GetOrResolveType("Discord.SeparatorComponent", ref _SeparatorComponentType);
+    
+    public Optional<INamedTypeSymbol?> _SeparatorComponentType;
+    
+    public INamedTypeSymbol? TextDisplayComponentType
+        => GetOrResolveType("Discord.TextDisplayComponent", ref _TextDisplayComponentType);
+    
+    public Optional<INamedTypeSymbol?> _TextDisplayComponentType;
+    
+    public INamedTypeSymbol? ThumbnailComponentType
+        => GetOrResolveType("Discord.ThumbnailComponent", ref _ThumbnailComponentType);
+    
+    public Optional<INamedTypeSymbol?> _ThumbnailComponentType;
+    
+    public INamedTypeSymbol? TextInputComponentType
+        => GetOrResolveType("Discord.TextInputComponent", ref _TextInputComponentType);
+    
+    public Optional<INamedTypeSymbol?> _TextInputComponentType;
+    
+    public INamedTypeSymbol? MessageComponentType
+        => GetOrResolveType("Discord.MessageComponent", ref _MessageComponentType);
+    
+    public Optional<INamedTypeSymbol?> _MessageComponentType;
+    
     public INamedTypeSymbol? CXPropertyAttributeType
         => GetOrResolveType("Discord.CXPropertyAttribute", ref _CXPropertyAttributeType);
     

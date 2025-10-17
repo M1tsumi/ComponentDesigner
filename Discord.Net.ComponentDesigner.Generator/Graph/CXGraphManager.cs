@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace Discord.CX;
 
@@ -21,12 +22,13 @@ public sealed record CXGraphManager(
 )
 {
     public const bool FORCE_NO_INCREMENTAL = true;
+    public const bool ALWAYS_REPARSE = true;
 
     public SyntaxTree SyntaxTree => InvocationSyntax.SyntaxTree;
     public InterceptableLocation InterceptLocation => Target.InterceptLocation;
     public InvocationExpressionSyntax InvocationSyntax => Target.InvocationSyntax;
     public ExpressionSyntax ArgumentExpressionSyntax => Target.ArgumentExpressionSyntax;
-    public IOperation Operation => Target.Operation;
+    public IInvocationOperation Operation => Target.Operation;
     public Compilation Compilation => Target.Compilation;
 
     public string CXDesigner => Target.CXDesigner;
@@ -49,6 +51,9 @@ public sealed record CXGraphManager(
             InterpolationInfos
         )
     );
+
+    public bool UsesDesigner
+        => Operation.TargetMethod.Parameters[0].Type.SpecialType is not SpecialType.System_String;
 
     private string? _simpleSource;
 
@@ -105,13 +110,13 @@ public sealed record CXGraphManager(
 
         var result = this with { Key = key, Target = target };
 
-        var newCXWithoutInterpolations = GetCXWithoutInterpolations(
-            target.ArgumentExpressionSyntax.SpanStart,
-            target.CXDesigner,
-            target.Interpolations
-        );
+        // var newCXWithoutInterpolations = GetCXWithoutInterpolations(
+        //     target.ArgumentExpressionSyntax.SpanStart,
+        //     target.CXDesigner,
+        //     target.Interpolations
+        // );
 
-        if (newCXWithoutInterpolations != SimpleSource)
+        if (ALWAYS_REPARSE) // newCXWithoutInterpolations != SimpleSource ||
         {
             // we're going to need to reparse, the underlying CX structure changed
             result.DoReparse(target, this, ref result, token);
@@ -151,39 +156,76 @@ public sealed record CXGraphManager(
         };
     }
 
+    private RenderedInterceptor? _render;
+
     public RenderedInterceptor Render(CancellationToken token = default)
     {
-        var diagnostics = new List<Diagnostic>(
-            Document
-                .Diagnostics
-                .Select(x => Diagnostic.Create(
-                        Diagnostics.ParseError,
-                        SyntaxTree.GetLocation(x.Span),
-                        x.Message
-                    )
-                )
-                .Concat(
-                    Graph.Diagnostics
-                )
-        );
+        _render ??= CreateRender(token);
+        return _render.Value;
+    }
 
-        if (diagnostics.Count > 0)
+    private RenderedInterceptor CreateRender(CancellationToken token = default)
+    {
+        var parserDiagnostics = Document
+            .Diagnostics
+            .Select(x =>
+                Diagnostics.CreateParsingDiagnostic(x, Graph.GetLocation(x.Span))
+            )
+            .ToArray();
+
+        if (parserDiagnostics.Length > 0)
         {
-            return new(InterceptLocation, string.Empty, [..diagnostics]);
+            return new RenderedInterceptor(
+                InterceptLocation,
+                InvocationSyntax.GetLocation(),
+                CXDesigner,
+                string.Empty,
+                [..parserDiagnostics],
+                UsesDesigner
+            );
         }
 
-        var context = new ComponentContext(Graph) { Diagnostics = diagnostics };
+        if (Graph.HasErrors)
+        {
+            return new RenderedInterceptor(
+                InterceptLocation,
+                InvocationSyntax.GetLocation(),
+                CXDesigner,
+                string.Empty,
+                [..parserDiagnostics, ..Graph.Diagnostics],
+                UsesDesigner
+            );
+        }
+
+        var context = new ComponentContext(Graph);
 
         Graph.Validate(context);
 
-        var source = context.HasErrors
-            ? string.Empty
-            : Graph.Render(context);
+        if (context.HasErrors || Graph.HasErrors)
+        {
+            return new(
+                this.InterceptLocation,
+                InvocationSyntax.GetLocation(),
+                CXDesigner,
+                string.Empty,
+                [..parserDiagnostics, ..Graph.Diagnostics, ..context.GlobalDiagnostics],
+                UsesDesigner
+            );
+        }
+
+        var source = Graph.Render(context);
 
         return new(
             this.InterceptLocation,
+            InvocationSyntax.GetLocation(),
+            CXDesigner,
             source,
-            [..diagnostics]
+            [
+                ..parserDiagnostics,
+                ..Graph.Diagnostics,
+                ..context.GlobalDiagnostics
+            ],
+            UsesDesigner
         );
     }
 
