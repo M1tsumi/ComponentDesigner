@@ -82,33 +82,33 @@ public sealed class SelectMenuComponentNode : ComponentNode
         ];
     }
 
-    public override ComponentState? Create(ICXNode source, List<CXNode> children)
+    public override ComponentState? Create(ComponentStateInitializationContext context)
     {
-        if (source is not CXElement element) return null;
+        if (context.Node is not CXElement element) return null;
 
         var typeAttribute = element.Attributes
             .FirstOrDefault(x => x.Identifier.Value.ToLowerInvariant() is "type");
 
-        if (typeAttribute is null) return new MissingTypeState() {Source = source};
+        if (typeAttribute is null) return new MissingTypeState() {Source = context.Node};
 
         if (typeAttribute.Value is not CXValue.StringLiteral {HasInterpolations: false} typeValue)
-            return new InvalidTypeState() {Source = source,};
+            return new InvalidTypeState() {Source = context.Node,};
 
         var kind = typeValue.Tokens.ToString().ToLowerInvariant();
         switch (kind)
         {
             case "string" or "text":
-                children.AddRange(element.Children);
-                return new StringSelectState() {Source = source};
+                context.AddChildren(element.Children);
+                return new StringSelectState() {Source = context.Node};
             case "user":
-                return new UserSelectState() {Source = source, Defaults = ExtractDefaultValues()};
+                return new UserSelectState() {Source = context.Node, Defaults = ExtractDefaultValues()};
             case "role":
-                return new RoleSelectState() {Source = source, Defaults = ExtractDefaultValues()};
+                return new RoleSelectState() {Source = context.Node, Defaults = ExtractDefaultValues()};
             case "channel":
-                return new ChannelSelectState() {Source = source, Defaults = ExtractDefaultValues()};
+                return new ChannelSelectState() {Source = context.Node, Defaults = ExtractDefaultValues()};
             case "mention" or "mentionable":
-                return new MentionableSelectState() {Source = source, Defaults = ExtractDefaultValues()};
-            default: return new InvalidTypeState() {Source = source, Kind = kind};
+                return new MentionableSelectState() {Source = context.Node, Defaults = ExtractDefaultValues()};
+            default: return new InvalidTypeState() {Source = context.Node, Kind = kind};
         }
 
         IReadOnlyList<SelectMenuDefautValue> ExtractDefaultValues()

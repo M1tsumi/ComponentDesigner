@@ -12,17 +12,32 @@ public enum InterleavedKind
 {
     None = 0,
 
-    MessageComponentBuilder = 1,
-    MessageComponent = 2,
-    CXMessageComponent = 3,
+    // ReSharper disable InconsistentNaming
+    IMessageComponentBuilder = 0b001,
+    IMessageComponent = 0b010,
+    // ReSharper restore InconsistentNaming
 
-    CollectionOf = 1 << 2,
+    CXMessageComponent = 0b011,
+    MessageComponent = 0b100,
 
-    ComponentMask = MessageComponentBuilder | MessageComponent | CXMessageComponent,
-    
-    CollectionOfBuilders = MessageComponentBuilder | CollectionOf,
-    CollectionOfComponents = MessageComponent | CollectionOf,
+    CollectionOf = 1 << 3,
+
+    ComponentMask = IMessageComponentBuilder | IMessageComponent | CXMessageComponent | MessageComponent,
+
+    CollectionOfIMessageComponentBuilders = IMessageComponentBuilder | CollectionOf,
+    CollectionOfIMessageComponents = IMessageComponent | CollectionOf,
     CollectionOfCXComponents = CXMessageComponent | CollectionOf,
+    CollectionOfMessageComponents = MessageComponent | CollectionOf,
+}
+
+public static class InterleavedKindExtensions
+{
+    public static bool SupportsCardinalityOfMany(this InterleavedKind kind)
+    {
+        if (kind.HasFlag(InterleavedKind.CollectionOf)) return true;
+
+        return kind is InterleavedKind.MessageComponent or InterleavedKind.CXMessageComponent;
+    }
 }
 
 public sealed class InterleavedComponentNode : ComponentNode
@@ -31,7 +46,7 @@ public sealed class InterleavedComponentNode : ComponentNode
     public ITypeSymbol Symbol { get; }
 
     public bool IsSingleCardinality
-        => Kind == InterleavedKind.MessageComponentBuilder;
+        => Kind == InterleavedKind.IMessageComponentBuilder;
 
     public override string Name => "<interpolated component>";
 
@@ -93,7 +108,16 @@ public sealed class InterleavedComponentNode : ComponentNode
             )
         )
         {
-            kind |= InterleavedKind.MessageComponentBuilder;
+            kind |= InterleavedKind.IMessageComponentBuilder;
+        }
+        else if (
+            compilation.HasImplicitConversion(
+                current,
+                compilation.GetKnownTypes().IMessageComponentType
+            )
+        )
+        {
+            kind |= InterleavedKind.IMessageComponent;
         }
         else if (
             compilation.HasImplicitConversion(
@@ -102,7 +126,7 @@ public sealed class InterleavedComponentNode : ComponentNode
             )
         )
         {
-            kind |= InterleavedKind.MessageComponent;
+            kind |= InterleavedKind.IMessageComponent;
         }
 
         return (kind & InterleavedKind.ComponentMask) is not 0;
@@ -124,32 +148,165 @@ public sealed class InterleavedComponentNode : ComponentNode
         return false;
     }
 
+    public static bool TryConvertBasic(string source, InterleavedKind from, InterleavedKind to, out string result)
+        => (result = ConvertBasic(source, from, to)!) is not null;
+
+    public static bool TryConvert(
+        string source,
+        InterleavedKind from,
+        InterleavedKind to,
+        out string result,
+        bool spreadCollections = false
+    ) => (result = Convert(source, from, to, spreadCollections)!) is not null;
+
+    public static string? Convert(
+        string source,
+        InterleavedKind from,
+        InterleavedKind to,
+        bool spreadCollections = false
+    )
+    {
+        if (from is InterleavedKind.None || to is InterleavedKind.None) return null;
+
+        var fromCollection = from.HasFlag(InterleavedKind.CollectionOf);
+        var toCollection = to.HasFlag(InterleavedKind.CollectionOf);
+
+        var fromBasicKind = from & InterleavedKind.ComponentMask;
+        var toBasicKind = to & InterleavedKind.ComponentMask;
+
+        var spread = spreadCollections ? ".." : string.Empty;
+
+        switch (fromCollection, toCollection)
+        {
+            case (false, false):
+                return ConvertBasic(source, from, to);
+            case (true, false):
+            {
+                var converter = ConvertBasic("x", fromBasicKind, toBasicKind);
+                return converter is not null ? $"{source}.Select(x => {converter})" : null;
+            }
+            case (false, true):
+            {
+                switch (fromBasicKind, toBasicKind)
+                {
+                    case (
+                        InterleavedKind.MessageComponent or InterleavedKind.CXMessageComponent,
+                        InterleavedKind.IMessageComponent
+                        ):
+                        return $"{spread}{source}.Components";
+                    case (
+                        InterleavedKind.MessageComponent,
+                        InterleavedKind.IMessageComponentBuilder
+                        ):
+                        return $"{spread}{source}.Components.Select(x => x.ToBuilder())";
+                    case (
+                        InterleavedKind.CXMessageComponent,
+                        InterleavedKind.IMessageComponentBuilder
+                        ):
+                        return $"{spread}{source}.Builders";
+                    default:
+                        var converter = ConvertBasic(source, fromBasicKind, toBasicKind);
+                        return converter is not null
+                            ? spreadCollections ? converter : $"[{converter}]"
+                            : null;
+                }
+            }
+            case (true, true):
+                switch (fromBasicKind, toBasicKind)
+                {
+                    case (InterleavedKind.MessageComponent or InterleavedKind.CXMessageComponent, InterleavedKind
+                        .IMessageComponent):
+                        return $"{source}.SelectMany(x => x.Components)";
+                    case (InterleavedKind.MessageComponent, InterleavedKind.IMessageComponentBuilder):
+                        return $"{source}.SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
+                    case (InterleavedKind.CXMessageComponent, InterleavedKind.IMessageComponentBuilder):
+                        return $"{source}.SelectMany(x => x.Builders)";
+                    default:
+                        var converter = ConvertBasic("x", fromBasicKind, toBasicKind);
+                        return converter is not null
+                            ? $"{source}.Select(x => {converter})"
+                            : null;
+                }
+        }
+    }
+
+    public static string? ConvertBasic(string source, InterleavedKind from, InterleavedKind to)
+    {
+        const string ComponentBuilderRef = "global::Discord.ComponentBuilderV2";
+        const string CXComponentRef = "global::Discord.CXMessageComponent";
+
+        switch (from, to)
+        {
+            case (InterleavedKind.IMessageComponent, InterleavedKind.IMessageComponent):
+                return source;
+            case (InterleavedKind.IMessageComponent, InterleavedKind.IMessageComponentBuilder):
+                return $"{source}.ToBuilder()";
+            case (InterleavedKind.IMessageComponent, InterleavedKind.MessageComponent):
+                return $"new {ComponentBuilderRef}({source}).Build()";
+            case (InterleavedKind.IMessageComponent, InterleavedKind.CXMessageComponent):
+                return $"new {CXComponentRef}({source})";
+
+            case (InterleavedKind.MessageComponent, InterleavedKind.IMessageComponent):
+                // no way to convert to single here
+                return null;
+            case (InterleavedKind.MessageComponent, InterleavedKind.IMessageComponentBuilder):
+                // no way to convert to single
+                return null;
+            case (InterleavedKind.MessageComponent, InterleavedKind.MessageComponent):
+                return source;
+            case (InterleavedKind.MessageComponent, InterleavedKind.CXMessageComponent):
+                return $"new {CXComponentRef}({source})";
+
+            case (InterleavedKind.IMessageComponentBuilder, InterleavedKind.IMessageComponent):
+                return $"{source}.Build()";
+            case (InterleavedKind.IMessageComponentBuilder, InterleavedKind.IMessageComponentBuilder):
+                return source;
+            case (InterleavedKind.IMessageComponentBuilder, InterleavedKind.MessageComponent):
+                return $"new {ComponentBuilderRef}({source}).Build()";
+            case (InterleavedKind.IMessageComponentBuilder, InterleavedKind.CXMessageComponent):
+                return $"new {CXComponentRef}({source})";
+
+            case (InterleavedKind.CXMessageComponent, InterleavedKind.IMessageComponent):
+                // no way to convert to single here
+                return null;
+            case (InterleavedKind.CXMessageComponent, InterleavedKind.IMessageComponentBuilder):
+                // no way to convert to single here
+                return null;
+            case (InterleavedKind.CXMessageComponent, InterleavedKind.MessageComponent):
+                return $"{source}.ToDiscordComponents()";
+            case (InterleavedKind.CXMessageComponent, InterleavedKind.CXMessageComponent):
+                return source;
+
+            default: return null;
+        }
+    }
+
     public static string ExtrapolateKindToBuilders(InterleavedKind kind, string source)
     {
         switch (kind)
         {
             // case 1: standard builder, we do nothing to the source
-            case InterleavedKind.MessageComponentBuilder: return source;
-            
-            case InterleavedKind.CollectionOfBuilders: return $"..{source}";
-            
+            case InterleavedKind.IMessageComponentBuilder: return source;
+
+            case InterleavedKind.CollectionOfIMessageComponentBuilders: return $"..{source}";
+
             case InterleavedKind.CXMessageComponent:
-            case InterleavedKind.MessageComponent: return $"..({source}).Components.Select(x => x.ToBuilder())";
-            
+            case InterleavedKind.IMessageComponent: return $"..({source}).Components.Select(x => x.ToBuilder())";
+
             case InterleavedKind.CollectionOfCXComponents:
-            case InterleavedKind.CollectionOfComponents:
+            case InterleavedKind.CollectionOfIMessageComponents:
                 return $"..({source}).SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
-            
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
     }
-    
-    public override ComponentState? Create(ICXNode source, List<CXNode> children)
-    {
-        if (source is not CXValue.Interpolation interpolation) return null;
 
-        return base.Create(source, children);
+    public override ComponentState? Create(ComponentStateInitializationContext context)
+    {
+        if (context.Node is not CXValue.Interpolation interpolation) return null;
+
+        return base.Create(context);
     }
 
 

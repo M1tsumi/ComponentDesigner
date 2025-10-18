@@ -47,12 +47,12 @@ public sealed class StringSelectOptionComponentNode : ComponentNode
         ];
     }
 
-    public override ComponentState? Create(ICXNode source, List<CXNode> children)
+    public override ComponentState? Create(ComponentStateInitializationContext context)
     {
-        var state = base.Create(source, children);
+        var state = base.Create(context);
 
         if (
-            source is CXElement {Children.Count: 1} element &&
+            context.Node is CXElement {Children.Count: 1} element &&
             element.Children[0] is CXValue value
         )
         {

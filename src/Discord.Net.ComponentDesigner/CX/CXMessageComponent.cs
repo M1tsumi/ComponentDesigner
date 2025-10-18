@@ -4,6 +4,8 @@ namespace Discord;
 
 public sealed class CXMessageComponent : INestedComponent
 {
+    public static readonly CXMessageComponent Empty = new(Array.Empty<IMessageComponent>());
+    
     public bool IsSingle => Components.Count is 1;
     public bool IsEmpty => Components.Count is 0;
 
@@ -27,7 +29,10 @@ public sealed class CXMessageComponent : INestedComponent
     {
         _components = [..components];
     }
-    
+
+    public CXMessageComponent(MessageComponent component) : this(component.Components)
+    {
+    }
     
     public MessageComponent ToDiscordComponents()
         => _built ??= new ComponentBuilderV2(Components).Build();
@@ -36,5 +41,5 @@ public sealed class CXMessageComponent : INestedComponent
         => self.ToDiscordComponents();
 
     public static implicit operator CXMessageComponent(MessageComponent comp)
-        => new(comp.Components);
+        => new(comp);
 }

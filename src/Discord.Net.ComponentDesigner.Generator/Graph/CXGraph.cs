@@ -139,7 +139,7 @@ public readonly struct CXGraph
                     )
                 )
                 {
-                    var state = inner.Create(interpolation, []);
+                    var state = inner.Create(new ComponentStateInitializationContext(interpolation, []));
 
                     if (state is null) return [];
 
@@ -197,7 +197,7 @@ public readonly struct CXGraph
 
                 var children = new List<CXNode>();
 
-                var state = componentNode.Create(element, children);
+                var state = componentNode.Create(new(element, children));
 
                 if (state is null) return [];
 

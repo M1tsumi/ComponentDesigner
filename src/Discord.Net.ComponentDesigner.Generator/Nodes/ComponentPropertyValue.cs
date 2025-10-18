@@ -21,10 +21,6 @@ public sealed record ComponentPropertyValue(
 
     public bool HasValue => Value is not null;
 
-    private readonly List<Diagnostic> _diagnostics = [];
-
-    public void AddDiagnostic(Diagnostic diagnostic) => _diagnostics.Add(diagnostic);
-
     public bool TryGetLiteralValue(ComponentContext context, out string value)
     {
         switch (Value)
@@ -35,10 +31,6 @@ public sealed record ComponentPropertyValue(
             case CXValue.StringLiteral {HasInterpolations: false} literal:
                 value = literal.Tokens.ToString();
                 return true;
-            // case CXValue.Interpolation interpolation:
-            //     var info = context.GetInterpolationInfo(interpolation);
-            //
-            //     break;
 
             default:
                 value = string.Empty;

@@ -145,7 +145,17 @@ public static class Renderers
         {
             if (info.Constant.Value is int || int.TryParse(info.Constant.Value?.ToString(), out _))
                 return info.Constant.Value!.ToString();
-
+            
+            if (info.Constant.HasValue)
+            {
+                context.AddDiagnostic(
+                    Diagnostics.TypeMismatch,
+                    owner,
+                    info.Constant.Value!.GetType().Name,
+                    "int"
+                );
+            }
+            
             if (
                 context.Compilation.HasImplicitConversion(
                     info.Symbol,
@@ -389,7 +399,7 @@ public static class Renderers
             case CXValue.Interpolation interpolation:
                 if (context.GetInterpolationInfo(interpolation).Constant.Value is string constant)
                     return ToCSharpString(constant);
-
+                
                 return context.GetDesignerValue(interpolation);
             case CXValue.Multipart literal: return RenderStringLiteral(literal);
             case CXValue.Scalar scalar:
@@ -509,7 +519,7 @@ public static class Renderers
         }
     }
 
-    private static string ToCSharpString(string text)
+    public static string ToCSharpString(string text)
     {
         var quoteCount = (GetSequentialQuoteCount(text) + 1) switch
         {

@@ -93,9 +93,9 @@ public sealed class SourceGenerator : IIncrementalGenerator
                   [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.InterceptLocation.Version}}, data: "{{interceptor.InterceptLocation.Data}}")]
                   public static global::Discord.CXMessageComponent _{{Math.Abs(interceptor.GetHashCode())}}(
                       {{parameter}}
-                  ) => new global::Discord.CXMessageComponent(
+                  ) => new global::Discord.CXMessageComponent([
                       {{interceptor.Source.WithNewlinePadding(4)}}
-                  );
+                  ]);
                   """
             );
         }

@@ -287,4 +287,13 @@ public static partial class Diagnostics
         DiagnosticSeverity.Warning,
         true
     );
+    
+    public static readonly DiagnosticDescriptor InvalidChildComponentCardinality = new(
+        "DC0030",
+        "Too many children",
+        "'{0}' only accepts one child",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
 }

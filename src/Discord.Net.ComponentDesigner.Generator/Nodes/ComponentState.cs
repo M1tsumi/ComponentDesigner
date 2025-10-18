@@ -35,6 +35,21 @@ public class ComponentState
         return _properties[property] = new(property, attribute);
     }
 
+    public bool TryGetChildGraphNode(ICXNode node, out CXGraph.Node childNode)
+    {
+        foreach (var child in Children)
+        {
+            if (ReferenceEquals(child.State.Source, node))
+            {
+                childNode = child;
+                return true;
+            }
+        }
+        
+        childNode = null!;
+        return false;
+    }
+    
     public void SubstitutePropertyValue(ComponentProperty property, CXValue value)
     {
         if (!_properties.TryGetValue(property, out var existing))

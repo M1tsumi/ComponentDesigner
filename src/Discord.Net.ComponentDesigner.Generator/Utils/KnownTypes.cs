@@ -20,6 +20,11 @@ public class KnownTypes
     }
 
     
+    public INamedTypeSymbol? CXChildrenAttribute
+        => GetOrResolveType("Discord.CXChildrenAttribute", ref _CXChildrenAttribute);
+    
+    public Optional<INamedTypeSymbol?> _CXChildrenAttribute;
+    
     public INamedTypeSymbol? MediaGalleryComponentType
         => GetOrResolveType("Discord.MediaGalleryComponent", ref _MediaGalleryComponentType);
     
@@ -109,6 +114,11 @@ public class KnownTypes
         => GetOrResolveType("Discord.IMessageComponentBuilder", ref _IMessageComponentBuilderType);
 
     private Optional<INamedTypeSymbol?> _IMessageComponentBuilderType;
+    
+    public INamedTypeSymbol? IMessageComponentType
+        => GetOrResolveType("Discord.IMessageComponent", ref _IMessageComponentType);
+
+    private Optional<INamedTypeSymbol?> _IMessageComponentType;
 
     public INamedTypeSymbol? ActionRowBuilderType
         => GetOrResolveType("Discord.ActionRowBuilder", ref _ActionRowBuilderType);

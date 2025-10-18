@@ -22,10 +22,10 @@ public abstract class ComponentNode<TState> : ComponentNode
     public sealed override void UpdateState(ref ComponentState state)
         => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state));
 
-    public abstract TState? CreateState(ICXNode source, List<CXNode> children);
+    public abstract TState? CreateState(ComponentStateInitializationContext context);
 
-    public sealed override ComponentState? Create(ICXNode source, List<CXNode> children)
-        => CreateState(source, children);
+    public sealed override ComponentState? Create(ComponentStateInitializationContext context)
+        => CreateState(context);
 
     public sealed override string Render(ComponentState state, ComponentContext context)
         => Render((TState)state, context);
@@ -109,14 +109,14 @@ public abstract class ComponentNode
     {
     }
 
-    public virtual ComponentState? Create(ICXNode source, List<CXNode> children)
+    public virtual ComponentState? Create(ComponentStateInitializationContext context)
     {
-        if (HasChildren && source is CXElement element)
+        if (HasChildren && context.Node is CXElement element)
         {
-            children.AddRange(element.Children);
+            context.AddChildren(element.Children);
         }
 
-        return new ComponentState() { Source = source };
+        return new ComponentState() { Source = context.Node };
     }
 
 
@@ -192,7 +192,7 @@ public abstract class ComponentNode
                     )
                 ) continue;
 
-                node = new FunctionalComponentNode(methodSymbol, kind);
+                node = FunctionalComponentNode.Create(methodSymbol, kind, cxSemanticModel.Compilation);
                 return true;
             }
         }

@@ -63,7 +63,9 @@ public sealed class ComponentContext
     public void AddDiagnostic(DiagnosticDescriptor descriptor, TextSpan span, params object?[]? args)
         => AddDiagnostic(Diagnostic.Create(descriptor, GetLocation(span), args));
 
-
+    public DesignerInterpolationInfo GetInterpolationInfo(CXToken token)
+        => GetInterpolationInfo(_graph.Manager.Document.GetInterpolationIndex(token));
+    
     public DesignerInterpolationInfo GetInterpolationInfo(CXValue.Interpolation interpolation)
         => GetInterpolationInfo(interpolation.InterpolationIndex);
 
