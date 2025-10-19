@@ -9,6 +9,19 @@
   - [String Literals](#string-literals)
   - [Interpolation Syntax](#interpolation-syntax)
 - [Component Designer](#component-designer)
+  - [Built-in Components](#built-in-components)
+    - [Action Row](#action-row)
+    - [Button](#button)
+    - [Container](#container)
+    - [File](#file)
+    - [Label](#label)
+    - [Media Gallery](#media-gallery)
+    - [Section](#section)
+    - [Select Menu](#select-menu)
+    - [Separator](#separator)
+    - [Text Display](#text-display)
+    - [Text Input](#text-input)
+    - [Thumbnail](#thumbnail)
   - [String Interpolation](#string-interpolation)
   - [Interpolated Components](#interpolated-components)
   - [Compile-time Diagnostics](#compile-time-diagnostics)
@@ -98,6 +111,401 @@ using static Discord.ComponentDesigner;
 var myAwesomeComponent = cx(...);
 ```
 
+## Built-in Components
+
+The Component Designer comes with all the [components provided by Discord](https://discord.com/developers/docs/components/overview) as built-ins.
+
+### Action Row
+
+Action rows wrap buttons or select menus providing top-level layout.
+
+#### Aliases
+- `row`
+
+#### Attributes
+
+| Name | Type | Description                        |
+| ---- | ---- | ---------------------------------- |
+| id?  | int  | The optonal identifier for the row |
+
+#### Valid children
+- [Button](#button)
+- [Select Menu](#select-menu)
+
+```html
+<action-row id={1}>
+    ...
+</action-row>
+```
+
+### Button
+
+A button is an interactive component that can only be used in messages. Buttons must be placed in an [Action Row](#action-row) or as an accessory to a [Section](#section)
+
+#### Attributes
+
+| Name      | Type                          | Description                            |
+| --------- | ----------------------------- | -------------------------------------- |
+| id?       | int                           | The optional identifier for the button |
+| style?    | string \| Discord.ButtonStyle | The style of the button                |
+| label?    | string \| children            | The label of the button                |
+| emoji?    | string \| Discord.IEmote      | The emoji of the button                |
+| customId? | string                        | The custom id of the button            |
+| sku?      | ulong \| string               | A SKU id                               |
+| url?      | string                        | A url for a link style button          |
+| disabled? | boolean                       | Whether the button is disabled         |
+
+Example basic button
+```html
+<button 
+    customId="my-button"
+    style="success"
+>
+    Click me!
+</button>
+```
+
+Example URL button
+```html
+<button
+    style="link"
+    url="http://example.com"
+    emoji="🔗"
+/>
+```
+
+### Container
+
+A container is a top-level layout component, offering the ability to visually encapsulate a collection of components and can have an optional accent color.
+
+#### Attributes
+
+| Name    | Type                           | Description                               |
+| ------- | ------------------------------ | ----------------------------------------- |
+| id?     | int                            | The optional identifier for the container |
+| color?  | string \| int \| Discord.Color | The accent color of the container         |
+| spoiler | boolean                        | Whether or not the container is a spoiler |
+
+#### Valid children
+- [Action Row](#action-row)
+- [Text Display](#text-display)
+- [Section](#section)
+- [Media Gallery](#media-gallery)
+- [Separator](#separator)
+- [File](#file)
+
+```html
+<container color="#00FF00">
+    ...
+</container>
+```
+
+### File
+
+A file allows you to display an uploaded file as an attachment.
+
+You can use `attachment://` to reference attachments uploaded in a message
+
+#### Attributes
+
+| Name     | Type    | Description                          |
+| -------- | ------- | ------------------------------------ |
+| id?      | int     | The optional identifier for the file |
+| url      | string  | The URL of the file to attach        |
+| spoiler? | boolean | Whether or not the file is a spoiler |
+
+```html
+<file
+    id={123}
+    url="attachment://file.png"
+    spoiler
+/>
+```
+
+### Label
+
+A label wraps modal components with text and an optional description
+
+#### Attributes
+
+| Name         | Type               | Description                           |
+| ------------ | ------------------ | ------------------------------------- |
+| id?          | int                | The optional identifier for the label |
+| value        | string \| children | The value text of the label           |
+| description? | string             | The description of the label          |
+
+#### Valid children
+- Text\*
+- [Text Input](#text-input)
+- [Select Menu](#select-menu)
+
+\* Text must be the first child of a label to be mapped to the `value`
+
+```html
+<label description="My Description">
+    My Label
+    <button {...}/>
+</label>
+```
+
+### Media Gallery
+
+A Media Gallery allows you to display media attachments in an organized format.
+
+#### Aliases
+- `gallery`
+
+#### Attributes
+| Name | Type | Description                             |
+| ---- | ---- | --------------------------------------- |
+| id?  | int  | The optional identifier for the gallery |
+
+#### Valid children
+- [Media Gallery Item](#media-gallery-item)
+
+```html
+<media-gallery id={123}>
+    ...
+</media-gallery>
+```
+
+### Media Gallery Item
+
+Used within a [Media Gallery](#media-gallery) representing a single media item.
+
+#### Aliases
+- `gallery-item`
+- `media`
+- `item`
+
+#### Attributes
+| Name         | Type    | Description                     |
+| ------------ | ------- | ------------------------------- |
+| url          | string  | The url of the media to display |
+| description? | string  | The description of the media    |
+| spoiler?     | boolean | Whether the media is a spoiler  |
+
+```html
+<media-gallery-item
+    url="attachment://media1.png"
+    description="My Description"
+    spoiler
+/>
+```
+
+### Section
+A Section allows you to contextually associate content with an accessory component.
+
+#### Attributes
+
+| Name      | Type                  | Description                             |
+| --------- | --------------------- | --------------------------------------- |
+| id?       | int                   | The optional identifier for the section |
+| accessory | component \| children | The accessory of the section            |
+
+#### Valid children
+- [Text Display](#text)
+- [Accessory](#accessory)
+
+#### Valid accessories
+- [Button](#button)
+- [Thumbnail](#thumbnail)
+
+```html
+<section
+    id={123}
+>
+    <text>...</text>
+    <accessory>...</accessory>
+</section>
+
+<section
+    id={123}
+    accessory={myAccessory}
+>
+    ...
+</section>
+```
+
+### Accessory
+
+An Accessory is used within the [Section](#section) to denote which child is to be treated as an accessory.
+It does not contain any attributes and must contain a valid accessory type as its child.
+
+### Select Menu
+
+A Select Menu allows users to select one or more provided choices.
+
+#### Aliases
+- `select`
+
+#### Attributes
+
+| Name         | Type                                   | Description                                                          |
+| ------------ | -------------------------------------- | -------------------------------------------------------------------- |
+| type         | [Select Menu Type](#select-menu-types) | The type of the select menu |
+| id?          | int                                    | The optional identifier for the select menu                          |
+| customId     | string                                 | The custom id of the select menu                                     |
+| placeholder? | string                                 | A placeholder to show if nothing is selected                         |
+| min?         | int                                    | The minimum number of items that can be chosen                       |
+| max?         | int                                    | The maximum number of items that can be chosen                       |
+| required?    | boolean                                | Whether or not the select menu is required to be answered in a modal |
+| disabled?    | boolean                                | Whether or not the select menu is disabled                           |
+
+#### Select menu types
+Valid select menu types are:
+- `string` or `text`
+- `user`
+- `role`
+- `channel`
+- `mention` or `mentionable`
+
+#### Valid children
+- `user` when type is `user` or `mentionable`
+- `role` when type is `role` or `mentionable`
+- `channel` when type is `channel` or `mentionable`
+- [Select Menu Option](#select-menu-option) when type is `string`
+
+for children of `user`, `role`, and `channel`, the element should contain the ID/entity as the child, ex: `<user>{userId}</user>`
+
+```html
+<select-menu
+    type="string"
+    customId="menu-1"
+    placeholder="Select an option..."
+    max={1}
+    min={1}
+    required
+>
+    <select-menu-option
+        label="Choice 1"
+        value="value-1"
+    />
+    <select-menu-option
+        label="Choice 2"
+        value="value-2"
+        description="The better choice"   
+    />
+</select-menu>
+
+<select-menu
+    type="user"
+    customId="menu-2"
+    placeholder="Select a user"
+    required
+>
+    <user>{userId1}</user>
+    <user>{user2}</user>
+</select-menu>
+```
+
+### Select Menu Option
+
+A Select Menu Option represents a choice within a [Select Menu](#select-menu)
+
+#### Aliases
+- `option`
+
+#### Attributes
+
+| Name         | Type                     | Description                                       |
+| ------------ | ------------------------ | ------------------------------------------------- |
+| label        | string                   | The label of the option                           |
+| value        | string                   | The developer-defined value of the option         |
+| description? | string                   | Additional description of the option              |
+| emoji?       | string \| Discord.IEmote | An emoji for the option                           |
+| default?     | boolean                  | Whether the option is shown as the default option |
+
+```html
+<select-menu-option
+    label="My Option"
+    value="option1"
+    description="This is option 1"
+    emoji={myEmote}
+    default={false}
+/>
+```
+
+### Separator
+
+A Separator adds vertical padding and visual division between components
+
+#### Attributes
+| Name     | Type                                    | Description                                 |
+| -------- | --------------------------------------- | ------------------------------------------- |
+| id?      | int                                     | The optional identifier for the separator   |
+| divider? | boolean                                 | Whether the separator has a visible divider |
+| spacing? | string  \| Discord.SeparatorSpacingSize | The size of the separator                   |
+
+```html
+<separator spacing="large" divider/>
+```
+
+### Text Display
+
+A Text Display renders content as markdown
+
+### Aliases
+- `text`
+
+#### Attributes
+
+| Name    | Type               | Description                                 |
+| ------- | ------------------ | ------------------------------------------- |
+| id?     | int                | The optional identifier of the text display |
+| content | string \| children | The text to display                         |
+
+```html
+<text-display>
+    # Hello, World!
+</text-display>
+```
+
+### Text Input
+
+A Text Input allows users to enter free-form text in a modal
+
+#### Aliases
+- `input`
+
+#### Attributes
+| Name         | Type                             | Description                                   |
+| ------------ | -------------------------------- | --------------------------------------------- |
+| id?          | int                              | The optional identifier of the text input     |
+| customId     | string                           | The custom id of the text input               |
+| style        | string \| Discord.TextInputStyle | The style of the text input                   |
+| min?         | int                              | The minimum input text length in characters   |
+| max?         | int                              | The maximum input text length in characters   |
+| required?    | boolean                          | Whether the text input is required in a modal |
+| value?       | string                           | The prefilled value of the input              |
+| placeholder? | string                           | A placeholder to show if the input is empty   |
+
+```html
+<text-input
+    customId="input-1"
+    style="short"
+    min={2}
+    max={36}
+    required
+    placeholder="This is a placeholder"
+/>
+```
+
+### Thumbnail
+
+A Thumbnail displays media in a compact form-factor.
+
+#### Attributes
+| Name         | Type    | Description                              |
+| ------------ | ------- | ---------------------------------------- |
+| id?          | int     | The optional identifier of the thumbnail |
+| url          | string  | The URL of the thumbnail                 |
+| description? | string  | The description of the thumbnail         |
+| spoiler?     | boolean | Whether the thumbnail is a spoiler |
+
+```html
+<thumbnail url="attachment://image.png" spoiler />
+```
 
 ## String Interpolation
 

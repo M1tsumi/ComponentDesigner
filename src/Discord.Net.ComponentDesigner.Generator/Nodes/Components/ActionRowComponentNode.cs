@@ -9,7 +9,9 @@ namespace Discord.CX.Nodes.Components;
 
 public sealed class ActionRowComponentNode : ComponentNode
 {
-    public override string Name => "row";
+    public override string Name => "action-row";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["row"];
 
     public override bool HasChildren => true;
 

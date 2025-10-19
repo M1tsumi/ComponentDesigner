@@ -7,7 +7,9 @@ public sealed class TextInputComponentNode : ComponentNode
 {
     public const string LIBRARY_TEXT_INPUT_STYLE_ENUM = "Discord.TextInputStyle";
 
-    public override string Name => "input";
+    public override string Name => "text-input";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["input"];
 
     public ComponentProperty CustomId { get; }
     public ComponentProperty Style { get; }

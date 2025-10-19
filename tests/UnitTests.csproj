@@ -26,4 +26,8 @@
       <ProjectReference Include="..\src\Discord.Net.ComponentDesigner\Discord.Net.ComponentDesigner.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="ComponentTests\" />
+    </ItemGroup>
+
 </Project>

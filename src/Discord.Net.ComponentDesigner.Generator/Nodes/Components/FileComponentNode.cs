@@ -19,6 +19,7 @@ public sealed class FileComponentNode : ComponentNode
             ComponentProperty.Id,
             File = new(
                 "file",
+                aliases: ["url"],
                 renderer: Renderers.UnfurledMediaItem,
                 dotnetParameterName: "media"
             ),

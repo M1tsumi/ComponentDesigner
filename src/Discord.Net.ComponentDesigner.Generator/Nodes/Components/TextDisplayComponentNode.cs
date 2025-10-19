@@ -6,7 +6,9 @@ namespace Discord.CX.Nodes.Components;
 
 public sealed class TextDisplayComponentNode : ComponentNode
 {
-    public override string Name => "text";
+    public override string Name => "text-display";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["text"];
 
     public ComponentProperty Content { get; }
     public override IReadOnlyList<ComponentProperty> Properties { get; }

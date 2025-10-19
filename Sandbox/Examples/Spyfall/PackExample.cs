@@ -102,9 +102,9 @@ public class PackExample
         );
     }
 
-    public static MessageComponent? PackAuthor(User? user)
+    public static CXMessageComponent PackAuthor(User? user)
     {
-        if (user is null) return null;
+        if (user is null) return CXMessageComponent.Empty;
 
         var viewProfileButton = cx(
             $"""

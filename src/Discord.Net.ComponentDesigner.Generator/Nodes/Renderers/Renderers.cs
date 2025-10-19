@@ -595,19 +595,19 @@ public static class Renderers
                 variants = symbol
                     .GetMembers()
                     .OfType<IFieldSymbol>()
-                    .Where(x => x.Type == symbol)
+                    .Where(x => x.Type.Equals(symbol, SymbolEqualityComparer.Default))
                     .ToDictionary(x => x.Name.ToLowerInvariant(), x => x.Name);
             }
 
             switch (propertyValue.Value)
             {
                 case CXValue.Scalar scalar:
-                    return FromText(scalar.Value.Trim());
+                    return FromText(scalar.Value.Trim(), scalar);
                 case CXValue.Interpolation interpolation:
                     return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
                 case CXValue.Multipart literal:
                     if (!literal.HasInterpolations)
-                        return FromText(literal.Tokens.ToString().Trim().ToLowerInvariant());
+                        return FromText(literal.Tokens.ToString().Trim().ToLowerInvariant(), literal);
 
                     if (IsLoneInterpolatedLiteral(context, literal, out var info))
                         return FromInterpolation(literal, info);
@@ -634,20 +634,29 @@ public static class Renderers
 
                 if (info.Constant.Value?.ToString() is { } str)
                 {
-                    return FromText(str.Trim().ToLowerInvariant());
+                    return FromText(str.Trim().ToLowerInvariant(), owner);
                 }
 
                 return
                     $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
             }
 
-            string FromText(string text)
+            string FromText(string text, ICXNode owner)
             {
                 if (variants.TryGetValue(text, out var name))
                     return $"{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{name}";
 
-                return
-                    $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})";
+                context.AddDiagnostic(
+                    Diagnostics.InvalidEnumVariant,
+                    owner,
+                    text,
+                    symbol.ToDisplayString()
+                );
+
+                return string.Empty;
+
+                // return
+                //     $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})";
             }
         };
     }

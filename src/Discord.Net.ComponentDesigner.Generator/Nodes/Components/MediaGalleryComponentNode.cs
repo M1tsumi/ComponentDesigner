@@ -5,11 +5,21 @@ namespace Discord.CX.Nodes.Components;
 
 public sealed class MediaGalleryComponentNode : ComponentNode
 {
-    public override string Name => "gallery";
+    public override string Name => "media-gallery";
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; } = [ComponentProperty.Id];
+    public override IReadOnlyList<string> Aliases { get; } = ["gallery"];
 
+    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    
     public override bool HasChildren => true;
+
+    public MediaGalleryComponentNode()
+    {
+        Properties =
+        [
+            ComponentProperty.Id,
+        ];
+    }
 
     public override string Render(ComponentState state, ComponentContext context)
         => $$"""
@@ -39,7 +49,9 @@ public sealed class MediaGalleryComponentNode : ComponentNode
 
 public sealed class MediaGalleryItemComponentNode : ComponentNode
 {
-    public override string Name => "media";
+    public override string Name => "media-gallery-item";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["gallery-item", "media", "item"];
 
     public ComponentProperty Url { get; }
     public ComponentProperty Description { get; }

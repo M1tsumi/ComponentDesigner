@@ -31,7 +31,9 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
     public sealed class MentionableSelectState : SelectStateWithDefaults;
 
-    public override string Name => "select";
+    public override string Name => "select-menu";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["select"];
 
     public ComponentProperty CustomId { get; }
     public ComponentProperty Placeholder { get; }

@@ -6,7 +6,9 @@ namespace Discord.CX.Nodes.Components.SelectMenus;
 
 public sealed class StringSelectOptionComponentNode : ComponentNode
 {
-    public override string Name => "option";
+    public override string Name => "select-menu-option";
+
+    public override IReadOnlyList<string> Aliases { get; } = ["option"];
 
     public ComponentProperty Label { get; }
     public ComponentProperty Value { get; }

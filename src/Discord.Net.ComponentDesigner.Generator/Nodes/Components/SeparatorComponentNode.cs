@@ -27,6 +27,7 @@ public sealed class SeparatorComponentNode : ComponentNode
             ),
             Spacing = new(
                 "spacing",
+                aliases: ["size"],
                 isOptional: true,
                 renderer: Renderers.RenderEnum(SEPARATOR_SPACING_QUALIFIED_NAME)
             )
