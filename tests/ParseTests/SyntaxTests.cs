@@ -307,7 +307,7 @@ public class SyntaxTests : BaseParsingTest
                 {
                     Token(
                         CXTokenKind.Text,
-                        "Some text here,\r\n    Across multiple lines\r\n"
+                        $"Some text here,{Environment.NewLine}    Across multiple lines{Environment.NewLine}"
                     );
                 }
 
