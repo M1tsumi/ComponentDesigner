@@ -17,7 +17,7 @@ public sealed record ComponentPropertyValue(
         init => _value = value;
     }
 
-    public bool IsSpecified => Attribute is not null;
+    public bool IsSpecified => Attribute is not null || HasValue;
 
     public bool HasValue => Value is not null;
 
