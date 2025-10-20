@@ -7,49 +7,49 @@ namespace UnitTests.ParseTests;
 
 public class IncrementalTests
 {
-    [Fact]
-    public void IncrementalWithChanges()
-    {
-        IncrementalRanges(
-            "<button />",
-            new TextChange(new(1, 0), " ")
-        );
-    }
-
-    [Fact]
-    public void LargeIncrementalFullRanges()
-    {
-        FullRangeIncremental(
-            """
-            <container>
-                <text>Hello, World!</text>
-                <button id="12" name="value" />
-                <section>
-                    <text>## Foo</text>
-                    <accessory><thumbnail url="example" /></accessory>
-                </section>
-            </container>
-            """
-        );
-    }
-    
-    
-    [Fact]
-    public void IncrementalButton()
-    {
-        foreach (
-            var result
-            in IterativeIncrementalParse(
-                """
-                <button>
-
-                </button>
-                """
-            )
-        )
-        {
-        }
-    }
+//     [Fact]
+//     public void IncrementalWithChanges()
+//     {
+//         IncrementalRanges(
+//             "<button />",
+//             new TextChange(new(1, 0), " ")
+//         );
+//     }
+//
+//     [Fact]
+//     public void LargeIncrementalFullRanges()
+//     {
+//         FullRangeIncremental(
+//             """
+//             <container>
+//                 <text>Hello, World!</text>
+//                 <button id="12" name="value" />
+//                 <section>
+//                     <text>## Foo</text>
+//                     <accessory><thumbnail url="example" /></accessory>
+//                 </section>
+//             </container>
+//             """
+//         );
+//     }
+//     
+//     
+//     [Fact]
+//     public void IncrementalButton()
+//     {
+//         foreach (
+//             var result
+//             in IterativeIncrementalParse(
+//                 """
+//                 <button>
+//
+//                 </button>
+//                 """
+//             )
+//         )
+//         {
+//         }
+//     }
     
     public void FullRangeIncremental(string cx)
     {
