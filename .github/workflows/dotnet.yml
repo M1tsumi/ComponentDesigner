@@ -48,7 +48,7 @@ jobs:
             run: dotnet build "Discord.Net.ComponentDesigner.sln" -v minimal -c Release --no-restore /p:BuildNumber=${{ env.Suffix }} /p:IsTagBuild=${{ env.IsTagBuild }}
 
           - name: Unit Test
-            run: dotnet test "test/UnitTests.csproj" --no-restore --no-build -v minimal -c Release --logger trx
+            run: dotnet test "tests/UnitTests.csproj" --no-restore --no-build -v minimal -c Release --logger trx
 
           - name: Publish Test Results
             uses: EnricoMi/publish-unit-test-result-action@v2
