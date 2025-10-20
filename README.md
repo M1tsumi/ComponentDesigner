@@ -36,7 +36,19 @@ The Component Designer uses a [source generator](https://devblogs.microsoft.com/
 
 ### Getting started
 
-TODO
+Install the `Discord.Net.ComponentDesigner` package from one of the following feeds:
+- [Discord.Net Baget](https://baget.discordnet.dev/)
+- [Github Packages](https://github.com/discord-net/ComponentDesigner/pkgs/nuget/Discord.Net.ComponentDesigner)
+
+Thats it! You can now use the [Discord.ComponentDesigner.cx](#component-designer) method:
+
+```cs
+var myComponent = ComponentDesigner.cx(
+    """
+    <text>Hello, World!</text>
+    """
+);
+```
 
 ## Component Syntax
 
