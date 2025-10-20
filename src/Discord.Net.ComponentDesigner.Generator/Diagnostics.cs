@@ -17,15 +17,6 @@ public static partial class Diagnostics
             ),
             location
         );
-    
-    // public static readonly DiagnosticDescriptor ParseError = new(
-    //     "DCP001",
-    //     "CX Parsing error",
-    //     "{0}",
-    //     "Component Parser (CX)",
-    //     DiagnosticSeverity.Error,
-    //     true
-    // );
 
     public static readonly DiagnosticDescriptor InvalidEnumVariant = new(
         "DC0001",
@@ -292,6 +283,87 @@ public static partial class Diagnostics
         "DC0030",
         "Too many children",
         "'{0}' only accepts one child",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor FileUploadNotInLabel = new(
+        "DC0031",
+        "A file upload component must be placed in a label",
+        "File uploads' parent must be a label",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor MissingTypeInAssembly = new(
+        "DC0032",
+        "Missing type in assembly",
+        "Could not find '{0}' in your assembly",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor MissingLabelComponent = new(
+        "DC0033",
+        "Label is missing a child component",
+        "Label requires a child component",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor TooManyChildrenInLabel = new(
+        "DC0034",
+        "Too many children in Label",
+        "Labels can only contain 1 component",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidLabelChild = new(
+        "DC0035",
+        "Invalid label child component",
+        "Labels can only contain a text input, file upload, or select menu",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidContainerChild = new(
+        "DC0036",
+        "Invalid container child component",
+        "'{0}' is not a valid child component of 'container'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidMediaGalleryChild = new(
+        "DC0037",
+        "Invalid media gallery child component",
+        "'{0}' is not a valid child component of 'media gallery'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor PropertyNotAllowed = new(
+        "DC0038",
+        "Property not allowed",
+        "'{0}' doesn't allow the property '{1}' to be specified in the current configuration",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor ButtonCannotHaveALabelAndEmoji = new(
+        "DC0039",
+        "Buttons can't have a label and emoji",
+        "Buttons can't have both a label and an emoji",
         "Components",
         DiagnosticSeverity.Error,
         true

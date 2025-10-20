@@ -51,6 +51,13 @@ public readonly struct CXGraph
         CXDoc document
     )
     {
+        /*
+         * Update semantics:
+         *
+         * We try to reuse any ComponentNodes who's source is a reused node within the 'parseResult' AND contain no
+         * diagnostics. Any nodes with errors are not reused.
+         */
+        
         if (manager == Manager) return this;
 
         var map = new Dictionary<ICXNode, Node>();
@@ -118,7 +125,8 @@ public readonly struct CXGraph
             oldGraph.HasValue &&
             incrementalParseResult.HasValue &&
             reusedNodes.Contains(cxNode) &&
-            oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing)
+            oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing) && 
+            existing.Diagnostics.Count is 0
         )
         {
             var node = map[cxNode] = existing.Reuse(parent, incrementalParseResult.Value, manager);
@@ -241,7 +249,7 @@ public readonly struct CXGraph
     public sealed class Node
     {
         public ComponentNode Inner { get; }
-        public ComponentState State { get; }
+        public ComponentState State => _state;
         public IReadOnlyList<Node> Children { get; }
         public Node? Parent { get; }
 
@@ -252,6 +260,8 @@ public readonly struct CXGraph
 
         private readonly List<Diagnostic> _diagnostics;
         private string? _render;
+
+        private ComponentState _state;
 
         public Node(
             ComponentNode inner,
@@ -264,7 +274,7 @@ public readonly struct CXGraph
         )
         {
             Inner = inner;
-            State = state;
+            _state = state;
             Children = children;
             Parent = parent;
             _diagnostics = [..diagnostics ?? []];
@@ -272,6 +282,15 @@ public readonly struct CXGraph
             Incremental = incremental;
         }
 
+        public void UpdateState(ComponentContext context)
+        {
+            // update children first
+            foreach (var node in Children)
+                node.UpdateState(context);
+            
+            Inner.UpdateState(ref _state, context);
+        }
+        
         public string Render(ComponentContext context)
         {
             if (_render is not null) return _render;

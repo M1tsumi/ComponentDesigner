@@ -5,10 +5,24 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
 
-public sealed class ButtonComponentNode : ComponentNode
+public sealed class ButtonComponentState : ComponentState
+{
+    public ButtonKind InferredKind { get; set; } = ButtonKind.Default;
+}
+
+public enum ButtonKind
+{
+    Default,
+    Link,
+    Premium
+}
+
+public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 {
     public const string BUTTON_STYLE_ENUM = "Discord.ButtonStyle";
-
+    public const int BUTTON_STYLE_LINK_VALUE = 5;
+    public const int BUTTON_STYLE_PREMIUM_VALUE = 6;
+    
     public override string Name => "button";
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
@@ -73,17 +87,104 @@ public sealed class ButtonComponentNode : ComponentNode
         ];
     }
 
-    public override ComponentState? Create(ComponentStateInitializationContext context)
+    public override ButtonComponentState? CreateState(ComponentStateInitializationContext context)
     {
-        var state = base.Create(context);
+        if (context.Node is not CXElement element) return null;
 
-        if (context.Node is CXElement { Children.Count: 1 } element && element.Children[0] is CXValue value)
-            state?.SubstitutePropertyValue(Label, value);
+        var state = new ButtonComponentState()
+        {
+            Source = element
+        };
 
+        if (element.Children.Count > 0 && element.Children[0] is CXValue value)
+            state.SubstitutePropertyValue(Label, value);
+
+        InferButtonKind(state);
+        
         return state;
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void UpdateState(ref ButtonComponentState state, ComponentContext context)
+    {
+        state.InferredKind = FurtherInferredButtonKindWithContext(state, context);
+    }
+
+    private void InferButtonKind(ButtonComponentState state)
+    {
+        if (
+            state.GetProperty(Url).IsSpecified &&
+            !state.GetProperty(CustomId).IsSpecified &&
+            !state.GetProperty(SkuId).IsSpecified
+        )
+        {
+            state.InferredKind = ButtonKind.Link;
+        }
+        else if (
+            !state.GetProperty(Url).IsSpecified &&
+            !state.GetProperty(CustomId).IsSpecified &&
+            state.GetProperty(SkuId).IsSpecified
+        )
+        {
+            state.InferredKind = ButtonKind.Premium;
+        }
+        else if (state.GetProperty(Style).TryGetLiteralValue(out var style))
+        {
+            state.InferredKind = style.ToLowerInvariant() switch
+            {
+                "link" => ButtonKind.Link,
+                "premium" => ButtonKind.Premium,
+                _ => ButtonKind.Default
+            };
+        }
+    }
+
+    private ButtonKind FurtherInferredButtonKindWithContext(ButtonComponentState state, ComponentContext context)
+    {
+        if (state.InferredKind is not ButtonKind.Default) return state.InferredKind;
+        
+        // check for interpolated constants
+        var style = state.GetProperty(Style);
+
+        switch (style.Value)
+        {
+            case CXValue.Multipart multipart when Renderers.IsLoneInterpolatedLiteral(context, multipart, out var info):
+                return FromInterpolation(info);
+            case CXValue.Interpolation interpolation:
+                return FromInterpolation(context.GetInterpolationInfo(interpolation));
+        }
+        
+        return state.InferredKind;
+
+        ButtonKind FromInterpolation(DesignerInterpolationInfo info)
+        {
+            var constant = info.Constant;
+
+            if (!constant.HasValue) return state.InferredKind;
+
+            switch (constant.Value)
+            {
+                case string str:
+                    switch (str.ToLowerInvariant())
+                    {
+                        case "link": return ButtonKind.Link;
+                        case "premium": return ButtonKind.Premium;
+                    }
+                    break;
+                case int i:
+                    switch (i)
+                    {
+                        case BUTTON_STYLE_LINK_VALUE: return ButtonKind.Link;
+                        case BUTTON_STYLE_PREMIUM_VALUE: return ButtonKind.Premium;
+                    }
+
+                    break;
+            }
+            
+            return state.InferredKind;
+        }
+    }
+
+    public override void Validate(ButtonComponentState state, ComponentContext context)
     {
         var label = state.GetProperty(Label);
 
@@ -101,125 +202,102 @@ public sealed class ButtonComponentNode : ComponentNode
             );
         }
 
-        if (state.GetProperty(Url)!.IsSpecified && state.GetProperty(CustomId)!.IsSpecified)
+        if (label.IsSpecified && state.GetProperty(Emoji).IsSpecified)
         {
             context.AddDiagnostic(
-                Diagnostic.Create(
-                    Diagnostics.ButtonCustomIdUrlConflict,
-                    context.GetLocation(state.Source)
-                )
+                Diagnostics.ButtonCannotHaveALabelAndEmoji,
+                (ICXNode?)label.Attribute ?? label.Value!
+            );
+            
+            context.AddDiagnostic(
+                Diagnostics.ButtonCannotHaveALabelAndEmoji,
+                state.GetProperty(Emoji).Attribute!
             );
         }
 
-        // TODO: interpolations with constants can be checked
-        if (
-            state.GetProperty(Style).TryGetLiteralValue(context, out var style)
-        )
+        switch (state.InferredKind)
         {
-            switch (style.ToLowerInvariant())
-            {
-                case "link" when !state.GetProperty(Url).IsSpecified:
-                    context.AddDiagnostic(
-                        Diagnostic.Create(
-                            Diagnostics.LinkButtonUrlMissing,
-                            context.GetLocation(state.Source)
-                        )
-                    );
-                    break;
-                case "premium" when !state.GetProperty(SkuId).IsSpecified:
-                    context.AddDiagnostic(
-                        Diagnostic.Create(
-                            Diagnostics.PremiumButtonSkuMissing,
-                            context.GetLocation(state.Source)
-                        )
-                    );
+            case ButtonKind.Link:
+                // url is required
+                state.GetProperty(Url).ReportPropertyConfigurationDiagnostics(
+                    context,
+                    state,
+                    optional: false,
+                    requiresValue: true
+                );
 
-                    if (state.GetProperty(CustomId).IsSpecified)
-                    {
-                        context.AddDiagnostic(
-                            Diagnostic.Create(
-                                Diagnostics.PremiumButtonPropertyNotAllowed,
-                                context.GetLocation(state.Source),
-                                "customId"
-                            )
-                        );
-                    }
+                state.ReportPropertyNotAllowed(CustomId, context);
+                state.ReportPropertyNotAllowed(SkuId, context);
+                
+                state.RequireOneOf(context, Label, Emoji);
+                break;
+            case ButtonKind.Premium:
+                // url is required
+                state.GetProperty(SkuId).ReportPropertyConfigurationDiagnostics(
+                    context,
+                    state,
+                    optional: false,
+                    requiresValue: true
+                );
 
-                    if (state.GetProperty(Label).IsSpecified)
-                    {
-                        context.AddDiagnostic(
-                            Diagnostic.Create(
-                                Diagnostics.PremiumButtonPropertyNotAllowed,
-                                context.GetLocation(state.Source),
-                                "label"
-                            )
-                        );
-                    }
-
-                    if (state.GetProperty(Url).IsSpecified)
-                    {
-                        context.AddDiagnostic(
-                            Diagnostic.Create(
-                                Diagnostics.PremiumButtonPropertyNotAllowed,
-                                context.GetLocation(state.Source),
-                                "url"
-                            )
-                        );
-                    }
-
-                    if (state.GetProperty(Emoji).IsSpecified)
-                    {
-                        context.AddDiagnostic(
-                            Diagnostic.Create(
-                                Diagnostics.PremiumButtonPropertyNotAllowed,
-                                context.GetLocation(state.Source),
-                                "emoji"
-                            )
-                        );
-                    }
-
-                    break;
-                default: ValidateStandardButtonRules(); break;
-            }
+                state.ReportPropertyNotAllowed(CustomId, context);
+                state.ReportPropertyNotAllowed(Url, context);
+                state.ReportPropertyNotAllowed(Label, context);
+                state.ReportPropertyNotAllowed(Emoji, context);
+                break;
+            case ButtonKind.Default:
+                // custom id is required
+                state.GetProperty(CustomId).ReportPropertyConfigurationDiagnostics(
+                    context,
+                    state,
+                    optional: false,
+                    requiresValue: true
+                );
+                
+                state.ReportPropertyNotAllowed(SkuId, context);
+                state.ReportPropertyNotAllowed(Url, context);
+                state.RequireOneOf(context, Label, Emoji);
+                break;
         }
-        else
-        {
-            ValidateStandardButtonRules();
-        }
-
+        
         base.Validate(state, context);
-
-        void ValidateStandardButtonRules()
-        {
-            if (!state.GetProperty(Url)!.IsSpecified && !state.GetProperty(CustomId)!.IsSpecified)
-            {
-                context.AddDiagnostic(
-                    Diagnostic.Create(
-                        Diagnostics.ButtonCustomIdOrUrlMissing,
-                        context.GetLocation(state.Source)
-                    )
-                );
-            }
-
-            if (state.GetProperty(CustomId).IsSpecified && !label.HasValue && !state.GetProperty(Emoji).HasValue)
-            {
-                context.AddDiagnostic(
-                    Diagnostic.Create(
-                        Diagnostics.ButtonMustHaveALabelOrEmoji,
-                        context.GetLocation(state.Source)
-                    )
-                );
-            }
-        }
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
-        => $"""
-            new {context.KnownTypes.ButtonBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                state.RenderProperties(this, context)
-                    .WithNewlinePadding(4)
-                    .PrefixIfSome(4)
-                    .WrapIfSome("\n")
-            })
-            """;
+    public override string Render(ButtonComponentState state, ComponentContext context)
+    {
+        string style;
+
+        if (state.InferredKind is not ButtonKind.Default)
+            style = $"global::Discord.ButtonKind.{state.InferredKind}";
+        else
+        {
+            // use the provided property from state
+            var stylePropertyValue = state.GetProperty(Style);
+
+            style = stylePropertyValue.Value is null
+                ? "global::Discord.ButtonKind.Primary"
+                : Style.Renderer(context, stylePropertyValue);
+        }
+
+        var props = string.Join(
+            ",\n",
+            [
+                $"style: {style}",
+                state.RenderProperties(
+                    this,
+                    context,
+                    ignorePredicate: x => x == Style
+                )
+            ]
+        );
+        
+        return $"""
+                new {context.KnownTypes.ButtonBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                    props
+                        .WithNewlinePadding(4)
+                        .PrefixIfSome(4)
+                        .WrapIfSome("\n")
+                })
+                """;
+    }
 }

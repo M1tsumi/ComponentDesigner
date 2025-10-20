@@ -21,6 +21,27 @@ public sealed class MediaGalleryComponentNode : ComponentNode
         ];
     }
 
+    public override void Validate(ComponentState state, ComponentContext context)
+    {
+        foreach (var child in state.Children)
+        {
+            if (!IsValidChild(child.Inner))
+            {
+                context.AddDiagnostic(
+                    Diagnostics.InvalidMediaGalleryChild,
+                    child.State.Source,
+                    child.Inner.Name
+                );
+            }   
+        }
+        
+        base.Validate(state, context);
+    }
+
+    private static bool IsValidChild(ComponentNode node)
+        => node is IDynamicComponentNode
+            or MediaGalleryItemComponentNode;
+
     public override string Render(ComponentState state, ComponentContext context)
         => $$"""
             new {{context.KnownTypes.MediaGalleryBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}{{

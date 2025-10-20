@@ -54,7 +54,7 @@ public static class Renderers
         };
     }
 
-    private static bool IsLoneInterpolatedLiteral(
+    public static bool IsLoneInterpolatedLiteral(
         ComponentContext context,
         CXValue.Multipart literal,
         out DesignerInterpolationInfo info)
@@ -409,6 +409,8 @@ public static class Renderers
 
     private static string RenderStringLiteral(CXValue.Multipart literal)
     {
+        if (literal.Tokens.Count is 0) return "string.Empty";
+        
         var sb = new StringBuilder();
 
         var parts = literal.Tokens

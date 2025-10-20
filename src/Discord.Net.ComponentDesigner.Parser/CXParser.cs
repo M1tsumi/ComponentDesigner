@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace Discord.CX.Parser;
 
-public sealed class CXParser
+public sealed partial class CXParser
 {
     public CXToken CurrentToken => Lex(_tokenIndex);
     public CXToken NextToken => Lex(_tokenIndex + 1);
@@ -139,7 +139,6 @@ public sealed class CXParser
                 identifier = Expect(CXTokenKind.Identifier);
             }
         }
-
 
         var attributes = ParseAttributes();
 

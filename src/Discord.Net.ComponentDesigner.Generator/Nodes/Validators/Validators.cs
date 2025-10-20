@@ -78,8 +78,14 @@ public static class Validators
             {
                 case null or CXValue.Invalid: return;
                 case CXValue.Interpolation interpolation:
-                    if (context.GetInterpolationInfo(interpolation).Constant.Value is string constantValue)
+                    var constant = context.GetInterpolationInfo(interpolation).Constant;
+
+                    if (!constant.HasValue) break;
+                    
+                    if(constant.Value is string constantValue)
                         Check(constantValue.Length);
+                    else if(constant.Value is int integer)
+                        Check(integer);
                     break;
 
                 case CXValue.Multipart literal:

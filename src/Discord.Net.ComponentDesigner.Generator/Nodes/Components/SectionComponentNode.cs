@@ -112,7 +112,7 @@ public sealed class SectionComponentNode : ComponentNode
         }
 
         static bool IsValidChildType(ComponentNode node)
-            => node is TextDisplayComponentNode or InterleavedComponentNode;
+            => node is TextDisplayComponentNode or IDynamicComponentNode;
     }
 
     public override string Render(ComponentState state, ComponentContext context)

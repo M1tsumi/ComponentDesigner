@@ -40,7 +40,7 @@ public static class InterleavedKindExtensions
     }
 }
 
-public sealed class InterleavedComponentNode : ComponentNode
+public sealed class InterleavedComponentNode : ComponentNode, IDynamicComponentNode
 {
     public InterleavedKind Kind { get; }
     public ITypeSymbol Symbol { get; }

@@ -89,39 +89,10 @@ public sealed record CXGraphManager(
 
     public CXGraphManager OnUpdate(string key, Target target, CancellationToken token)
     {
-        /*
-         * TODO:
-         * There are 2 modes of incremental updating: re-parse and re-gen,
-         *
-         * Reparsing:
-         *   This requires incremental parsing and then re-generating the updated nodes that were parsed, we can
-         *   re-use old gen information
-         *
-         * Regenerating
-         *   Caused mostly by interpolation types changing, the actual values don't matter since it doesn't change
-         *   out emitted code
-         *
-         *   Some key things to note:
-         *     A fast-path is possible for regenerating, if an interpolations content (source code) has changed, we
-         *     can skip reparse and regeneration, and simply update any diagnostics' text spans.
-         *     If an interpolations type has changed, we re-run the validator wrapping the interpolation, and regenerate
-         *     our emitted source.
-         */
-
         var result = this with { Key = key, Target = target };
 
-        // var newCXWithoutInterpolations = GetCXWithoutInterpolations(
-        //     target.ArgumentExpressionSyntax.SpanStart,
-        //     target.CXDesigner,
-        //     target.Interpolations
-        // );
-
-        if (ALWAYS_REPARSE) // newCXWithoutInterpolations != SimpleSource ||
-        {
-            // we're going to need to reparse, the underlying CX structure changed
-            result.DoReparse(target, this, ref result, token);
-        }
-
+        result.DoReparse(target, this, ref result, token);
+        
         return result;
     }
 

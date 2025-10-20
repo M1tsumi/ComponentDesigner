@@ -1,0 +1,8 @@
+<Project InitialTargets="Discord_Net_ComponentDesigner">
+    <Target Name="Discord_Net_ComponentDesigner">
+        <PropertyGroup>
+            <InterceptorsNamespaces>$(InterceptorsNamespaces);InlineComponent</InterceptorsNamespaces>
+            <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);InlineComponent</InterceptorsPreviewNamespaces>
+        </PropertyGroup>
+    </Target>
+</Project>

@@ -79,7 +79,7 @@ public sealed class ActionRowComponentNode : ComponentNode
     private static bool IsValidChild(ComponentNode node)
         => node is ButtonComponentNode
             or SelectMenuComponentNode
-            or InterleavedComponentNode;
+            or IDynamicComponentNode;
 
     public override string Render(ComponentState state, ComponentContext context)
         => $$"""

@@ -15,12 +15,12 @@ public abstract class ComponentNode<TState> : ComponentNode
 {
     public abstract string Render(TState state, ComponentContext context);
 
-    public virtual void UpdateState(ref TState state)
+    public virtual void UpdateState(ref TState state, ComponentContext context)
     {
     }
 
-    public sealed override void UpdateState(ref ComponentState state)
-        => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state));
+    public sealed override void UpdateState(ref ComponentState state, ComponentContext context)
+        => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state), context);
 
     public abstract TState? CreateState(ComponentStateInitializationContext context);
 
@@ -54,15 +54,7 @@ public abstract class ComponentNode
         {
             var propertyValue = state.GetProperty(property);
 
-            if (!property.IsOptional && !propertyValue.HasValue)
-            {
-                context.AddDiagnostic(
-                    Diagnostics.MissingRequiredProperty,
-                    state.Source,
-                    Name,
-                    property.Name
-                );
-            }
+            propertyValue.ReportPropertyConfigurationDiagnostics(context, state);
 
             foreach (var validator in property.Validators)
             {
@@ -105,7 +97,7 @@ public abstract class ComponentNode
 
     public abstract string Render(ComponentState state, ComponentContext context);
 
-    public virtual void UpdateState(ref ComponentState state)
+    public virtual void UpdateState(ref ComponentState state, ComponentContext context)
     {
     }
 

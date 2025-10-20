@@ -38,6 +38,10 @@ public static class Constants
 
     public const int THUMBNAIL_DESCRIPTION_MAX_LENGTH = 1024;
 
-
+    public const int FILE_UPLOAD_MIN_VALUES_LOWER = 0;
+    public const int FILE_UPLOAD_MIN_VALUES_UPPER = 10;
+    
+    public const int FILE_UPLOAD_MAX_VALUES_LOWER = 0;
+    public const int FILE_UPLOAD_MAX_VALUES_UPPER = 10;
 
 }

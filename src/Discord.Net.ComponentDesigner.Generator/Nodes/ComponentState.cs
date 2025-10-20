@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Discord.CX.Nodes;
 
@@ -35,6 +36,57 @@ public class ComponentState
         return _properties[property] = new(property, attribute);
     }
 
+    public void ReportPropertyNotAllowed(ComponentProperty property, ComponentContext context)
+    {
+        var propertyValue = GetProperty(property);
+        if (propertyValue.IsSpecified)
+        {
+            context.AddDiagnostic(
+                Diagnostics.PropertyNotAllowed,
+                propertyValue.Attribute!,
+                OwningNode?.Inner.Name,
+                propertyValue.Attribute!.Identifier.Value
+            );
+        }
+    }
+
+    public void RequireOneOf(ComponentContext context, params ReadOnlySpan<ComponentProperty> properties)
+    {
+        if (properties.Length is 0) return;
+
+        if (properties.Length is 1)
+        {
+            GetProperty(properties[0]).ReportPropertyConfigurationDiagnostics(context, this, optional: false);
+            return;
+        }
+        
+        for (var i = 0; i < properties.Length; i++)
+        {
+            if (GetProperty(properties[i]).IsSpecified) return;
+        }
+
+        var sb = new StringBuilder();
+
+        for (var i = 0; i < properties.Length; i++)
+        {
+            if (i == properties.Length - 1)
+                sb.Append(" or ");
+            
+            if (i is not 0) sb.Append('\'');
+
+            sb.Append(properties[i].Name);
+
+            if (sb.Length < properties.Length - 1) sb.Append('\'');
+        }
+
+        context.AddDiagnostic(
+            Diagnostics.MissingRequiredProperty,
+            Source,
+            OwningNode?.Inner.Name,
+            sb.ToString()
+        );
+    }
+    
     public bool TryGetChildGraphNode(ICXNode node, out CXGraph.Node childNode)
     {
         foreach (var child in Children)

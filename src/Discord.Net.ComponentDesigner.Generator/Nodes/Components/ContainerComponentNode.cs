@@ -41,11 +41,27 @@ public sealed class ContainerComponentNode : ComponentNode
     {
         foreach (var child in state.Children)
         {
-            // TODO: check for allowed children
+            if (!IsValidChild(child.Inner))
+            {
+                context.AddDiagnostic(
+                    Diagnostics.InvalidContainerChild,
+                    child.State.Source,
+                    child.Inner.Name
+                );
+            }
         }
 
         base.Validate(state, context);
     }
+
+    private static bool IsValidChild(ComponentNode node)
+        => node is IDynamicComponentNode
+            or ActionRowComponentNode
+            or TextDisplayComponentNode
+            or SectionComponentNode
+            or MediaGalleryComponentNode
+            or SeparatorComponentNode
+            or FileComponentNode;
 
     public override string Render(ComponentState state, ComponentContext context)
         => $$"""

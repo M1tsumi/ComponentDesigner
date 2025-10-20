@@ -1,14 +1,72 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
 
-    <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <LangVersion>latest</LangVersion>
-    </PropertyGroup>
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <LangVersion>latest</LangVersion>
+    <Authors>Discord.Net Contributors</Authors>
+    <PackageId>Discord.Net.ComponentDesigner</PackageId>
+    <PackageTags>discord;discordapp;components</PackageTags>
+    <PackageProjectUrl>https://github.com/discord-net/ComponentDesigner</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/discord-net/ComponentDesigner</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <BuildPackage>true</BuildPackage>
+
+    <TargetsForTfmSpecificBuildOutput>
+      $(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Discord.Net.Core" Version="3.18.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="..\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj"
+      PrivateAssets="All"
+    />
+  </ItemGroup>
+
+  <Target Name="CopyProjectReferencesToPackage"
+    DependsOnTargets="BuildOnlySettings;ResolveReferences">
+    <ItemGroup>
+      <_ReferenceCopyLocalPaths
+        Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference')->WithMetadataValue('PrivateAssets', 'All'))" />
+    </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Discord.Net.Core" Version="3.18.0" />
+      <BuildOutputInPackage Include="@(_ReferenceCopyLocalPaths)"
+        TargetPath="%(_ReferenceCopyLocalPaths.DestinationSubDirectory)" />
     </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)\Discord.Net.ComponentDesigner.Generator.dll" Pack="true"
+      PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\Discord.Net.ComponentDesigner.Parser.dll" Pack="true"
+      PackagePath="analyzers/dotnet/cs" Visible="false" />
+
+    <None Include="../../README.md" Pack="true" PackagePath="" />
+    <None Include="Discord.Net.ComponentDesigner.targets" Pack="true" PackagePath="build"
+      Visible="true" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(IsTagBuild)' == 'true' ">
+    <VersionSuffix Condition=" '$(BuildNumber)' == '' "></VersionSuffix>
+    <VersionSuffix Condition=" '$(BuildNumber)' != '' ">$(BuildNumber)</VersionSuffix>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(BuildNumber)' == '' And $(IsTagBuild) != 'true' ">
+    <VersionSuffix Condition=" '$(VersionSuffix)' != ''">$(VersionSuffix)-dev</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionSuffix)' == ''">dev</VersionSuffix>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(BuildNumber)' != '' And $(IsTagBuild) != 'true' ">
+    <VersionSuffix Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)-$(BuildNumber)</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionSuffix)' == '' ">$(BuildNumber)</VersionSuffix>
+  </PropertyGroup>
 
 </Project>

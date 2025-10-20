@@ -19,6 +19,10 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    public INamedTypeSymbol? LabelBuilderType
+        => GetOrResolveType("Discord.LabelBuilder", ref _LabelBuilderType);
+    
+    public Optional<INamedTypeSymbol?> _LabelBuilderType;
     
     public INamedTypeSymbol? CXChildrenAttribute
         => GetOrResolveType("Discord.CXChildrenAttribute", ref _CXChildrenAttribute);
@@ -149,6 +153,11 @@ public class KnownTypes
         => GetOrResolveType("Discord.FileComponentBuilder", ref _FileComponentBuilderType);
 
     private Optional<INamedTypeSymbol?> _FileComponentBuilderType;
+    
+    public INamedTypeSymbol? FileUploadComponentBuilderType
+        => GetOrResolveType("Discord.FileUploadComponentBuilder", ref _FileUploadComponentBuilderType);
+
+    private Optional<INamedTypeSymbol?> _FileUploadComponentBuilderType;
 
     public INamedTypeSymbol? MediaGalleryBuilderType
         => GetOrResolveType("Discord.MediaGalleryBuilder", ref _MediaGalleryBuilderType);

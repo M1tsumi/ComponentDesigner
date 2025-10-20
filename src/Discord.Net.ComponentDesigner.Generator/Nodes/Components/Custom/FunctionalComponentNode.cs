@@ -12,7 +12,7 @@ public sealed class FunctionalComponentNodeState : ComponentState
     public IReadOnlyList<ComponentChildrenAdapter.ComponentChild> Children { get; init; }
 }
 
-public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeState>
+public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeState>, IDynamicComponentNode
 {
     public override bool HasChildren => _childrenParameter is not null;
 

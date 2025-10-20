@@ -15,26 +15,9 @@ public class GeneralTests
                   public static CXMessageComponent Consumer()
                       => cx(
                           $"""
-                           <CompWithScalarChild foo="b">
-                               {1}
-                               {2}
-                           </CompWithScalarChild>
+                           <button style={Discord.ButtonStyle.Link} />
                            """
                       );
-                  
-                  public static CXMessageComponent CompWithChildren(string name, [CXChildren] CXMessageComponent component)
-                      => cx(
-                          $"""
-                           <container>
-                               {component}
-                           </container>
-                           """
-                      );
-                      
-                  public static CXMessageComponent CompWithScalarChild(string foo, [CXChildren] int bar)
-                  {
-                      return null!;
-                  }
               }
               """"
         );
