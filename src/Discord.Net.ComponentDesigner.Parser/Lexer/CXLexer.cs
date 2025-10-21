@@ -459,6 +459,7 @@ public sealed class CXLexer
                 if (isTrailing)
                 {
                     trivia++;
+                    Reader.Advance();
                     break;
                 }
 
