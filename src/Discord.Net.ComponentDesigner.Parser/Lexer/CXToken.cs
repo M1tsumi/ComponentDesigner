@@ -30,9 +30,9 @@ public sealed record CXToken(
 
     public bool HasErrors
         => _hasErrors ??= (
-            Kind is CXTokenKind.Invalid ||
             Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error) ||
-            (Flags & CXTokenFlags.Missing) != 0
+            IsInvalid ||
+            IsMissing
         );
 
     public bool IsMissing => (Flags & CXTokenFlags.Missing) != 0;
@@ -43,10 +43,57 @@ public sealed record CXToken(
 
     public int Width => FullSpan.Length;
 
-    int ICXNode.GraphWidth => 0;
-    IReadOnlyList<CXNode.ParseSlot> ICXNode.Slots => [];
+    public string LeadingTrivia
+        => LeadingTriviaLength is 0 
+            ? string.Empty 
+            : FullValue.Substring(0, LeadingTriviaLength);
+
+    public string TrailingTrivia
+        => TrailingTriviaLength is 0
+            ? string.Empty
+            : FullValue.Substring(FullValue.Length - TrailingTriviaLength);
 
     private bool? _hasErrors;
+
+    public static CXToken CreateSynthetic(
+        CXTokenKind kind,
+        TextSpan? span = null,
+        CXTokenFlags? flags = null,
+        string? value = null,
+        IEnumerable<CXDiagnostic>? diagnostics = null
+    )
+    {
+        return new CXToken(
+            kind,
+            span ?? default,
+            0,
+            0,
+            CXTokenFlags.Synthetic | (flags ?? CXTokenFlags.None),
+            value ?? string.Empty,
+            [..diagnostics ?? []]
+        );
+    }
+
+    public static CXToken CreateMissing(
+        CXTokenKind kind,
+        TextSpan span,
+        params IEnumerable<CXDiagnostic> diagnostics
+    ) => CreateMissing(kind, span, string.Empty, diagnostics);
+
+    public static CXToken CreateMissing(
+        CXTokenKind kind,
+        TextSpan span,
+        string value,
+        params IEnumerable<CXDiagnostic> diagnostics
+    ) => new(
+        kind,
+        span,
+        0,
+        0,
+        Flags: CXTokenFlags.Missing,
+        FullValue: value,
+        Diagnostics: [..diagnostics]
+    );
 
     public void ResetCachedState()
     {
@@ -57,7 +104,7 @@ public sealed record CXToken(
     {
         if (FullSpan.Start == position) return this;
 
-        return this with {FullSpan = new(position, FullSpan.Length)};
+        return this with { FullSpan = new(position, FullSpan.Length) };
     }
 
     public override string ToString() => ToString(false, false);
@@ -100,4 +147,7 @@ public sealed record CXToken(
             return hashCode;
         }
     }
+
+    int ICXNode.GraphWidth => 0;
+    IReadOnlyList<CXNode.ParseSlot> ICXNode.Slots => [];
 }

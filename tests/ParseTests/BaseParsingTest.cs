@@ -9,6 +9,7 @@ public abstract class BaseParsingTest
 {
     protected CXDoc? Document { get; private set; }
     private IEnumerator<ICXNode>? _enumerator;
+    private readonly Stack<CXDiagnostic> _diagnostics = [];
 
 
     protected sealed class SourceBuilder
@@ -33,17 +34,33 @@ public abstract class BaseParsingTest
         }
     }
 
+    protected CXDiagnostic Diagnostic(CXErrorCode code, string? message = null, TextSpan? span = null)
+    {
+        Assert.NotEmpty(_diagnostics);
+        var diagnostic =  _diagnostics.Pop();
+        
+        Assert.Equal(code, diagnostic.Code);
+        
+        if(message is not null) Assert.Equal(message, diagnostic.Message);
+        
+        if(span.HasValue) Assert.Equal(span.Value, diagnostic.Span);
+
+        return diagnostic;
+    }
+    
     [MemberNotNull(nameof(Document))]
     protected void Parses(
         SourceBuilder source,
-        Func<CXParser, IEnumerable<CXNode>>? parseFunc = null
-    ) => Parses(source.StringBuilder.ToString(), parseFunc, source.Interpolations.ToArray());
+        Func<CXParser, IEnumerable<CXNode>>? parseFunc = null,
+        bool allowErrors = false
+    ) => Parses(source.StringBuilder.ToString(), parseFunc, source.Interpolations.ToArray(), allowErrors);
     
     [MemberNotNull(nameof(Document))]
     protected void Parses(
         string cx,
         Func<CXParser, IEnumerable<CXNode>>? parseFunc = null,
-        TextSpan[]? interpolations = null
+        TextSpan[]? interpolations = null,
+        bool allowErrors = false
     )
     {
         parseFunc ??= (parser) => parser.ParseRootNodes();
@@ -53,8 +70,13 @@ public abstract class BaseParsingTest
 
         Document = new CXDoc(parser, nodes);
         
-        Assert.False(Document.HasErrors);
+        if(!allowErrors) Assert.False(Document.HasErrors);
 
+        foreach (var diagnostic in Document.Diagnostics)
+        {
+            _diagnostics.Push(diagnostic);
+        }
+        
         _enumerator = nodes
             .SelectMany(Enumerate)
             .GetEnumerator();
@@ -100,6 +122,7 @@ public abstract class BaseParsingTest
     protected CXElement Element(string? content = null) => Node<CXElement>(content);
     protected CXAttribute Attribute(string? content = null) => Node<CXAttribute>(content);
 
+    protected CXValue.Element ElementValue(string? content = null) => Node<CXValue.Element>(content);
     protected CXValue.StringLiteral StringLiteral(string? content = null) => Node<CXValue.StringLiteral>(content);
 
     protected CXValue.Interpolation Interpolation(string? content = null, int? index = null)
@@ -126,8 +149,8 @@ public abstract class BaseParsingTest
         return (T)current;
     }
 
-    protected CXToken Identifier(string content)
-        => Token(CXTokenKind.Identifier, content);
+    protected CXToken Identifier(string content, CXTokenFlags? flags = null)
+        => Token(CXTokenKind.Identifier, content, flags);
 
     protected CXToken InterpolationToken(string? content = null, int? index = null)
     {
@@ -140,7 +163,7 @@ public abstract class BaseParsingTest
         return token;
     }
 
-    protected CXToken Token(CXTokenKind kind, string? content = null)
+    protected CXToken Token(CXTokenKind kind, string? content = null, CXTokenFlags? flags = null)
     {
         var current = GetNextNode();
 
@@ -152,6 +175,8 @@ public abstract class BaseParsingTest
 
         if (content is not null)
             Assert.Equal(content, token.ToString());
+        
+        if(flags is not null)  Assert.Equal(flags.Value, token.Flags);
 
         return token;
     }
@@ -160,5 +185,6 @@ public abstract class BaseParsingTest
     {
         Assert.NotNull(_enumerator);
         Assert.False(_enumerator.MoveNext());
+        Assert.Empty(_diagnostics);
     }
 }

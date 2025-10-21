@@ -76,6 +76,8 @@ public static class Renderers
     {
         switch (propertyValue.Value)
         {
+            case CXValue.Element when propertyValue.Node is not null:
+                return propertyValue.Node.Render(context);
             case CXValue.Interpolation interpolation:
                 // ensure its a component builder
                 var info = context.GetInterpolationInfo(interpolation);
@@ -83,7 +85,8 @@ public static class Renderers
                 if (
                     !InterleavedComponentNode.IsValidInterleavedType(
                         info.Symbol,
-                        context.Compilation
+                        context.Compilation,
+                        out var interleavedKind
                     )
                 )
                 {
@@ -97,11 +100,53 @@ public static class Renderers
                     return string.Empty;
                 }
 
-                return context.GetDesignerValue(
+                var source = context.GetDesignerValue(
                     info,
-                    context.KnownTypes.IMessageComponentBuilderType!
-                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 );
+
+
+                // ensure we can convert it to a builder
+                if (
+                    !InterleavedComponentNode.TryConvert(
+                        source,
+                        interleavedKind,
+                        InterleavedKind.IMessageComponentBuilder,
+                        out var converted
+                    )
+                )
+                {
+                    source = interleavedKind switch
+                    {
+                        InterleavedKind.CXMessageComponent => $"{source}.Builders.First()",
+                        InterleavedKind.MessageComponent => $"{source}.Components.First().ToBuilder()",
+                        InterleavedKind.CollectionOfCXComponents => $"{source}.First().Builders.First()",
+                        InterleavedKind.CollectionOfIMessageComponentBuilders => $"{source}.First()",
+                        InterleavedKind.CollectionOfIMessageComponents => $"{source}.First().ToBuilder()",
+                        InterleavedKind.CollectionOfMessageComponents =>
+                            $"{source}.First().Components.First().ToBuilder",
+                        _ => string.Empty
+                    };
+
+                    if (source != string.Empty)
+                    {
+                        context.AddDiagnostic(
+                            Diagnostics.CardinalityForcedToRuntime,
+                            interpolation,
+                            info.Symbol.ToDisplayString()
+                        );
+                    }
+                    else
+                    {
+                        context.AddDiagnostic(
+                            Diagnostics.InvalidChildComponentCardinality,
+                            interpolation,
+                            propertyValue.Property.Name
+                        );
+                    }
+                }
+
+                return source;
             default:
                 if (propertyValue.Value is not null)
                 {
@@ -145,7 +190,7 @@ public static class Renderers
         {
             if (info.Constant.Value is int || int.TryParse(info.Constant.Value?.ToString(), out _))
                 return info.Constant.Value!.ToString();
-            
+
             if (info.Constant.HasValue)
             {
                 context.AddDiagnostic(
@@ -155,7 +200,7 @@ public static class Renderers
                     "int"
                 );
             }
-            
+
             if (
                 context.Compilation.HasImplicitConversion(
                     info.Symbol,
@@ -399,7 +444,7 @@ public static class Renderers
             case CXValue.Interpolation interpolation:
                 if (context.GetInterpolationInfo(interpolation).Constant.Value is string constant)
                     return ToCSharpString(constant);
-                
+
                 return context.GetDesignerValue(interpolation);
             case CXValue.Multipart literal: return RenderStringLiteral(literal);
             case CXValue.Scalar scalar:
@@ -410,7 +455,7 @@ public static class Renderers
     private static string RenderStringLiteral(CXValue.Multipart literal)
     {
         if (literal.Tokens.Count is 0) return "string.Empty";
-        
+
         var sb = new StringBuilder();
 
         var parts = literal.Tokens
@@ -444,8 +489,41 @@ public static class Renderers
             ? new string('}', dollars.Length)
             : string.Empty;
 
-        var isMultiline = parts.Any(x => x.Contains('\n'));
+        var isMultiline = literal.Tokens.Any(x => x.FullValue.Contains("\n"));
+        
+        foreach (var token in literal.Tokens)
+        {
+            switch (token.Kind)
+            {
+                case CXTokenKind.Text:
+                    sb
+                        .Append(token.LeadingTrivia)
+                        .Append(EscapeBackslashes(token.Value))
+                        .Append(token.TrailingTrivia);
+                    break;
+                case CXTokenKind.Interpolation:
+                    var index = Array.IndexOf(literal.Document.InterpolationTokens, token);
 
+                    // TODO: handle better
+                    if (index is -1) throw new InvalidOperationException();
+
+                    sb
+                        .Append(token.LeadingTrivia)
+                        .Append(startInterpolation)
+                        .Append($"designer.GetValueAsString({index})")
+                        .Append(endInterpolation)
+                        .Append(token.TrailingTrivia);
+                    break;
+
+                default: continue;
+            }
+        }
+        
+        // normalize the value indentation
+        var value = sb.ToString().NormalizeIndentation().Trim(['\r', '\n']);
+
+        sb.Clear();
+        
         if (isMultiline)
         {
             sb.AppendLine();
@@ -458,26 +536,7 @@ public static class Renderers
 
         if (isMultiline) sb.AppendLine();
 
-        foreach (var token in literal.Tokens)
-        {
-            switch (token.Kind)
-            {
-                case CXTokenKind.Text:
-                    sb.Append(EscapeBackslashes(token.Value));
-                    break;
-                case CXTokenKind.Interpolation:
-                    var index = Array.IndexOf(literal.Document.InterpolationTokens, token);
-
-                    // TODO: handle better
-                    if (index is -1) throw new InvalidOperationException();
-
-                    sb.Append(startInterpolation).Append($"designer.GetValueAsString({index})")
-                        .Append(endInterpolation);
-                    break;
-
-                default: continue;
-            }
-        }
+        sb.Append(value);
 
         if (isMultiline) sb.AppendLine();
         sb.Append(quotes);
@@ -529,6 +588,8 @@ public static class Renderers
             var r => r
         };
 
+        text = text.NormalizeIndentation().Trim(['\r', '\n']);
+        
         var isMultiline = text.Contains('\n');
 
         if (isMultiline)
@@ -693,9 +754,9 @@ public static class Renderers
                 return UseLibraryParser(ToCSharpString(scalar.Value));
 
             case CXValue.Multipart stringLiteral:
-                if(!stringLiteral.HasInterpolations)
+                if (!stringLiteral.HasInterpolations)
                     LightlyValidateEmote(stringLiteral.Tokens.ToString(), stringLiteral.Tokens);
-                
+
                 return UseLibraryParser(RenderStringLiteral(stringLiteral));
 
             default: return "null";
@@ -720,7 +781,9 @@ public static class Renderers
                     : global::Discord.Emote.Parse({source})
                 """;
     }
-    
-    private static readonly Regex IsEmoji = new Regex(@"^(?>(?>[\uD800-\uDBFF][\uDC00-\uDFFF]\p{M}*){1,5}|\p{So})$", RegexOptions.Compiled);
+
+    private static readonly Regex IsEmoji = new Regex(@"^(?>(?>[\uD800-\uDBFF][\uDC00-\uDFFF]\p{M}*){1,5}|\p{So})$",
+        RegexOptions.Compiled);
+
     private static readonly Regex IsDiscordEmote = new Regex(@"^<(?>a|):.+:\d+>$", RegexOptions.Compiled);
 }

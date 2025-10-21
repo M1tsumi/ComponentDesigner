@@ -33,7 +33,15 @@ public class ComponentState
                 property.Name == x.Identifier.Value || property.Aliases.Contains(x.Identifier.Value)
             );
 
-        return _properties[property] = new(property, attribute);
+        CXGraph.Node? node = null;
+        
+        if (attribute?.Value is CXValue.Element element)
+        {
+            node = OwningNode?.AttributeNodes
+                .FirstOrDefault(x => ReferenceEquals(x.State.Source, element.Value));
+        }
+
+        return _properties[property] = new(property, attribute, node);
     }
 
     public void ReportPropertyNotAllowed(ComponentProperty property, ComponentContext context)

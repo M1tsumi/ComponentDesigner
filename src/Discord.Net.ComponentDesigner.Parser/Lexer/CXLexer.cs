@@ -47,6 +47,9 @@ public sealed class CXLexer
     public const char QUOTE_CHAR = '\'';
     public const char DOUBLE_QUOTE_CHAR = '"';
 
+    public const char OPEN_PAREN = '(';
+    public const char CLOSE_PAREN = ')';
+
     public CXSourceReader Reader { get; }
 
     public int? InterpolationIndex { get; private set; }
@@ -219,6 +222,14 @@ public sealed class CXLexer
 
         switch (Reader.Current)
         {
+            case OPEN_PAREN when Mode == LexMode.Attribute:
+                Reader.Advance();
+                info.Kind = CXTokenKind.OpenParenthesis;
+                return;
+            case CLOSE_PAREN when Mode == LexMode.Attribute:
+                Reader.Advance();
+                info.Kind = CXTokenKind.CloseParenthesis;
+                return;
             case LESS_THAN_CHAR:
                 Reader.Advance();
                 if (Reader.Current is FORWARD_SLASH_CHAR)
@@ -432,9 +443,7 @@ public sealed class CXLexer
             var current = Reader.Current;
 
             if (CurrentInterpolationSpan is not null) return;
-
-            if (IsWhitespace(current)) continue;
-
+            
             if (current is CARRAGE_RETURN_CHAR && Reader.Next is NEWLINE_CHAR)
             {
                 trivia += 2;
@@ -455,6 +464,8 @@ public sealed class CXLexer
 
                 continue;
             }
+            
+            if (IsWhitespace(current)) continue;
 
             if (current is LESS_THAN_CHAR && IsCurrentlyAtCommentStart())
             {

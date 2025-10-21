@@ -76,8 +76,9 @@ Valid children of an element are:
 ### Attributes
 
 Attributes consist of a name and an optional value, valid values can be:
-- A string literal.
-- An interpolation
+- A [string literal](#string-literals).
+- An [interpolation](#interpolation-syntax)
+- An [inline element](#inline-elements-in-attributes)
 
 
 ```xml
@@ -87,8 +88,21 @@ Attributes consist of a name and an optional value, valid values can be:
     baz={123}
     switch1
     switch2
+    inline=(<Foo/>)
 />
 ```
+
+
+#### Inline elements in attributes
+
+Inline elements are valid for attribute values, and are defined as one [element](#elements) wrapped in parenthesis `()`:
+
+```xml
+<Example
+    foo=(<Bar/>)
+/>
+```
+
 
 ### String literals
 

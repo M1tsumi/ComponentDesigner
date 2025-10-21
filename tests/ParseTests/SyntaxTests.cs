@@ -705,4 +705,85 @@ public class SyntaxTests : BaseParsingTest
             EOF();
         }
     }
+
+    [Fact]
+    public void MissingElementCloseTag()
+    {
+        Parses(
+            """
+            <Foo>
+                <Bar>
+            </Foo>
+            """,
+            allowErrors: true
+        );
+        {
+            Diagnostic(CXErrorCode.MissingElementClosingTag);
+
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+                
+                Element();
+                {
+                    Token(CXTokenKind.LessThan);
+                    Identifier("Bar");
+                    Token(CXTokenKind.GreaterThan);
+                    
+                    Token(CXTokenKind.LessThanForwardSlash, flags: CXTokenFlags.Missing);
+                    Identifier("Bar", flags: CXTokenFlags.Missing);
+                    Token(CXTokenKind.GreaterThan, flags: CXTokenFlags.Missing);
+                }
+
+                Token(CXTokenKind.LessThanForwardSlash);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+            }
+            
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void AttributeWithElementValue()
+    {
+        Parses(
+            """
+            <Foo
+                bar=(<Baz />)
+            />
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+
+                Attribute();
+                {
+                    Identifier("bar");
+                    Token(CXTokenKind.Equals);
+
+                    ElementValue();
+                    {
+                        Token(CXTokenKind.OpenParenthesis);
+                        Element();
+                        {
+                            Token(CXTokenKind.LessThan);
+                            Identifier("Baz");
+                            Token(CXTokenKind.ForwardSlashGreaterThan);
+                        }
+                        Token(CXTokenKind.CloseParenthesis);
+                    }
+                }
+
+                Token(CXTokenKind.ForwardSlashGreaterThan);
+            }
+            
+            EOF();
+        }
+    }
 }

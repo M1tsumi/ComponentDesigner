@@ -150,6 +150,7 @@ public sealed partial class CXParser
                 var children = ParseElementChildren();
 
                 ParseClosingElement(
+                    end,
                     out var endStart,
                     out var endIdent,
                     out var endClose
@@ -177,6 +178,7 @@ public sealed partial class CXParser
         }
 
         void ParseClosingElement(
+            CXToken elementEnd,
             out CXToken elementEndStart,
             out CXToken? elementEndIdent,
             out CXToken elementEndClose)
@@ -197,14 +199,34 @@ public sealed partial class CXParser
 
             elementEndClose = Expect(CXTokenKind.GreaterThan);
 
+            var missingStructure
+                = elementEndStart.IsMissing ||
+                  (elementEndIdent?.IsMissing ?? false) ||
+                  elementEndClose.IsMissing;
+
+            var missingNamedClosing = identifier is null
+                ? elementEndIdent is not null
+                : elementEndIdent is null || identifier.Value != elementEndIdent.Value;
 
             if (
-                identifier is not null &&
-                elementEndIdent is not null &&
-                identifier.IsMissing && elementEndIdent.Value != identifier.Value
+                missingNamedClosing ||
+                missingStructure
             )
             {
-                diagnostics.Add(CXDiagnostic.MissingElementClosingTag(identifier, identifier.Span));
+                var diagnosticSpan = TextSpan.FromBounds(start.Span.Start, elementEnd.Span.End);
+                
+                diagnostics.Add(
+                    CXDiagnostic.MissingElementClosingTag(identifier, diagnosticSpan)
+                );
+
+                var missingSpan = elementEndStart.Span;
+
+                elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash, missingSpan);
+                elementEndIdent = identifier is not null 
+                    ? CXToken.CreateMissing(CXTokenKind.Identifier, missingSpan, identifier.Value) 
+                    : null;
+                elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan, missingSpan);
+                
                 // rollback
                 _tokenIndex = sentinel;
             }
@@ -272,7 +294,7 @@ public sealed partial class CXParser
                     goto case CXTokenKind.Invalid;
             }
         }
-        
+
         end:
 
         if (parts.Count > 0)
@@ -280,7 +302,7 @@ public sealed partial class CXParser
             node = BuildParts();
             return true;
         }
-        
+
         node = null!;
         return false;
 
@@ -364,6 +386,13 @@ public sealed partial class CXParser
 
         switch (CurrentToken.Kind)
         {
+            case CXTokenKind.OpenParenthesis:
+                return new CXValue.Element(
+                    Eat(),
+                    ParseElement(),
+                    Expect(CXTokenKind.CloseParenthesis)
+                );
+            
             case CXTokenKind.Interpolation:
                 return new CXValue.Interpolation(
                     Eat(),

@@ -87,7 +87,9 @@ public class PackExample
             content = cx(
                 $"""
                  <section
-                     accessory={cx($"<thumbnail url={location.Icon} />")}
+                     accessory=(
+                        <thumbnail url={location.Icon} />
+                     )
                  >
                      {content}
                  </section>
@@ -144,9 +146,9 @@ public class PackExample
         return cx(
             $"""
              <section
-                accessory={cx(
-                    $"<thumbnail url={pack.Icon} />"
-                )}
+                accessory=(
+                    <thumbnail url={pack.Icon} />
+                )
              >
                  {packHeaderText}
              </section>

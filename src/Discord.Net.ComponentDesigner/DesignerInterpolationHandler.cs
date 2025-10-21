@@ -16,7 +16,7 @@ public struct DesignerInterpolationHandler
 
     public void AppendLiteral(string s)
     {
-        _interpolatedValues[_index++] = s;
+        
     }
 
     public void AppendFormatted<T>(T value)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 
 namespace Discord.CX;
 
@@ -48,5 +49,11 @@ public static class StringUtils
                 x.Length > minSpacing ? x.Substring(minSpacing) : x
             )
         );
+    }
+    
+    public static void NormalizeIndentation(this StringBuilder str)
+    {
+        var normal = str.ToString().NormalizeIndentation();
+        str.Clear().Append(normal);
     }
 }

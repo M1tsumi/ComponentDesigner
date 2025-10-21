@@ -6,5 +6,6 @@ namespace Discord.CX.Parser;
 public enum CXTokenFlags : byte
 {
     None = 0,
-    Missing = 1 << 0
+    Missing = 1 << 0,
+    Synthetic = 1 << 1
 }

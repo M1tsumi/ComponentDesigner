@@ -368,4 +368,22 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
+    
+    public static readonly DiagnosticDescriptor CardinalityForcedToRuntime = new(
+        "DC0040",
+        "Cardinality forced to runtime check",
+        "'{0}' can be more than 1 component, a runtime check will occur to enforce a single component",
+        "Components",
+        DiagnosticSeverity.Warning,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor LabelComponentDuplicate = new(
+        "DC0041",
+        "Duplicate component definition",
+        "A label cannot specify 'component' both in an attribute and in the children",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
 }

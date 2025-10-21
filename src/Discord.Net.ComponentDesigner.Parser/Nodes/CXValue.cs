@@ -8,6 +8,24 @@ public abstract class CXValue : CXNode
 {
     public sealed class Invalid : CXValue;
 
+    public sealed class Element : CXValue
+    {
+        public CXToken OpenParenthesis { get; }
+        public CXElement Value { get; }
+        public CXToken CloseParenthesis { get; }
+
+        public Element(
+            CXToken open,
+            CXElement element,
+            CXToken close
+        )
+        {
+            Slot(OpenParenthesis = open);
+            Slot(Value = element);
+            Slot(CloseParenthesis = close);
+        }
+    }
+
     public class Multipart : CXValue
     {
         public bool HasInterpolations => Tokens.Any(x => x.Kind is CXTokenKind.Interpolation);
@@ -18,7 +36,7 @@ public abstract class CXValue : CXNode
             Slot(Tokens = tokens);
         }
     }
-    
+
     public sealed class StringLiteral : Multipart
     {
         public CXToken StartToken { get; }
@@ -32,7 +50,7 @@ public abstract class CXValue : CXNode
         {
             Slot(StartToken = start);
             Slot(EndToken = end);
-            
+
             // hack: we flip the slot order due to inheritance with the constructor
             SwapSlots(0, 1);
         }

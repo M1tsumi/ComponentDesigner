@@ -157,6 +157,7 @@ public readonly struct CXGraph
                             inner,
                             state,
                             [],
+                            [],
                             parent
                         )
                     ];
@@ -209,13 +210,34 @@ public readonly struct CXGraph
 
                 if (state is null) return [];
 
+                var attributeNodes = new List<Node>();
                 var nodeChildren = new List<Node>();
                 var node = map[element] = state.OwningNode = new(
                     componentNode,
                     state,
                     nodeChildren,
+                    attributeNodes,
                     parent
                 );
+                
+                foreach (var attribute in element.Attributes)
+                {
+                    if (attribute.Value is CXValue.Element nestedElement)
+                    {
+                        attributeNodes.AddRange(
+                            CreateNodes(
+                                manager,
+                                nestedElement.Value,
+                                node,
+                                reusedNodes,
+                                oldGraph,
+                                map,
+                                diagnostics,
+                                incrementalParseResult
+                            )
+                        );
+                    }
+                }
 
                 nodeChildren.AddRange(
                     children
@@ -251,10 +273,15 @@ public readonly struct CXGraph
         public ComponentNode Inner { get; }
         public ComponentState State => _state;
         public IReadOnlyList<Node> Children { get; }
+        public IReadOnlyList<Node> AttributeNodes { get; }
         public Node? Parent { get; }
 
         public IReadOnlyList<Diagnostic> Diagnostics
-            => [.._diagnostics, ..Children.SelectMany(x => x.Diagnostics)];
+            => [
+                .._diagnostics, 
+                ..AttributeNodes.SelectMany(x => x.Diagnostics),
+                ..Children.SelectMany(x => x.Diagnostics)
+            ];
 
         public bool Incremental { get; }
 
@@ -267,6 +294,7 @@ public readonly struct CXGraph
             ComponentNode inner,
             ComponentState state,
             IReadOnlyList<Node> children,
+            IReadOnlyList<Node> attributeNodes,
             Node? parent = null,
             IReadOnlyList<Diagnostic>? diagnostics = null,
             bool incremental = false,
@@ -276,6 +304,7 @@ public readonly struct CXGraph
             Inner = inner;
             _state = state;
             Children = children;
+            AttributeNodes = attributeNodes;
             Parent = parent;
             _diagnostics = [..diagnostics ?? []];
             _render = render;
@@ -284,7 +313,9 @@ public readonly struct CXGraph
 
         public void UpdateState(ComponentContext context)
         {
-            // update children first
+            foreach (var attributeNode in AttributeNodes)
+                attributeNode.UpdateState(context);
+            
             foreach (var node in Children)
                 node.UpdateState(context);
             
@@ -306,6 +337,7 @@ public readonly struct CXGraph
             using (context.CreateDiagnosticScope(_diagnostics))
             {
                 Inner.Validate(State, context);
+                foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context);
                 foreach (var child in Children) child.Validate(context);
             }
         }
@@ -364,6 +396,7 @@ public readonly struct CXGraph
                 Inner,
                 State,
                 Children,
+                AttributeNodes,
                 parent,
                 diagnostics,
                 true,

@@ -7,7 +7,13 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
 
-public sealed class LabelComponentNode : ComponentNode
+public sealed class LabelComponentState : ComponentState
+{
+    public CXValue? ChildValue { get; set; }
+    public CXElement? ChildElement { get; set; }
+}
+
+public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 {
     public override string Name => "label";
 
@@ -24,6 +30,10 @@ public sealed class LabelComponentNode : ComponentNode
         Properties =
         [
             ComponentProperty.Id,
+            Component = new(
+                "component",
+                renderer: Renderers.ComponentAsProperty
+            ),
             Value = new(
                 "value",
                 renderer: Renderers.String
@@ -36,23 +46,68 @@ public sealed class LabelComponentNode : ComponentNode
         ];
     }
 
-    public override ComponentState? Create(ComponentStateInitializationContext context)
+    public override LabelComponentState? CreateState(ComponentStateInitializationContext context)
     {
         if (context.Node is not CXElement element) return null;
 
-        var state = base.Create(context);
+        var state = new LabelComponentState()
+        {
+            Source = element
+        };
 
-        if (state is null) return null;
+        CXElement? component = null;
 
-        if (element.Children.FirstOrDefault() is CXValue value)
-            state.SubstitutePropertyValue(Value, value);
+        switch (element.Children.FirstOrDefault())
+        {
+            case CXValue value:
+            {
+                state.SubstitutePropertyValue(Value, value);
+                state.ChildValue = value;
+
+                if (element.Children.Count > 1 && element.Children[1] is CXElement labelComponent)
+                    component = labelComponent;
+                break;
+            }
+            case CXElement labelComponent:
+                component = labelComponent;
+                break;
+        }
+
+        if (component is not null)
+        {
+            state.ChildElement = component;
+            state.SubstitutePropertyValue(
+                Component,
+                new CXValue.Element(
+                    CXToken.CreateSynthetic(CXTokenKind.OpenParenthesis),
+                    component,
+                    CXToken.CreateSynthetic(CXTokenKind.CloseParenthesis)
+                )
+            );
+        }
 
         return state;
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(LabelComponentState state, ComponentContext context)
     {
         base.Validate(state, context);
+
+        var component = state.GetProperty(Component);
+
+        if (component.Attribute is not null && state.ChildValue is not null)
+        {
+            // specified both in attribute and in the children
+            context.AddDiagnostic(
+                Diagnostics.LabelComponentDuplicate,
+                component.Attribute
+            );
+
+            context.AddDiagnostic(
+                Diagnostics.LabelComponentDuplicate,
+                state.ChildValue
+            );
+        }
 
         if (context.KnownTypes.LabelBuilderType is null)
         {
@@ -63,34 +118,34 @@ public sealed class LabelComponentNode : ComponentNode
             );
         }
 
-        if (!state.HasChildren)
-        {
-            context.AddDiagnostic(
-                Diagnostics.MissingLabelComponent,
-                state.Source
-            );
+        // if (!state.HasChildren)
+        // {
+        //     context.AddDiagnostic(
+        //         Diagnostics.MissingLabelComponent,
+        //         state.Source
+        //     );
+        //
+        //     return;
+        // }
 
-            return;
+        foreach (var child in ((CXElement)state.Source).Children)
+        {
+            if (child != state.ChildValue && child != state.ChildElement)
+            {
+                context.AddDiagnostic(
+                    Diagnostics.TooManyChildrenInLabel,
+                    child
+                );
+            }
         }
 
-        if (state.Children.Count > 1)
-        {
-            var lower = state.Children[1].State.Source.Span.Start;
-            var upper = state.Children.Last().State.Source.Span.End;
-
-            context.AddDiagnostic(
-                Diagnostics.TooManyChildrenInLabel,
-                TextSpan.FromBounds(lower, upper)
-            );
-        }
-
-        var labelInnerComponent = state.Children[0];
-
-        if (!IsValidLabelChild(labelInnerComponent.Inner))
+        var labelChild = state.GetProperty(Component).Node;
+        
+        if (labelChild is not null && !IsValidLabelChild(labelChild.Inner))
         {
             context.AddDiagnostic(
                 Diagnostics.InvalidLabelChild,
-                labelInnerComponent.State.Source
+                labelChild.State.Source
             );
         }
     }
@@ -101,7 +156,7 @@ public sealed class LabelComponentNode : ComponentNode
             or TextInputComponentNode
             or FileUploadComponentNode;
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(LabelComponentState state, ComponentContext context)
     {
         var props = string.Join(
             ",\n",

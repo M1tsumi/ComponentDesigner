@@ -16,6 +16,9 @@ public enum CXTokenKind : byte
 
     StringLiteralStart,
     StringLiteralEnd,
+    
+    OpenParenthesis,
+    CloseParenthesis,
 
     Identifier,
 }

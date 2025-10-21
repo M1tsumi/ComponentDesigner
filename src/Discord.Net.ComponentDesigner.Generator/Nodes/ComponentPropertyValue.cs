@@ -6,7 +6,8 @@ namespace Discord.CX.Nodes;
 
 public sealed record ComponentPropertyValue(
     ComponentProperty Property,
-    CXAttribute? Attribute
+    CXAttribute? Attribute,
+    CXGraph.Node? Node = null
 )
 {
     private CXValue? _value;
