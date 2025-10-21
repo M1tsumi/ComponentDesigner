@@ -150,7 +150,7 @@ public sealed record CXGraphManager(
                 InterceptLocation,
                 InvocationSyntax.GetLocation(),
                 CXDesigner,
-                string.Empty,
+                "// omitted, contains parser errors.",
                 [..parserDiagnostics],
                 UsesDesigner
             );
@@ -162,7 +162,7 @@ public sealed record CXGraphManager(
                 InterceptLocation,
                 InvocationSyntax.GetLocation(),
                 CXDesigner,
-                string.Empty,
+                "// omitted, contains graph structural errors.",
                 [..parserDiagnostics, ..Graph.Diagnostics],
                 UsesDesigner
             );
@@ -178,7 +178,7 @@ public sealed record CXGraphManager(
                 this.InterceptLocation,
                 InvocationSyntax.GetLocation(),
                 CXDesigner,
-                string.Empty,
+                "// omitted, contains validation errors.",
                 [..parserDiagnostics, ..Graph.Diagnostics, ..context.GlobalDiagnostics],
                 UsesDesigner
             );

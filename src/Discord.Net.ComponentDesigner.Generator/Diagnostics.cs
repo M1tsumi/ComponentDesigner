@@ -8,9 +8,9 @@ public static partial class Diagnostics
     public static Diagnostic CreateParsingDiagnostic(CXDiagnostic diagnostic, Location location)
         => Diagnostic.Create(
             new DiagnosticDescriptor(
-                $"DCP{diagnostic.Code.ToString().PadLeft(3, '0')}",
+                $"DCP{((int)diagnostic.Code).ToString().PadLeft(3, '0')}",
                 diagnostic.Message,
-                string.Empty,
+                diagnostic.Message,
                 "CX Parser",
                 diagnostic.Severity,
                 true
