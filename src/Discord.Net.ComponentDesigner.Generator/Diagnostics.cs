@@ -360,15 +360,6 @@ public static partial class Diagnostics
         true
     );
     
-    public static readonly DiagnosticDescriptor ButtonCannotHaveALabelAndEmoji = new(
-        "DC0039",
-        "Buttons can't have a label and emoji",
-        "Buttons can't have both a label and an emoji",
-        "Components",
-        DiagnosticSeverity.Error,
-        true
-    );
-    
     public static readonly DiagnosticDescriptor CardinalityForcedToRuntime = new(
         "DC0040",
         "Cardinality forced to runtime check",
@@ -382,6 +373,33 @@ public static partial class Diagnostics
         "DC0041",
         "Duplicate component definition",
         "A label cannot specify 'component' both in an attribute and in the children",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor ComponentDoesntAllowChildren = new(
+        "DC0042",
+        "Component doesn't allow children",
+        "'{0}' doesn't allow children",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor MediaGalleryIsEmpty = new(
+        "DC0043",
+        "Empty media gallery",
+        "A media gallery must have at least one 'media-gallery-item'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor TooManyItemsInMediaGallery = new(
+        "DC0043",
+        "Too many items in media gallery",
+        $"A media gallery can have at most {Constants.MAX_MEDIA_ITEMS} 'media-gallery-item's",
         "Components",
         DiagnosticSeverity.Error,
         true

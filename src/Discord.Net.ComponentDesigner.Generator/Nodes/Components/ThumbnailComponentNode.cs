@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -43,7 +44,7 @@ public sealed class ThumbnailComponentNode : ComponentNode
             new {context.KnownTypes.ThumbnailBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)
                     .PrefixIfSome(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

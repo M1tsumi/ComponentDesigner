@@ -263,7 +263,15 @@ public sealed class CXLexer
                 goto default;
 
             default:
-                if (Mode == LexMode.Attribute && TryScanAttributeValue(ref info)) return;
+                if (
+                    Mode is LexMode.Attribute && (
+                        TryScanAttributeValue(ref info) ||
+                        
+                        // when we're scanning an attributes value, and it doesn't have a value, the next logical
+                        // token should be an identifier, so we scan for that.
+                        TryScanIdentifier(ref info)
+                    )
+                ) return;
 
                 info.Kind = CXTokenKind.Invalid;
                 return;

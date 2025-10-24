@@ -1,5 +1,7 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using System.Collections.Generic;
+using System.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -31,6 +33,7 @@ public sealed class ContainerComponentNode : ComponentNode
             Spoiler = new(
                 "spoiler",
                 isOptional: true,
+                requiresValue: false,
                 renderer: Renderers.Boolean,
                 dotnetPropertyName: "IsSpoiler"
             )
@@ -64,27 +67,58 @@ public sealed class ContainerComponentNode : ComponentNode
             or FileComponentNode;
 
     public override string Render(ComponentState state, ComponentContext context)
-        => $$"""
-             new {{context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}{{
-                 $"{
-                     state
-                         .RenderProperties(this, context, asInitializers: true)
-                         .PostfixIfSome("\n")
-                 }{
-                     state.RenderChildren(context)
-                         .Map(x =>
-                             $"""
-                              Components =
-                              [
-                                  {x.WithNewlinePadding(4)}
-                              ]
-                              """
-                         )
-                 }"
-                     .TrimEnd()
-                     .WithNewlinePadding(4)
-                     .PrefixIfSome("\n{\n".Postfix(4))
-                     .PostfixIfSome("\n}")
-             }}
-             """;
+    {
+        var props = state.RenderProperties(this, context, asInitializers: true);
+        var children = state.RenderChildren(context);
+
+        var init = new StringBuilder(props);
+
+        if (!string.IsNullOrWhiteSpace(children))
+        {
+            if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+            
+            init.Append(
+                $"""
+                 Components =
+                 [
+                     {children.WithNewlinePadding(4)}
+                 ]
+                 """
+            );
+        }
+
+        return
+            $$"""
+              new {{context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
+                  init
+                      .ToString()
+                      .WithNewlinePadding(4)
+                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+                      .PostfixIfSome($"{Environment.NewLine}}}")
+              }}
+              """;
+    }
+//         => $$"""
+//              new {{context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
+//                  $"{
+//                      state
+//                          .RenderProperties(this, context, asInitializers: true)
+//                          .PostfixIfSome(Environment.NewLine)
+//                  }{
+//                      state.RenderChildren(context)
+//                          .Map(x =>
+//                              $"""
+//                               Components =
+//                               [
+//                                   {x.WithNewlinePadding(4)}
+//                               ]
+//                               """
+//                          )
+//                  }"
+//                      .TrimEnd()
+//                      .WithNewlinePadding(4)
+//                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+//                      .PostfixIfSome($"{Environment.NewLine}}}")
+//              }}
+//              """;
 }

@@ -32,6 +32,7 @@ public abstract class ComponentNode<TState> : ComponentNode
 
     public virtual void Validate(TState state, ComponentContext context)
     {
+        base.Validate(state, context);
     }
 
     public sealed override void Validate(ComponentState state, ComponentContext context)
@@ -47,6 +48,8 @@ public abstract class ComponentNode
 
     public virtual IReadOnlyList<ComponentProperty> Properties { get; } = [];
 
+    protected virtual bool AllowChildrenInCX => HasChildren;
+    
     public virtual void Validate(ComponentState state, ComponentContext context)
     {
         // validate properties
@@ -62,9 +65,9 @@ public abstract class ComponentNode
             }
         }
 
-        // report any unknown properties
         if (state.Source is CXElement element)
         {
+            // report any unknown properties
             foreach (var attribute in element.Attributes)
             {
                 if (!TryGetPropertyFromName(attribute.Identifier.Value, out _))
@@ -76,6 +79,16 @@ public abstract class ComponentNode
                         Name
                     );
                 }
+            }
+            
+            // report invalid children
+            if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
+            {
+                context.AddDiagnostic(
+                    Diagnostics.ComponentDoesntAllowChildren,
+                    element.Children,
+                    Name
+                );
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -7,7 +8,10 @@ public sealed class FileComponentNode : ComponentNode
 {
     public override string Name => "file";
 
-    public ComponentProperty File { get; }
+    protected override bool AllowChildrenInCX => false;
+
+    public ComponentProperty Id { get; }
+    public ComponentProperty Url { get; }
     public ComponentProperty Spoiler { get; }
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
@@ -16,10 +20,10 @@ public sealed class FileComponentNode : ComponentNode
     {
         Properties =
         [
-            ComponentProperty.Id,
-            File = new(
-                "file",
-                aliases: ["url"],
+            Id = ComponentProperty.Id,
+            Url = new(
+                "url",
+                aliases: ["media"],
                 renderer: Renderers.UnfurledMediaItem,
                 dotnetParameterName: "media"
             ),
@@ -38,7 +42,7 @@ public sealed class FileComponentNode : ComponentNode
                 state.RenderProperties(this, context)
                     .WithNewlinePadding(4)
                     .PrefixIfSome(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

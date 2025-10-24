@@ -10,7 +10,6 @@ namespace Discord.CX.Nodes;
 
 public static class Validators
 {
-
     public static void Snowflake(ComponentContext context, ComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
@@ -67,7 +66,7 @@ public static class Validators
         var bounds = (lower, upper) switch
         {
             (not null, null) => $"at least {lower}",
-            (null, not null) => $"at most {lower}",
+            (null, not null) => $"at most {upper}",
             (not null, not null) => $"between {lower} and {upper}",
             _ => string.Empty
         };
@@ -81,10 +80,10 @@ public static class Validators
                     var constant = context.GetInterpolationInfo(interpolation).Constant;
 
                     if (!constant.HasValue) break;
-                    
-                    if(constant.Value is string constantValue)
+
+                    if (constant.Value is string constantValue)
                         Check(constantValue.Length);
-                    else if(constant.Value is int integer)
+                    else if (constant.Value is int integer)
                         Check(integer);
                     break;
 
@@ -96,13 +95,17 @@ public static class Validators
                         switch (token.Kind)
                         {
                             case CXTokenKind.Text:
+                                length ??= 0;
                                 length += token.Span.Length;
                                 break;
                             case CXTokenKind.Interpolation
                                 when literal.Document.TryGetInterpolationIndex(token, out var index):
                                 var info = context.GetInterpolationInfo(index);
                                 if (info.Constant.Value is string str)
+                                {
+                                    length ??= 0;
                                     length += str.Length;
+                                }
                                 break;
                         }
                     }
@@ -122,8 +125,12 @@ public static class Validators
                     length > upper || length < lower
                 )
                 {
-                    context.AddDiagnostic(Diagnostics.OutOfRange, propertyValue.Value, propertyValue.Property.Name,
-                        bounds);
+                    context.AddDiagnostic(
+                        Diagnostics.OutOfRange,
+                        propertyValue.Value,
+                        propertyValue.Property.Name,
+                        bounds
+                    );
                 }
             }
         };

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -72,7 +73,7 @@ public sealed class TextInputComponentNode : ComponentNode
                 state.RenderProperties(this, context)
                     .PrefixIfSome(4)
                     .WithNewlinePadding(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

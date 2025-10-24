@@ -16,7 +16,7 @@ public static class Constants
     public const int SELECT_MIN_VALUES = 0;
     public const int SELECT_MAX_VALUES = 25;
 
-    public const int MAX_MEDIA_ITEMS = 25;
+    public const int MAX_MEDIA_ITEMS = 10;
     public const int MAX_MEDIA_ITEM_DESCRIPTION_LENGTH = 1024;
 
     public const int MAX_SECTION_CHILDREN = 3;

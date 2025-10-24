@@ -22,6 +22,8 @@ public sealed record ComponentPropertyValue(
 
     public bool HasValue => Value is not null;
 
+    public bool CanOmitFromSource => Property.IsOptional && !IsSpecified;
+
     public bool TryGetLiteralValue(out string value)
     {
         switch (Value)
@@ -58,17 +60,14 @@ public sealed record ComponentPropertyValue(
             );
         }
 
-        if (requiresValue.HasValue)
+        if (requiresValue.HasValue && Attribute is not null && Value is null)
         {
-            if (Value is null or CXValue.Invalid && requiresValue.Value)
-            {
-                context.AddDiagnostic(
-                    Diagnostics.MissingRequiredProperty,
-                    Attribute ?? state.Source,
-                    state.OwningNode?.Inner.Name,
-                    Property.Name
-                );
-            }
+            context.AddDiagnostic(
+                Diagnostics.MissingRequiredProperty,
+                Attribute ?? state.Source,
+                state.OwningNode?.Inner.Name,
+                Property.Name
+            );
         }
     }
 }

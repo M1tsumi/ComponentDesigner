@@ -167,8 +167,13 @@ public sealed record CXGraphManager(
                 UsesDesigner
             );
         }
-
+        
         var context = new ComponentContext(Graph);
+
+        foreach (var node in Graph.RootNodes)
+        {
+            node.UpdateState(context);
+        }
 
         Graph.Validate(context);
 

@@ -1,4 +1,5 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -27,6 +28,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
 
+    public ComponentProperty Id { get; }
     public ComponentProperty Style { get; }
     public ComponentProperty Label { get; }
     public ComponentProperty Emoji { get; }
@@ -35,15 +37,16 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
     public ComponentProperty Url { get; }
     public ComponentProperty Disabled { get; }
 
+    protected override bool AllowChildrenInCX => true;
+
     public ButtonComponentNode()
     {
         Properties =
         [
-            ComponentProperty.Id,
+            Id = ComponentProperty.Id,
             Style = new ComponentProperty(
                 "style",
                 isOptional: true,
-                validators: [Validators.EnumVariant(BUTTON_STYLE_ENUM)],
                 renderer: Renderers.RenderEnum(BUTTON_STYLE_ENUM)
             ),
             Label = new ComponentProperty(
@@ -202,19 +205,6 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             );
         }
 
-        if (label.IsSpecified && state.GetProperty(Emoji).IsSpecified)
-        {
-            context.AddDiagnostic(
-                Diagnostics.ButtonCannotHaveALabelAndEmoji,
-                (ICXNode?)label.Attribute ?? label.Value!
-            );
-            
-            context.AddDiagnostic(
-                Diagnostics.ButtonCannotHaveALabelAndEmoji,
-                state.GetProperty(Emoji).Attribute!
-            );
-        }
-
         switch (state.InferredKind)
         {
             case ButtonKind.Link:
@@ -268,19 +258,19 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         string style;
 
         if (state.InferredKind is not ButtonKind.Default)
-            style = $"global::Discord.ButtonKind.{state.InferredKind}";
+            style = $"global::{BUTTON_STYLE_ENUM}.{state.InferredKind}";
         else
         {
             // use the provided property from state
             var stylePropertyValue = state.GetProperty(Style);
 
             style = stylePropertyValue.Value is null
-                ? "global::Discord.ButtonKind.Primary"
+                ? $"global::{BUTTON_STYLE_ENUM}.Primary"
                 : Style.Renderer(context, stylePropertyValue);
         }
 
         var props = string.Join(
-            ",\n",
+            $",{Environment.NewLine}",
             [
                 $"style: {style}",
                 state.RenderProperties(
@@ -296,7 +286,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                     props
                         .WithNewlinePadding(4)
                         .PrefixIfSome(4)
-                        .WrapIfSome("\n")
+                        .WrapIfSome(Environment.NewLine)
                 })
                 """;
     }

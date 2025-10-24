@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis.Text;
+﻿using System;
+using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.Linq;
 using Discord.CX.Parser;
@@ -135,10 +136,10 @@ public sealed class SectionComponentNode : ComponentNode
                      {
                          state
                              .RenderChildren(context, x => x.Inner is not AccessoryComponentNode)
-                             .WithNewlinePadding(4)
+                             .WithNewlinePadding(8)
                      }
                  ]
-             ){state.RenderInitializer(this, context, x => x == Accessory).PrefixIfSome("\n")}
+             ){state.RenderInitializer(this, context, x => x == Accessory).PrefixIfSome(Environment.NewLine)}
              """;
     }
 }

@@ -1,0 +1,312 @@
+﻿using Discord.CX;
+using Discord.CX.Nodes.Components;
+using Discord.CX.Nodes.Components.SelectMenus;
+using Discord.CX.Parser;
+
+namespace UnitTests.ComponentTests;
+
+public sealed class ActionRowTests : BaseComponentTest
+{
+    [Fact]
+    public void EmptyRow()
+    {
+        Graph(
+            """
+            <row />
+            """
+        );
+        {
+            Node<ActionRowComponentNode>();
+
+            Validate(hasErrors: true);
+
+            Diagnostic(Diagnostics.EmptyActionRow.Id);
+
+            EOF();
+        }
+
+        Graph(
+            """
+            <row>
+
+            </row>
+            """
+        );
+        {
+            Node<ActionRowComponentNode>();
+
+            Validate(hasErrors: true);
+
+            Diagnostic(Diagnostics.EmptyActionRow.Id);
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void RowWithIdAndChild()
+    {
+        Graph(
+            """
+            <row id="123">
+                <button url="abc" label="label"/>
+            </row>
+            """
+        );
+        {
+            var row = Node<ActionRowComponentNode>(out var rowNode);
+            {
+                Node<ButtonComponentNode>();
+            }
+
+            var id = rowNode.State.GetProperty(row.Id);
+
+            Assert.True(id.IsSpecified);
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                new global::Discord.ActionRowBuilder()
+                {
+                    Id = 123,
+                    Components =
+                    [
+                        new global::Discord.ButtonBuilder(
+                            style: global::Discord.ButtonStyle.Link,
+                            label: "label",
+                            url: "abc"
+                        )
+                    ]
+                }
+                """
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void TooManyButtonsInRow()
+    {
+        Graph(
+            """
+            <row>
+                <button url="url-1" label="label-1"/>
+                <button url="url-2" label="label-2"/>
+                <button url="url-3" label="label-3"/>
+                <button url="url-4" label="label-4"/>
+                <button url="url-5" label="label-5"/>
+                <button url="url-6" label="label-6"/>
+            </row>
+            """
+        );
+        {
+            CXGraph.Node extraButtonNode;
+
+            Node<ActionRowComponentNode>();
+            {
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>(out extraButtonNode);
+            }
+
+            Validate(hasErrors: true);
+
+            Diagnostic(
+                Diagnostics.ActionRowInvalidChild.Id,
+                location: CurrentGraph.GetLocation(extraButtonNode.State.Source)
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void MixOfRowAndButton()
+    {
+        Graph(
+            """
+            <row>
+                <button url="url-1" label="label-1" />
+                <select type="string" customId="abc" />
+                <button url="url-2" label="label-2" />
+            </row>
+            """
+        );
+        {
+            CXGraph.Node selectMenuNode;
+            Node<ActionRowComponentNode>();
+            {
+                Node<ButtonComponentNode>();
+                Node<SelectMenuComponentNode>(out selectMenuNode);
+                Node<ButtonComponentNode>();
+            }
+
+            Validate(hasErrors: true);
+
+            Diagnostic(
+                Diagnostics.ActionRowInvalidChild.Id,
+                location: CurrentGraph.GetLocation(selectMenuNode.State.Source)
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void RowWithSelectMenu()
+    {
+        Graph(
+            """
+            <row>
+                <select type="string" customId="abc" />
+            </row>
+            """
+        );
+        {
+            Node<ActionRowComponentNode>();
+            {
+                Node<SelectMenuComponentNode>();
+            }
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                new global::Discord.ActionRowBuilder()
+                {
+                    Components =
+                    [
+                        new global::Discord.SelectMenuBuilder(
+                            customId: "abc"
+                        )
+                    ]
+                }
+                """
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void RowWithButtons()
+    {
+        Graph(
+            """
+            <row>
+                <button url="url-1" label="label-1"/>
+                <button url="url-2" label="label-2"/>
+                <button url="url-3" label="label-3"/>
+            </row>
+            """
+        );
+        {
+            Node<ActionRowComponentNode>();
+            {
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+                Node<ButtonComponentNode>();
+            }
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                new global::Discord.ActionRowBuilder()
+                {
+                    Components =
+                    [
+                        new global::Discord.ButtonBuilder(
+                            style: global::Discord.ButtonStyle.Link,
+                            label: "label-1",
+                            url: "url-1"
+                        ),
+                        new global::Discord.ButtonBuilder(
+                            style: global::Discord.ButtonStyle.Link,
+                            label: "label-2",
+                            url: "url-2"
+                        ),
+                        new global::Discord.ButtonBuilder(
+                            style: global::Discord.ButtonStyle.Link,
+                            label: "label-3",
+                            url: "url-3"
+                        )
+                    ]
+                }
+                """
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void RowWithInvalidProperty()
+    {
+        Graph(
+            """
+            <row abc someProp="123">
+                <button url="url-1" label="label-1" />
+            </row>
+            """
+        );
+        {
+            Node<ActionRowComponentNode>(out var rowNode);
+            {
+                Node<ButtonComponentNode>();
+            }
+
+            var abcAttr = ((CXElement)rowNode.State.Source).Attributes.First(x => x.Identifier.Value == "abc");
+            var somePropAttr =
+                ((CXElement)rowNode.State.Source).Attributes.First(x => x.Identifier.Value == "someProp");
+
+            Validate();
+
+            Diagnostic(
+                Diagnostics.UnknownProperty.Id,
+                location: CurrentGraph.GetLocation(abcAttr)
+            );
+            Diagnostic(
+                Diagnostics.UnknownProperty.Id,
+                location: CurrentGraph.GetLocation(somePropAttr)
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
+    public void RowWithInvalidChild()
+    {
+        Graph(
+            """
+            <row>
+                <button url="url-1" label="label-1" />
+                <container />
+            </row>
+            """
+        );
+        {
+            CXGraph.Node containerNode;
+            Node<ActionRowComponentNode>();
+            {
+                Node<ButtonComponentNode>();
+                Node<ContainerComponentNode>(out containerNode);
+            }
+
+            Validate(hasErrors: true);
+
+            Diagnostic(
+                Diagnostics.ActionRowInvalidChild.Id,
+                location: CurrentGraph.GetLocation(containerNode.State.Source)
+            );
+            
+            EOF();
+        }
+    }
+}

@@ -1,4 +1,5 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -11,7 +12,10 @@ public sealed class TextDisplayComponentNode : ComponentNode
     public override IReadOnlyList<string> Aliases { get; } = ["text"];
 
     public ComponentProperty Content { get; }
+    
     public override IReadOnlyList<ComponentProperty> Properties { get; }
+    
+    protected override bool AllowChildrenInCX => true;
 
     public TextDisplayComponentNode()
     {
@@ -29,7 +33,7 @@ public sealed class TextDisplayComponentNode : ComponentNode
     {
         var state = base.Create(context)!;
 
-        if (context.Node is CXElement {Children.Count: 1} element && element.Children[0] is CXValue value)
+        if (context.Node is CXElement { Children.Count: 1 } element && element.Children[0] is CXValue value)
             state.SubstitutePropertyValue(Content, value);
 
         return state;
@@ -41,7 +45,7 @@ public sealed class TextDisplayComponentNode : ComponentNode
                 state.RenderProperties(this, context)
                     .WithNewlinePadding(4)
                     .PrefixIfSome(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

@@ -240,6 +240,10 @@ public static class Renderers
                     return FromInterpolation(stringLiteral, info);
 
                 return $"bool.Parse({context.GetDesignerValue(info)})";
+            
+            case null when !propertyValue.Property.RequiresValue:
+                return "true";
+            
             default: return "default";
         }
 
@@ -265,7 +269,7 @@ public static class Renderers
 
         string FromText(ICXNode owner, string value)
         {
-            if (value is not "true" or "false")
+            if (value is not "true" and not "false")
             {
                 context.AddDiagnostic(
                     Diagnostics.TypeMismatch,
@@ -366,9 +370,15 @@ public static class Renderers
                 return UseLibraryParser(scalar.Value);
 
             case CXValue.Multipart stringLiteral:
+                if (
+                    !stringLiteral.HasInterpolations &&
+                    TryGetColorPreset(context, stringLiteral.Tokens.ToString(), out var presetName)
+                ) return $"{qualifiedColor}.{presetName}";
+
                 return UseLibraryParser(RenderStringLiteral(stringLiteral));
             default: return "default";
         }
+
 
         string UseLibraryParser(string source)
             => $"{qualifiedColor}.Parse({source})";
@@ -490,7 +500,7 @@ public static class Renderers
             : string.Empty;
 
         var isMultiline = literal.Tokens.Any(x => x.FullValue.Contains("\n"));
-        
+
         foreach (var token in literal.Tokens)
         {
             switch (token.Kind)
@@ -518,12 +528,12 @@ public static class Renderers
                 default: continue;
             }
         }
-        
+
         // normalize the value indentation
         var value = sb.ToString().NormalizeIndentation().Trim(['\r', '\n']);
 
         sb.Clear();
-        
+
         if (isMultiline)
         {
             sb.AppendLine();
@@ -589,7 +599,7 @@ public static class Renderers
         };
 
         text = text.NormalizeIndentation().Trim(['\r', '\n']);
-        
+
         var isMultiline = text.Contains('\n');
 
         if (isMultiline)
@@ -676,7 +686,7 @@ public static class Renderers
                         return FromInterpolation(literal, info);
 
                     return
-                        $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({RenderStringLiteral(literal)})";
+                        $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({RenderStringLiteral(literal)})";
                 default: return "default";
             }
 
@@ -701,7 +711,7 @@ public static class Renderers
                 }
 
                 return
-                    $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
+                    $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
             }
 
             string FromText(string text, ICXNode owner)
@@ -716,10 +726,8 @@ public static class Renderers
                     symbol.ToDisplayString()
                 );
 
-                return string.Empty;
-
-                // return
-                //     $"Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})";
+                return
+                    $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})";
             }
         };
     }

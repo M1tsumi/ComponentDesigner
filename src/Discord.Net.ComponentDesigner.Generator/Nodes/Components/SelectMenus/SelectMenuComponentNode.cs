@@ -177,7 +177,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
             new {context.KnownTypes.SelectMenuBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 string
                     .Join(
-                        ",\n",
+                        $",{Environment.NewLine}",
                         ((IEnumerable<string>)
                         [
                             (
@@ -203,7 +203,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
                             state is SelectStateWithDefaults {Defaults: var defaults}
                                 ? string
                                     .Join(
-                                        ",\n",
+                                        $",{Environment.NewLine}",
                                         defaults.Select(x => RenderDefaultValue(context, x))
                                     )
                                     .Map(x =>
@@ -219,7 +219,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
                     )
                     .PrefixIfSome(4)
                     .WithNewlinePadding(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

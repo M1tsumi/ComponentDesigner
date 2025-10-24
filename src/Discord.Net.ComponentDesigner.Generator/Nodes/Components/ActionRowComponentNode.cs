@@ -1,8 +1,10 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using Discord.CX.Nodes.Components.SelectMenus;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -15,7 +17,17 @@ public sealed class ActionRowComponentNode : ComponentNode
 
     public override bool HasChildren => true;
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; } = [ComponentProperty.Id];
+    public ComponentProperty Id { get; }
+
+    public override IReadOnlyList<ComponentProperty> Properties { get; }
+
+    public ActionRowComponentNode()
+    {
+        Properties =
+        [
+            Id = ComponentProperty.Id
+        ];
+    }
 
     public override void Validate(ComponentState state, ComponentContext context)
     {
@@ -44,6 +56,14 @@ public sealed class ActionRowComponentNode : ComponentNode
                     }
                 }
 
+                foreach (var extra in state.Children.Skip(5))
+                {
+                    context.AddDiagnostic(
+                        Diagnostics.ActionRowInvalidChild,
+                        extra.State.Source
+                    );
+                }
+                
                 break;
             case SelectMenuComponentNode:
                 foreach (var rest in state.Children.Skip(1))
@@ -82,27 +102,59 @@ public sealed class ActionRowComponentNode : ComponentNode
             or IDynamicComponentNode;
 
     public override string Render(ComponentState state, ComponentContext context)
-        => $$"""
-             new {{context.KnownTypes.ActionRowBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}{{
-                $"{
-                    state
-                        .RenderProperties(this, context, asInitializers: true)
-                        .PostfixIfSome("\n")
-                }{
-                    state.RenderChildren(context)
-                        .Map(x =>
-                            $"""
-                             Components =
-                             [
-                                 {x.WithNewlinePadding(4)}
-                             ]
-                             """
-                        )
-                }"
-                    .TrimEnd()
-                    .WithNewlinePadding(4)
-                    .PrefixIfSome("\n{\n".Postfix(4))
-                    .PostfixIfSome("\n}")
-            }}
-             """;
+    {
+        var props = state.RenderProperties(this, context, asInitializers: true);
+        var children = state.RenderChildren(context);
+
+        var init = new StringBuilder(props);
+
+        if (!string.IsNullOrWhiteSpace(children))
+        {
+            if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+            
+            init.Append(
+                $"""
+                 Components =
+                 [
+                     {children.WithNewlinePadding(4)}
+                 ]
+                 """
+            );
+        }
+
+        return
+            $$"""
+              new {{context.KnownTypes.ActionRowBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
+                  init
+                      .ToString()
+                      .WithNewlinePadding(4)
+                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+                      .PostfixIfSome($"{Environment.NewLine}}}")
+              }}
+              """;
+    }
+    //         => $$"""
+//              new {{context.KnownTypes.ActionRowBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
+//                 $"{
+//                     state
+//                         .RenderProperties(this, context, asInitializers: true)
+//                         .PostfixIfSome(Environment.NewLine)
+//                 }{
+//                     state
+//                         .RenderChildren(context)
+//                         .Map(x =>
+//                             $"""
+//                              Components =
+//                              [
+//                                  {x.WithNewlinePadding(4)}
+//                              ]
+//                              """
+//                         )
+//                 }"
+//                     .TrimEnd()
+//                     .WithNewlinePadding(4)
+//                     .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+//                     .PostfixIfSome($"{Environment.NewLine}}}")
+//             }}
+//              """;
 }

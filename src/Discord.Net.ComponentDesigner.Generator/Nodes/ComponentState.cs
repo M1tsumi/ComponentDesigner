@@ -84,7 +84,7 @@ public class ComponentState
 
             sb.Append(properties[i].Name);
 
-            if (sb.Length < properties.Length - 1) sb.Append('\'');
+            if (i < properties.Length - 1) sb.Append('\'');
         }
 
         context.AddDiagnostic(
@@ -135,8 +135,8 @@ public class ComponentState
 
             var propertyValue = GetProperty(property);
 
-            if (propertyValue?.Value is null) continue;
-
+            if(propertyValue.CanOmitFromSource) continue;
+            
             var prefix = asInitializers
                 ? $"{property.DotnetPropertyName} = "
                 : $"{property.DotnetParameterName}: ";
@@ -144,8 +144,7 @@ public class ComponentState
             values.Add($"{prefix}{property.Renderer(context, propertyValue)}");
         }
 
-        var joiner = asInitializers ? string.Empty : ",";
-        return string.Join($"{joiner}\n", values);
+        return string.Join($",{Environment.NewLine}", values);
     }
 
     public string RenderInitializer(
@@ -175,7 +174,7 @@ public class ComponentState
         if (predicate is not null) children = children.Where(predicate);
 
         return string.Join(
-            ",\n",
+            $",{Environment.NewLine}",
             children.Select(x => x.Render(context))
         );
     }

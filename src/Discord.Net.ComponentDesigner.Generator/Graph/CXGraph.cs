@@ -12,7 +12,6 @@ namespace Discord.CX;
 
 public readonly struct CXGraph
 {
-
     public bool HasErrors => Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
     public IReadOnlyList<Diagnostic> Diagnostics
         => [.._diagnostics, ..RootNodes.SelectMany(x => x.Diagnostics)];

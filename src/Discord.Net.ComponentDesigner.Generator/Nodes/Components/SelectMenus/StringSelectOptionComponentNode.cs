@@ -1,4 +1,5 @@
-﻿using Discord.CX.Parser;
+﻿using System;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 
@@ -70,7 +71,7 @@ public sealed class StringSelectOptionComponentNode : ComponentNode
                 state.RenderProperties(this, context)
                     .WithNewlinePadding(4)
                     .PrefixIfSome(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

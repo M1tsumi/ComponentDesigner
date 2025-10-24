@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -40,7 +41,7 @@ public sealed class SeparatorComponentNode : ComponentNode
                 state.RenderProperties(this, context)
                     .WithNewlinePadding(4)
                     .PrefixIfSome(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
             })
             """;
 }

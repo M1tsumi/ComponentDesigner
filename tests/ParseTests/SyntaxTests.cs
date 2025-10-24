@@ -786,4 +786,92 @@ public class SyntaxTests : BaseParsingTest
             EOF();
         }
     }
+
+    [Fact]
+    public void AttributesWithoutValues()
+    {
+        Parses(
+            """
+            <Foo bar baz />
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+
+                Attribute();
+                {
+                    Identifier("bar");
+                }
+                
+                Attribute();
+                {
+                    Identifier("baz");
+                }
+
+                Token(CXTokenKind.ForwardSlashGreaterThan);
+            }
+            
+            EOF();
+        }
+    }
+    
+    [Fact]
+    public void AttributesWithAndWithoutValues()
+    {
+        Parses(
+            """
+            <Foo abc="def" bar baz='123' test />
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+
+                Attribute();
+                {
+                    Identifier("abc");
+                    Token(CXTokenKind.Equals);
+
+                    StringLiteral();
+                    {
+                        Token(CXTokenKind.StringLiteralStart, "\"");
+                        Token(CXTokenKind.Text, "def");
+                        Token(CXTokenKind.StringLiteralEnd, "\"");
+                    }
+                }
+                
+                Attribute();
+                {
+                    Identifier("bar");
+                }
+
+                Attribute();
+                {
+                    Identifier("baz");
+                    Token(CXTokenKind.Equals);
+
+                    StringLiteral();
+                    {
+                        Token(CXTokenKind.StringLiteralStart, "'");
+                        Token(CXTokenKind.Text, "123");
+                        Token(CXTokenKind.StringLiteralEnd, "'");
+                    }
+                }
+                
+                Attribute();
+                {
+                    Identifier("test");
+                }
+                
+                Token(CXTokenKind.ForwardSlashGreaterThan);
+            }
+            
+            EOF();
+        }
+    }
 }

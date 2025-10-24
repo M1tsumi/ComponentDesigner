@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Discord.CX.Nodes.Components.SelectMenus;
 using Discord.CX.Parser;
@@ -118,16 +119,6 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
             );
         }
 
-        // if (!state.HasChildren)
-        // {
-        //     context.AddDiagnostic(
-        //         Diagnostics.MissingLabelComponent,
-        //         state.Source
-        //     );
-        //
-        //     return;
-        // }
-
         foreach (var child in ((CXElement)state.Source).Children)
         {
             if (child != state.ChildValue && child != state.ChildElement)
@@ -159,7 +150,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
     public override string Render(LabelComponentState state, ComponentContext context)
     {
         var props = string.Join(
-            ",\n",
+            $",{Environment.NewLine}",
             [
                 state.RenderProperties(this, context),
                 state.Children.FirstOrDefault()?.Render(context)
@@ -172,7 +163,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
                 props
                     .Prefix(4)
                     .WithNewlinePadding(4)
-                    .WrapIfSome("\n")
+                    .WrapIfSome(Environment.NewLine)
                     .Map(x => $"({x})")
             }";
     }
