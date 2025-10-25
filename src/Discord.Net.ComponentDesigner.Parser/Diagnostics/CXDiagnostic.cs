@@ -9,17 +9,19 @@ public readonly record struct CXDiagnostic(
     DiagnosticSeverity Severity,
     CXErrorCode Code,
     string Message,
-    TextSpan Span
+    ICXNode Owner
 )
 {
-    public static CXDiagnostic MissingElementClosingTag(CXToken? identifier, TextSpan span)
+    public TextSpan Span => Owner.Span;
+    
+    public static CXDiagnostic MissingElementClosingTag(CXToken? identifier, ICXNode owner)
         => new(
             DiagnosticSeverity.Error,
             CXErrorCode.MissingElementClosingTag,
             identifier is not null
                 ? $"Missing closing tag for '{identifier.Value}'"
                 : "Missing fragment closing tag",
-            span
+            owner
         );
     
     public static CXDiagnostic InvalidRootElement(CXToken token)
@@ -28,7 +30,7 @@ public readonly record struct CXDiagnostic(
             DiagnosticSeverity.Error,
             CXErrorCode.InvalidRootElement,
             $"'{token.Kind}' is not a valid root element",
-            token.FullSpan
+            token
         );
     }
     
@@ -38,7 +40,7 @@ public readonly record struct CXDiagnostic(
             DiagnosticSeverity.Error,
             CXErrorCode.InvalidElementChildToken,
             $"'{token.Kind}' is not a valid child of an element",
-            token.FullSpan
+            token
         );
     }
     
@@ -48,7 +50,7 @@ public readonly record struct CXDiagnostic(
             DiagnosticSeverity.Error,
             CXErrorCode.InvalidStringLiteralToken,
             $"'{token.Kind}' is not valid within a string literal",
-            token.FullSpan
+            token
         );
     }
 
@@ -64,7 +66,7 @@ public readonly record struct CXDiagnostic(
                 DiagnosticSeverity.Error,
                 CXErrorCode.MissingAttributeValue,
                 "Missing attribute value",
-                token.FullSpan
+                token
             );
         }
 
@@ -72,7 +74,7 @@ public readonly record struct CXDiagnostic(
             DiagnosticSeverity.Error,
             CXErrorCode.InvalidAttributeValue,
             $"'{token.Kind}' is not a valid attribute value token",
-            token.FullSpan
+            token
         );
     }
 
@@ -83,7 +85,7 @@ public readonly record struct CXDiagnostic(
         DiagnosticSeverity.Error,
         CXErrorCode.UnexpectedToken,
         $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'",
-        token.FullSpan
+        token
     );
 
     private static string FormatExpected(CXTokenKind[] kinds)

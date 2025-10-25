@@ -123,5 +123,6 @@
     &lt;TestId&gt;xUnit::460851AC-1EFE-43D7-BCF1-396248CFB58D::net9.0::UnitTests.ComponentTests.SectionTests.EmptySection&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::460851AC-1EFE-43D7-BCF1-396248CFB58D::net9.0::UnitTests.ComponentTests.SectionTests.SectionWithInlineAccessory&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::460851AC-1EFE-43D7-BCF1-396248CFB58D::net9.0::UnitTests.ComponentTests.SectionTests.SectionWithChildAccessory&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::460851AC-1EFE-43D7-BCF1-396248CFB58D::net9.0::UnitTests.ParseTests.SyntaxTests.AttributesWithAndWithoutValues&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

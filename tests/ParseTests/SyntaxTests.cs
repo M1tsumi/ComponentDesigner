@@ -718,15 +718,14 @@ public class SyntaxTests : BaseParsingTest
             allowErrors: true
         );
         {
-            Diagnostic(CXErrorCode.MissingElementClosingTag);
-
+            CXElement barElement;
             Element();
             {
                 Token(CXTokenKind.LessThan);
                 Identifier("Foo");
                 Token(CXTokenKind.GreaterThan);
                 
-                Element();
+                barElement = Element();
                 {
                     Token(CXTokenKind.LessThan);
                     Identifier("Bar");
@@ -741,6 +740,8 @@ public class SyntaxTests : BaseParsingTest
                 Identifier("Foo");
                 Token(CXTokenKind.GreaterThan);
             }
+            
+            Diagnostic(CXErrorCode.MissingElementClosingTag, span: barElement.Span);
             
             EOF();
         }

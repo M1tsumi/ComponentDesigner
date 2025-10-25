@@ -32,7 +32,7 @@ public sealed class CXLexer
 
     public const char NULL_CHAR = '\0';
     public const char NEWLINE_CHAR = '\n';
-    public const char CARRAGE_RETURN_CHAR = '\r';
+    public const char CARRIAGE_RETURN_CHAR = '\r';
 
     public const char UNDERSCORE_CHAR = '_';
     public const char HYPHEN_CHAR = '-';
@@ -190,7 +190,6 @@ public sealed class CXLexer
 
         var token = new CXToken(
             info.Kind,
-            fullSpan,
             info.LeadingTriviaLength,
             info.TrailingTriviaLength,
             info.Flags,
@@ -452,7 +451,7 @@ public sealed class CXLexer
 
             if (CurrentInterpolationSpan is not null) return;
             
-            if (current is CARRAGE_RETURN_CHAR && Reader.Next is NEWLINE_CHAR)
+            if (current is CARRIAGE_RETURN_CHAR && Reader.Next is NEWLINE_CHAR)
             {
                 trivia += 2;
                 Reader.Advance(2);

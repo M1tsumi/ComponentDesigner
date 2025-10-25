@@ -107,10 +107,10 @@ public sealed partial class CXParser
 
     internal CXElement ParseElement()
     {
-        if (IsIncremental && CurrentNode is CXElement element)
+        if (IsIncremental && CurrentNode is CXElement incElement)
         {
             EatNode();
-            return element;
+            return incElement;
         }
 
         using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
@@ -153,10 +153,11 @@ public sealed partial class CXParser
                     end,
                     out var endStart,
                     out var endIdent,
-                    out var endClose
+                    out var endClose, 
+                    out var onCreate
                 );
 
-                return new CXElement(
+                var element = new CXElement(
                     start,
                     identifier,
                     attributes,
@@ -166,6 +167,10 @@ public sealed partial class CXParser
                     endIdent,
                     endClose
                 ) { Diagnostics = diagnostics };
+                
+                onCreate?.Invoke(element);
+
+                return element;
             default:
             case CXTokenKind.ForwardSlashGreaterThan:
                 return new CXElement(
@@ -181,8 +186,11 @@ public sealed partial class CXParser
             CXToken elementEnd,
             out CXToken elementEndStart,
             out CXToken? elementEndIdent,
-            out CXToken elementEndClose)
+            out CXToken elementEndClose,
+            out Action<CXElement>? onCreate
+        )
         {
+            onCreate = null;
             var sentinel = _tokenIndex;
 
             elementEndStart = Expect(CXTokenKind.LessThanForwardSlash);
@@ -213,20 +221,17 @@ public sealed partial class CXParser
                 missingStructure
             )
             {
-                var diagnosticSpan = TextSpan.FromBounds(start.Span.Start, elementEnd.Span.End);
-                
-                diagnostics.Add(
-                    CXDiagnostic.MissingElementClosingTag(identifier, diagnosticSpan)
-                );
+                onCreate = node =>
+                {
+                    node.AddDiagnostic(CXDiagnostic.MissingElementClosingTag(identifier, node));
+                };
 
-                var missingSpan = elementEndStart.Span;
-
-                elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash, missingSpan);
-                elementEndIdent = identifier is not null 
-                    ? CXToken.CreateMissing(CXTokenKind.Identifier, missingSpan, identifier.Value) 
+                elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash);
+                elementEndIdent = identifier is not null
+                    ? CXToken.CreateMissing(CXTokenKind.Identifier, identifier.Value)
                     : null;
-                elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan, missingSpan);
-                
+                elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan);
+
                 // rollback
                 _tokenIndex = sentinel;
             }
@@ -392,7 +397,7 @@ public sealed partial class CXParser
                     ParseElement(),
                     Expect(CXTokenKind.CloseParenthesis)
                 );
-            
+
             case CXTokenKind.Interpolation:
                 return new CXValue.Interpolation(
                     Eat(),
@@ -522,7 +527,6 @@ public sealed partial class CXParser
 
                 return new CXToken(
                     kinds[0],
-                    new TextSpan(current.Span.Start, 1),
                     0,
                     0,
                     Flags: CXTokenFlags.Missing,
@@ -540,7 +544,6 @@ public sealed partial class CXParser
         {
             return new CXToken(
                 kind,
-                new TextSpan(token.Span.Start, 1),
                 0,
                 0,
                 Flags: CXTokenFlags.Missing,

@@ -267,10 +267,7 @@ public sealed class CXBlender
         }
 
         MoveToNextSibling(ref cursor);
-
-        if (current is CXToken token)
-            current = token.WithNewPosition(cursor.NewPosition);
-
+        
         blendedNode = new(
             current,
             cursor with {NewPosition = cursor.NewPosition + current.FullSpan.Length,}

@@ -156,6 +156,9 @@ public abstract partial class CXNode : ICXNode
         _slots = [];
     }
 
+    public void AddDiagnostic(CXDiagnostic diagnostic)
+        => _diagnostics.Add(diagnostic);
+    
     private bool TryGetDocument(out CXDoc result)
     {
         if (_doc is not null)

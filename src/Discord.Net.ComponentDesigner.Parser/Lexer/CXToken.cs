@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -8,7 +9,6 @@ namespace Discord.CX.Parser;
 
 public sealed record CXToken(
     CXTokenKind Kind,
-    TextSpan FullSpan,
     int LeadingTriviaLength,
     int TrailingTriviaLength,
     CXTokenFlags Flags,
@@ -26,6 +26,48 @@ public sealed record CXToken(
         FullValue.Length - LeadingTriviaLength - TrailingTriviaLength
     );
 
+    public TextSpan FullSpan
+    {
+        get
+        {
+            return new TextSpan(
+                GetOffset(),
+                FullValue.Length
+            );
+            
+            int GetOffset()
+            {
+                if(Parent is null) return 0;
+                
+                var parentOffset = Parent.Offset;
+                var parentSlotIndex = GetParentSlotIndex();
+
+                return parentSlotIndex switch
+                {
+                    -1 => throw new InvalidOperationException(),
+                    0 => parentOffset,
+                    _ => Parent.Slots[parentSlotIndex - 1].Value switch
+                    {
+                        CXNode sibling => sibling.Offset + sibling.Width,
+                        CXToken token => token.FullSpan.End,
+                        _ => throw new InvalidOperationException()
+                    }
+                };
+            }
+
+            int GetParentSlotIndex()
+            {
+                if (Parent is null) return -1;
+
+                for (var i = 0; i < Parent.Slots.Count; i++)
+                    if (Parent.Slots[i] == this)
+                        return i;
+
+                return -1;
+            }
+        }
+    }
+    
     public CXNode? Parent { get; set; }
 
     public bool HasErrors
@@ -65,7 +107,6 @@ public sealed record CXToken(
     {
         return new CXToken(
             kind,
-            span ?? default,
             0,
             0,
             CXTokenFlags.Synthetic | (flags ?? CXTokenFlags.None),
@@ -76,18 +117,15 @@ public sealed record CXToken(
 
     public static CXToken CreateMissing(
         CXTokenKind kind,
-        TextSpan span,
         params IEnumerable<CXDiagnostic> diagnostics
-    ) => CreateMissing(kind, span, string.Empty, diagnostics);
+    ) => CreateMissing(kind, string.Empty, diagnostics);
 
     public static CXToken CreateMissing(
         CXTokenKind kind,
-        TextSpan span,
         string value,
         params IEnumerable<CXDiagnostic> diagnostics
     ) => new(
         kind,
-        span,
         0,
         0,
         Flags: CXTokenFlags.Missing,
@@ -98,13 +136,6 @@ public sealed record CXToken(
     public void ResetCachedState()
     {
         _hasErrors = null;
-    }
-
-    public CXToken WithNewPosition(int position)
-    {
-        if (FullSpan.Start == position) return this;
-
-        return this with { FullSpan = new(position, FullSpan.Length) };
     }
 
     public override string ToString() => ToString(false, false);
