@@ -39,12 +39,6 @@ public static class StringUtils
         var rawLines = str.Split('\n');
         var lines = new List<string>(rawLines);
 
-        var minSpacing = lines.Min(x =>
-            string.IsNullOrWhiteSpace(x) ? int.MaxValue : x.TakeWhile(char.IsWhiteSpace).Count()
-        );
-
-        if (minSpacing is 0 or int.MaxValue) return str;
-
         // remove leading empty lines
         foreach (var line in rawLines)
         {
@@ -59,10 +53,16 @@ public static class StringUtils
             else break;
         }
         
+        var minSpacing = lines.Min(x =>
+            x.TakeWhile(char.IsWhiteSpace).Count()
+        );
+
+        if (minSpacing is 0 or int.MaxValue) return str;
+        
         return string.Join(
             "\n",
             lines.Select(x =>
-                x.Length > minSpacing ? x.Substring(minSpacing) : x
+                x.Length > minSpacing ? x.Substring(minSpacing) : string.Empty
             )
         );
     }
