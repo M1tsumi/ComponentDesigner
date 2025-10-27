@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -35,7 +36,8 @@ public static class StringUtils
 
     public static string NormalizeIndentation(this string str)
     {
-        var lines = str.Split('\n');
+        var rawLines = str.Split('\n');
+        var lines = new List<string>(rawLines);
 
         var minSpacing = lines.Min(x =>
             string.IsNullOrWhiteSpace(x) ? int.MaxValue : x.TakeWhile(char.IsWhiteSpace).Count()
@@ -43,6 +45,20 @@ public static class StringUtils
 
         if (minSpacing is 0 or int.MaxValue) return str;
 
+        // remove leading empty lines
+        foreach (var line in rawLines)
+        {
+            if (string.IsNullOrWhiteSpace(line)) lines.Remove(line);
+            else break;
+        }
+        
+        // remove trailing empty lines
+        for (var i = rawLines.Length - 1; i >= 0; i--)
+        {
+            if (string.IsNullOrWhiteSpace(rawLines[i])) lines.Remove(rawLines[i]);
+            else break;
+        }
+        
         return string.Join(
             "\n",
             lines.Select(x =>

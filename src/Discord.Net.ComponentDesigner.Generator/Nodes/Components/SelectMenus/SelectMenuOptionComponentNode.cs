@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Discord.CX.Nodes.Components.SelectMenus;
 
-public sealed class StringSelectOptionComponentNode : ComponentNode
+public sealed class SelectMenuOptionComponentNode : ComponentNode
 {
     public override string Name => "select-menu-option";
 
@@ -19,33 +19,48 @@ public sealed class StringSelectOptionComponentNode : ComponentNode
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
 
-    public StringSelectOptionComponentNode()
+    protected override bool AllowChildrenInCX => true;
+
+    public SelectMenuOptionComponentNode()
     {
         Properties =
         [
             Label = new(
                 "label",
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators:
+                [
+                    Validators.StringRange(upper: Constants.STRING_SELECT_OPTION_LABEL_MAX_LENGTH)
+                ]
             ),
             Value = new(
                 "value",
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators:
+                [
+                    Validators.StringRange(upper: Constants.STRING_SELECT_OPTION_VALUE_MAX_LENGTH)
+                ]
             ),
             Description = new(
                 "description",
                 isOptional: true,
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators:
+                [
+                    Validators.StringRange(upper: Constants.STRING_SELECT_OPTION_DESCRIPTION_MAX_LENGTH)
+                ]
             ),
             Emoji = new(
                 "emoji",
-                isOptional: false,
+                isOptional: true,
                 renderer: Renderers.Emoji
             ),
             Default = new(
                 "default",
                 isOptional: true,
                 renderer: Renderers.Boolean,
-                dotnetParameterName: "isDefault"
+                dotnetParameterName: "isDefault",
+                requiresValue: false
             )
         ];
     }
@@ -55,14 +70,19 @@ public sealed class StringSelectOptionComponentNode : ComponentNode
         var state = base.Create(context);
 
         if (
-            context.Node is CXElement {Children.Count: 1} element &&
+            context.Node is CXElement { Children.Count: 1 } element &&
             element.Children[0] is CXValue value
         )
         {
-            state!.SubstitutePropertyValue(Value, value);
+            state!.SubstitutePropertyValue(Label, value);
         }
 
         return state;
+    }
+
+    public override void Validate(ComponentState state, ComponentContext context)
+    {
+        base.Validate(state, context);
     }
 
     public override string Render(ComponentState state, ComponentContext context)

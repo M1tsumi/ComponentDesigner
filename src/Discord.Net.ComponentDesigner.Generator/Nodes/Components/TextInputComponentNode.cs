@@ -12,6 +12,7 @@ public sealed class TextInputComponentNode : ComponentNode
 
     public override IReadOnlyList<string> Aliases { get; } = ["input"];
 
+    public ComponentProperty Id { get; }
     public ComponentProperty CustomId { get; }
     public ComponentProperty Style { get; }
     public ComponentProperty MinLength { get; }
@@ -26,7 +27,7 @@ public sealed class TextInputComponentNode : ComponentNode
     {
         Properties =
         [
-            ComponentProperty.Id,
+            Id = ComponentProperty.Id,
             CustomId = new(
                 "customId",
                 isOptional: false,
@@ -34,37 +35,67 @@ public sealed class TextInputComponentNode : ComponentNode
             ),
             Style = new(
                 "style",
-                isOptional: false,
+                isOptional: true,
                 renderer: Renderers.RenderEnum(LIBRARY_TEXT_INPUT_STYLE_ENUM)
             ),
             MinLength = new(
                 "minLength",
                 aliases: ["min"],
                 isOptional: true,
-                renderer: Renderers.Integer
+                renderer: Renderers.Integer,
+                validators:
+                [
+                    Validators.IntRange(
+                        Constants.TEXT_INPUT_MIN_LENGTH_MIN_VALUE,
+                        Constants.TEXT_INPUT_MIN_LENGTH_MAX_VALUE
+                    )
+                ]
             ),
             MaxLength = new(
                 "maxLength",
                 aliases: ["max"],
                 isOptional: true,
-                renderer: Renderers.Integer
+                renderer: Renderers.Integer,
+                validators:
+                [
+                    Validators.IntRange(
+                        Constants.TEXT_INPUT_MAX_LENGTH_MIN_VALUE,
+                        Constants.TEXT_INPUT_MAX_LENGTH_MAX_VALUE
+                    )
+                ]
             ),
             Required = new(
                 "required",
                 isOptional: true,
-                renderer: Renderers.Boolean
+                renderer: Renderers.Boolean,
+                requiresValue: false
             ),
             Value = new(
                 "value",
                 isOptional: true,
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators:
+                [
+                    Validators.StringRange(upper: Constants.TEXT_INPUT_VALUE_MAX_LENGTH)
+                ]
             ),
             Placeholder = new(
                 "placeholder",
                 isOptional: true,
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators:
+                [
+                    Validators.StringRange(upper: Constants.TEXT_INPUT_PLACEHOLDER_MAX_LENGTH)
+                ]
             )
         ];
+    }
+
+    public override void Validate(ComponentState state, ComponentContext context)
+    {
+        base.Validate(state, context);
+
+        Validators.Range(context, state, MinLength, MaxLength);
     }
 
     public override string Render(ComponentState state, ComponentContext context)

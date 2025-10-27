@@ -39,7 +39,7 @@ public static partial class Diagnostics
     public static readonly DiagnosticDescriptor OutOfRange = new(
         "DC0003",
         "Type mismatch",
-        "'{0}' must be {1} in length",
+        "'{0}' must be {1}",
         "Components",
         DiagnosticSeverity.Error,
         true
@@ -397,9 +397,90 @@ public static partial class Diagnostics
     );
     
     public static readonly DiagnosticDescriptor TooManyItemsInMediaGallery = new(
-        "DC0043",
+        "DC0044",
         "Too many items in media gallery",
         $"A media gallery can have at most {Constants.MAX_MEDIA_ITEMS} 'media-gallery-item's",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidRange = new(
+        "DC0045",
+        "Invalid range",
+        "'{0}' must be less than or equal to '{1}'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultKind = new(
+        "DC0046",
+        "Invalid select menu default kind",
+        "'{0}' is not a valid default kind, valid kinds are: 'user', 'role', and 'channel'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor MissingSelectMenuDefaultValue = new(
+        "DC0047",
+        "Missing value for default option",
+        "A value is required for a default select menu option",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor TooManyValuesInSelectMenuDefault = new(
+        "DC0048",
+        "Too many values in default option",
+        "At most 1 value is allowed for a select menu default option",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultChild = new(
+        "DC0049",
+        "Invalid child of select menu default option",
+        "'{0}' is not a valid value, expected a scalar or interpolation",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultKindInCurrentMenu = new(
+        "DC0050",
+        "Invalid default value kind",
+        "'{0}' is not a valid default kind for the menu '{1}'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor EmptyStringSelectMenu = new(
+        "DC0051",
+        "A string select menu requires at least one option",
+        "A string select menu requires at least one option",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor InvalidStringSelectChild = new(
+        "DC0052",
+        "Invalid child of string select menu",
+        "'{0}' is not a valid child of a string select menu; valid children are: 'select-menu-option' or <interpolation>",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor TooManyStringSelectMenuChildren = new(
+        "DC0053",
+        "Too many string select children",
+        $"A string select menu must contain at most {Constants.STRING_SELECT_MAX_VALUES} options",
         "Components",
         DiagnosticSeverity.Error,
         true

@@ -19,6 +19,21 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    public INamedTypeSymbol? IUserType
+        => GetOrResolveType("Discord.IUser", ref _IUserType);
+    
+    public Optional<INamedTypeSymbol?> _IUserType;
+    
+    public INamedTypeSymbol? IChannelType
+        => GetOrResolveType("Discord.IChannel", ref _IChannelType);
+    
+    public Optional<INamedTypeSymbol?> _IChannelType;
+    
+    public INamedTypeSymbol? IRoleType
+        => GetOrResolveType("Discord.IRole", ref _IRoleType);
+    
+    public Optional<INamedTypeSymbol?> _IRoleType;
+    
     public INamedTypeSymbol? LabelBuilderType
         => GetOrResolveType("Discord.LabelBuilder", ref _LabelBuilderType);
     

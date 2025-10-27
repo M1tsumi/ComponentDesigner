@@ -28,13 +28,15 @@ public sealed class ThumbnailComponentNode : ComponentNode
             Description = new(
                 "description",
                 isOptional: true,
-                renderer: Renderers.String
+                renderer: Renderers.String,
+                validators: [Validators.StringRange(upper: Constants.THUMBNAIL_DESCRIPTION_MAX_LENGTH)]
             ),
             Spoiler = new(
                 "spoiler",
                 isOptional: true,
                 renderer: Renderers.Boolean,
-                dotnetParameterName: "isSpoiler"
+                dotnetParameterName: "isSpoiler",
+                requiresValue: false
             )
         ];
     }
@@ -44,6 +46,7 @@ public sealed class ThumbnailComponentNode : ComponentNode
             new {context.KnownTypes.ThumbnailBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)
                     .PrefixIfSome(4)
+                    .WithNewlinePadding(4)
                     .WrapIfSome(Environment.NewLine)
             })
             """;

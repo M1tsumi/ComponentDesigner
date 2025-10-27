@@ -22,7 +22,7 @@ public sealed record ComponentPropertyValue(
 
     public bool HasValue => Value is not null;
 
-    public bool CanOmitFromSource => Property.IsOptional && !IsSpecified;
+    public bool CanOmitFromSource => Property.Synthetic || ( Property.IsOptional && !IsSpecified);
 
     public bool TryGetLiteralValue(out string value)
     {

@@ -126,13 +126,15 @@ public sealed class ActionRowTests : BaseComponentTest
     }
 
     [Fact]
-    public void MixOfRowAndButton()
+    public void MixOfSelectMenusAndButton()
     {
         Graph(
             """
             <row>
                 <button url="url-1" label="label-1" />
-                <select type="string" customId="abc" />
+                <select type="string" customId="abc">
+                    <option value="foo">Foo</option>
+                </select>
                 <button url="url-2" label="label-2" />
             </row>
             """
@@ -143,6 +145,9 @@ public sealed class ActionRowTests : BaseComponentTest
             {
                 Node<ButtonComponentNode>();
                 Node<SelectMenuComponentNode>(out selectMenuNode);
+                {
+                    Node<SelectMenuOptionComponentNode>();
+                }
                 Node<ButtonComponentNode>();
             }
 
@@ -163,7 +168,9 @@ public sealed class ActionRowTests : BaseComponentTest
         Graph(
             """
             <row>
-                <select type="string" customId="abc" />
+                <select type="string" customId="abc">
+                    <option value="1">Foo</option>
+                </select>
             </row>
             """
         );
@@ -171,6 +178,9 @@ public sealed class ActionRowTests : BaseComponentTest
             Node<ActionRowComponentNode>();
             {
                 Node<SelectMenuComponentNode>();
+                {
+                    Node<SelectMenuOptionComponentNode>();
+                }
             }
 
             Validate(hasErrors: false);
@@ -182,7 +192,15 @@ public sealed class ActionRowTests : BaseComponentTest
                     Components =
                     [
                         new global::Discord.SelectMenuBuilder(
-                            customId: "abc"
+                            type: global::Discord.ComponentType.StringSelect,
+                            customId: "abc",
+                            options: 
+                            [
+                                new global::Discord.SelectMenuOptionBuilder(
+                                    label: "Foo",
+                                    value: "1"
+                                )
+                            ]
                         )
                     ]
                 }

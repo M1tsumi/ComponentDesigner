@@ -2,6 +2,8 @@
 
 public enum SelectMenuDefaultValueKind
 {
+    Unknown,
+    
     User,
     Role,
     Channel

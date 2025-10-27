@@ -24,7 +24,8 @@ public sealed class SeparatorComponentNode : ComponentNode
             Divider = new(
                 "divider",
                 isOptional: true,
-                renderer: Renderers.Boolean
+                renderer: Renderers.Boolean,
+                dotnetParameterName: "isDivider"
             ),
             Spacing = new(
                 "spacing",

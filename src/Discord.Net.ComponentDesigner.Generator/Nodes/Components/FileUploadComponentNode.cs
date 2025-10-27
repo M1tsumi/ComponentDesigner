@@ -18,7 +18,7 @@ public sealed class FileUploadComponentNode : ComponentNode
             new(
                 "customId",
                 renderer: Renderers.String,
-                validators: [Validators.Range(upper: Constants.CUSTOM_ID_MAX_LENGTH)]
+                validators: [Validators.StringRange(upper: Constants.CUSTOM_ID_MAX_LENGTH)]
             ),
             new(
                 "min",
@@ -26,7 +26,7 @@ public sealed class FileUploadComponentNode : ComponentNode
                 aliases: ["minValues"],
                 renderer: Renderers.Integer,
                 validators: [
-                    Validators.Range(Constants.FILE_UPLOAD_MIN_VALUES_LOWER, Constants.FILE_UPLOAD_MIN_VALUES_UPPER)
+                    Validators.IntRange(Constants.FILE_UPLOAD_MIN_VALUES_LOWER, Constants.FILE_UPLOAD_MIN_VALUES_UPPER)
                 ]
             ),
             new(
@@ -35,7 +35,7 @@ public sealed class FileUploadComponentNode : ComponentNode
                 aliases: ["maxValues"],
                 renderer: Renderers.Integer,
                 validators: [
-                    Validators.Range(Constants.FILE_UPLOAD_MAX_VALUES_LOWER, Constants.FILE_UPLOAD_MAX_VALUES_UPPER)
+                    Validators.IntRange(Constants.FILE_UPLOAD_MAX_VALUES_LOWER, Constants.FILE_UPLOAD_MAX_VALUES_UPPER)
                 ]
             ),
             new(

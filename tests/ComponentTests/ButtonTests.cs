@@ -1,4 +1,5 @@
-﻿using Discord.CX;
+﻿using Discord;
+using Discord.CX;
 using Discord.CX.Nodes.Components;
 
 namespace UnitTests.ComponentTests;
@@ -328,7 +329,7 @@ public sealed class ButtonTests : BaseComponentTest
 
             Diagnostic(
                 Diagnostics.OutOfRange.Id,
-                message: "'label' must be at most 80 in length",
+                message: "'label' must be at most 80 characters in length",
                 location: CurrentGraph.GetLocation(label.Value)
             );
             
@@ -358,7 +359,7 @@ public sealed class ButtonTests : BaseComponentTest
 
             Diagnostic(
                 Diagnostics.OutOfRange.Id,
-                message: "'customId' must be at most 100 in length",
+                message: "'customId' must be at most 100 characters in length",
                 location: CurrentGraph.GetLocation(customId.Value)
             );
             

@@ -13,8 +13,8 @@ public static class Constants
 
     public const int MAX_ACTION_ROW_COMPONENTS = 5;
 
-    public const int SELECT_MIN_VALUES = 0;
-    public const int SELECT_MAX_VALUES = 25;
+    public const int STRING_SELECT_MIN_VALUES = 0;
+    public const int STRING_SELECT_MAX_VALUES = 25;
 
     public const int MAX_MEDIA_ITEMS = 10;
     public const int MAX_MEDIA_ITEM_DESCRIPTION_LENGTH = 1024;

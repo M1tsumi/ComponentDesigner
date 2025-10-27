@@ -20,6 +20,7 @@ public sealed class ComponentProperty
 
     public bool IsOptional { get; }
     public bool RequiresValue { get; }
+    public bool Synthetic { get; }
     public string DotnetPropertyName { get; }
     public string DotnetParameterName { get; }
     public PropertyRenderer Renderer { get; }
@@ -34,13 +35,15 @@ public sealed class ComponentProperty
         IEnumerable<PropertyValidator>? validators = null,
         PropertyRenderer? renderer = null,
         string? dotnetParameterName = null,
-        string? dotnetPropertyName = null
+        string? dotnetPropertyName = null,
+        bool synthetic = false
     )
     {
         Name = name;
         Aliases = [..aliases ?? []];
         IsOptional = isOptional;
         RequiresValue = requiresValue;
+        Synthetic = synthetic;
         DotnetPropertyName = dotnetPropertyName ?? name;
         DotnetParameterName = dotnetParameterName ?? name;
         Renderer = renderer ?? Renderers.CreateDefault(this);

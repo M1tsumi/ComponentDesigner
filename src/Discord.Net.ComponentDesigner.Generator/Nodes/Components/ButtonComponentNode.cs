@@ -52,7 +52,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             Label = new ComponentProperty(
                 "label",
                 isOptional: true,
-                validators: [Validators.Range(upper: Constants.BUTTON_MAX_LABEL_LENGTH)],
+                validators: [Validators.StringRange(upper: Constants.BUTTON_MAX_LABEL_LENGTH)],
                 renderer: Renderers.String
             ),
             Emoji = new ComponentProperty(
@@ -65,7 +65,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             CustomId = new(
                 "customId",
                 isOptional: true,
-                validators: [Validators.Range(upper: Constants.CUSTOM_ID_MAX_LENGTH)],
+                validators: [Validators.StringRange(upper: Constants.CUSTOM_ID_MAX_LENGTH)],
                 renderer: Renderers.String
             ),
             SkuId = new(
@@ -78,7 +78,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             Url = new(
                 "url",
                 isOptional: true,
-                validators: [Validators.Range(upper: Constants.BUTTON_URL_MAX_LENGTH)],
+                validators: [Validators.StringRange(upper: Constants.BUTTON_URL_MAX_LENGTH)],
                 renderer: Renderers.String
             ),
             Disabled = new(

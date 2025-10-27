@@ -70,7 +70,8 @@ public abstract class CXValue : CXNode
 
     public sealed class Scalar : CXValue
     {
-        public string Value => Token.ToString();
+        public string FullValue => Token.FullValue;
+        public string Value => Token.Value;
         public CXToken Token { get; }
 
         public Scalar(CXToken token)

@@ -240,10 +240,10 @@ public static class Renderers
                     return FromInterpolation(stringLiteral, info);
 
                 return $"bool.Parse({context.GetDesignerValue(info)})";
-            
+
             case null when !propertyValue.Property.RequiresValue:
                 return "true";
-            
+
             default: return "default";
         }
 
@@ -458,7 +458,7 @@ public static class Renderers
                 return context.GetDesignerValue(interpolation);
             case CXValue.Multipart literal: return RenderStringLiteral(literal);
             case CXValue.Scalar scalar:
-                return ToCSharpString(scalar.Value.Trim());
+                return ToCSharpString(scalar.FullValue);
         }
     }
 
@@ -609,6 +609,8 @@ public static class Renderers
 
         var sb = new StringBuilder();
 
+        if (isMultiline) sb.AppendLine();
+
         sb.Append(quotes);
 
         if (isMultiline) sb.AppendLine();
@@ -734,6 +736,8 @@ public static class Renderers
 
     public static string Emoji(ComponentContext context, ComponentPropertyValue propertyValue)
     {
+        bool isDiscordEmote = false;
+        bool isEmoji = false;
         switch (propertyValue.Value)
         {
             case CXValue.Interpolation interpolation:
@@ -758,21 +762,29 @@ public static class Renderers
                 );
 
             case CXValue.Scalar scalar:
-                LightlyValidateEmote(scalar.Value, scalar);
-                return UseLibraryParser(ToCSharpString(scalar.Value));
+                LightlyValidateEmote(scalar.Value, scalar, out isDiscordEmote, out isEmoji);
+                return UseLibraryParser(ToCSharpString(scalar.Value), isEmoji, isDiscordEmote);
 
             case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
-                    LightlyValidateEmote(stringLiteral.Tokens.ToString(), stringLiteral.Tokens);
+                    LightlyValidateEmote(
+                        stringLiteral.Tokens.ToString(),
+                        stringLiteral.Tokens,
+                        out isDiscordEmote,
+                        out isEmoji
+                    );
 
-                return UseLibraryParser(RenderStringLiteral(stringLiteral));
+                return UseLibraryParser(RenderStringLiteral(stringLiteral), isEmoji, isDiscordEmote);
 
             default: return "null";
         }
 
-        void LightlyValidateEmote(string emote, ICXNode node)
+        void LightlyValidateEmote(string emote, ICXNode node, out bool isDiscordEmote, out bool isEmoji)
         {
-            if (!IsDiscordEmote.IsMatch(emote) && !IsEmoji.IsMatch(emote))
+            isDiscordEmote = IsDiscordEmote.IsMatch(emote);
+            isEmoji = IsEmoji.IsMatch(emote);
+
+            if (!isDiscordEmote && !isEmoji)
             {
                 context.AddDiagnostic(
                     Diagnostics.PossibleInvalidEmote,
@@ -782,12 +794,21 @@ public static class Renderers
             }
         }
 
-        static string UseLibraryParser(string source)
-            => $"""
-                global::Discord.Emoji.TryParse({source}, out var emoji)
-                    ? (global::Discord.IEmote)emoji
-                    : global::Discord.Emote.Parse({source})
-                """;
+        static string UseLibraryParser(string source, bool? isEmoji = null, bool? isDiscordEmote = null)
+        {
+            if (isEmoji is true)
+                return $"global::Discord.Emoji.Parse({source})";
+
+            if (isDiscordEmote is true)
+                return $"global::Discord.Emote.Parse({source})";
+
+            return
+                $"""
+                 global::Discord.Emoji.TryParse({source}, out var emoji)
+                     ? (global::Discord.IEmote)emoji
+                     : global::Discord.Emote.Parse({source})
+                 """;
+        }
     }
 
     private static readonly Regex IsEmoji = new Regex(@"^(?>(?>[\uD800-\uDBFF][\uDC00-\uDFFF]\p{M}*){1,5}|\p{So})$",

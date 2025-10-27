@@ -59,7 +59,45 @@ public static class Validators
         }
     }
 
-    public static PropertyValidator Range(int? lower = null, int? upper = null)
+    public static void Range(ComponentContext context, ComponentState state, ComponentProperty lower,
+        ComponentProperty upper)
+    {
+        var lowerValue = state.GetProperty(lower);
+        var upperValue = state.GetProperty(upper);
+
+        if (!lowerValue.HasValue || !upperValue.HasValue) return;
+
+        if (
+            !TryGetIntValue(context, lowerValue.Value, out var lowerInt) ||
+            !TryGetIntValue(context, upperValue.Value, out var upperInt)
+        ) return;
+
+        if (lowerInt > upperInt)
+        {
+            context.AddDiagnostic(
+                Diagnostics.InvalidRange,
+                (ICXNode?)lowerValue.Attribute ?? lowerValue.Value!,
+                lower.Name,
+                upper.Name
+            );
+        }
+    }
+
+    public static PropertyValidator IntRange(
+        int? lower = null,
+        int? upper = null
+    ) => Range(false, lower, upper);
+    
+    public static PropertyValidator StringRange(
+        int? lower = null,
+        int? upper = null
+    ) => Range(true, lower, upper);
+    
+    public static PropertyValidator Range(
+        bool asString,
+        int? lower = null,
+        int? upper = null
+    )
     {
         Debug.Assert(lower.HasValue || upper.HasValue);
 
@@ -81,13 +119,19 @@ public static class Validators
 
                     if (!constant.HasValue) break;
 
-                    if (constant.Value is string constantValue)
+                    if (constant.Value is string constantValue && asString)
                         Check(constantValue.Length);
-                    else if (constant.Value is int integer)
+                    else if (constant.Value is int integer && !asString)
                         Check(integer);
                     break;
 
-                case CXValue.Multipart literal:
+                case CXValue.Multipart {HasInterpolations: false, Tokens: var tokens} when !asString:
+                    if(int.TryParse(tokens.ToString(), out var val))
+                        Check(val);
+                    break;
+                
+                case CXValue.Multipart literal when asString:
+                {
                     int? length = null;
 
                     foreach (var token in literal.Tokens)
@@ -106,6 +150,7 @@ public static class Validators
                                     length ??= 0;
                                     length += str.Length;
                                 }
+
                                 break;
                         }
                     }
@@ -113,10 +158,19 @@ public static class Validators
                     if (length.HasValue) Check(length.Value);
 
                     break;
+                }
                 case CXValue.Scalar scalar:
-                    Check(scalar.Value.Length);
+                {
+                    int length;
+
+                    if (asString) length = scalar.Value.Length;
+                    else if (!int.TryParse(scalar.Value, out length))
+                        return;
+                    
+                    Check(length);
 
                     return;
+                }
             }
 
             void Check(int length)
@@ -129,11 +183,41 @@ public static class Validators
                         Diagnostics.OutOfRange,
                         propertyValue.Value,
                         propertyValue.Property.Name,
-                        bounds
+                        bounds + (asString ? " characters in length" : string.Empty)
                     );
                 }
             }
         };
+    }
+
+    private static bool TryGetIntValue(ComponentContext context, CXValue? value, out int result)
+    {
+        switch (value)
+        {
+            case CXValue.Interpolation interpolation:
+                var constant = context.GetInterpolationInfo(interpolation).Constant;
+
+                if (!constant.HasValue) break;
+
+                switch (constant.Value)
+                {
+                    case string constantValue when int.TryParse(constantValue, out result):
+                        return true;
+                    case int integer:
+                        result = integer;
+                        return true;
+                }
+
+                break;
+            case CXValue.Multipart { HasInterpolations: false, Tokens: var tokens }:
+                return int.TryParse(tokens.ToString(), out result);
+
+            case CXValue.Scalar scalar:
+                return int.TryParse(scalar.Value, out result);
+        }
+
+        result = 0;
+        return false;
     }
 
     public static PropertyValidator EnumVariant(string fullyQualifiedName)
