@@ -39,6 +39,10 @@ public abstract class ComponentNode<TState> : ComponentNode
         => Validate((TState)state, context);
 }
 
+public delegate string ComponentNodeRenderer<in TState>(TState state, ComponentContext context)
+    where TState : ComponentState;
+public delegate string ComponentNodeRenderer(ComponentState state, ComponentContext context);
+
 public abstract class ComponentNode
 {
     public abstract string Name { get; }

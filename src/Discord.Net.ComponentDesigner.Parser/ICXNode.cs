@@ -19,6 +19,8 @@ public interface ICXNode
     CXNode? Parent { get; internal set; }
 
     IReadOnlyList<CXNode.ParseSlot> Slots { get; }
+    
+    CXDoc? Document { get; }
 
     void ResetCachedState();
 

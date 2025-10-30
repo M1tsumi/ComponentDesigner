@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Discord.CX.Parser;
+using Discord.Net.ComponentDesignerGenerator.Utils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -9,15 +11,18 @@ namespace Discord.CX.Nodes.Components.SelectMenus;
 
 public abstract class SelectMenuDefaultValue
 {
+    public abstract ICXNode Owner { get; }
+    public abstract SelectMenuDefaultValueKind Kind { get; }
+
     public void Validate(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
     {
-        this.ValidateInternal(context, selectState);    
+        this.ValidateInternal(context, selectState);
     }
-    
+
     protected abstract void ValidateInternal(ComponentContext context, SelectMenuComponentNode.SelectState selectState);
     public abstract string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState);
 
-    protected static string FromIdAndKind(ComponentContext context, string id, SelectMenuDefaultValueKind kind)
+    private static string FromIdAndKind(ComponentContext context, string id, SelectMenuDefaultValueKind kind)
     {
         var dotnetType = context.KnownTypes
             .SelectMenuDefaultValueType!
@@ -27,22 +32,33 @@ public abstract class SelectMenuDefaultValue
             .SelectDefaultValueTypeEnumType!
             .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-        return $"new {dotnetType}(id: {id}, type: {kindType}.{kind})";
+        return
+            $"""
+             new {dotnetType}(
+                 id: {id},
+                 type: {kindType}.{kind}
+             )
+             """;
     }
-    
+
     public static SelectMenuDefaultValue Create(ICXNode node)
     {
         switch (node)
         {
             case CXElement element: return new Element(element);
-            case CXValue.Interpolation interpolation: return new Interpolation(interpolation);
+            case CXValue.Interpolation interpolation: return new Interpolation(interpolation.Token);
+            case CXToken token when token.Document?.IsInterpolation(token) is true: return new Interpolation(token);
             default: return new InvalidNode(node);
         }
     }
 
     private sealed class InvalidNode(ICXNode node) : SelectMenuDefaultValue
     {
-        protected override void ValidateInternal(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override ICXNode Owner => node;
+        public override SelectMenuDefaultValueKind Kind => SelectMenuDefaultValueKind.Unknown;
+
+        protected override void ValidateInternal(ComponentContext context,
+            SelectMenuComponentNode.SelectState selectState)
         {
             context.AddDiagnostic(
                 Diagnostics.InvalidSelectMenuDefaultKind,
@@ -55,98 +71,135 @@ public abstract class SelectMenuDefaultValue
             => string.Empty;
     }
 
-    public sealed class Interpolation(CXValue.Interpolation interpolation) : SelectMenuDefaultValue
+    public sealed class Interpolation(CXToken interpolation) : SelectMenuDefaultValue
     {
-        private string? _source;
-        private SelectMenuDefaultValueKind? _kind;
+        // KEEP IN SYNC WITH SelectMenuDefaultValueKind
+        [Flags]
+        private enum InterpolationKind
+        {
+            Unknown,
 
-        private bool TryGetSourceAndKind(
-            ComponentContext context, 
-            out string source,
-            out SelectMenuDefaultValueKind kind)
+            User = 0b001,
+            Role = 0b010,
+            Channel = 0b011,
+
+            LibrarySymbol = 0b100,
+
+            EnumerableOf = 0b1000,
+
+            LibraryDefaultValueKindMask = 0b0011,
+            BasicKindMask = 0b0111,
+        }
+
+        public override ICXNode Owner => interpolation;
+
+        public override SelectMenuDefaultValueKind Kind
+            => _kind is null
+                ? SelectMenuDefaultValueKind.Unknown
+                : (SelectMenuDefaultValueKind)((int)(_kind.Value & InterpolationKind.LibraryDefaultValueKindMask));
+
+        private InterpolationKind? _kind;
+
+        private bool TryGetKind(
+            ComponentContext context,
+            out InterpolationKind kind
+        )
         {
             var info = context.GetInterpolationInfo(interpolation);
 
+            var symbol = info.Symbol;
+
+            kind = InterpolationKind.Unknown;
+
+            if (symbol.TryGetEnumerableType(out var innerSymbol))
+            {
+                kind |= InterpolationKind.EnumerableOf;
+                symbol = innerSymbol;
+            }
+
             if (
                 context.Compilation.HasImplicitConversion(
-                    info.Symbol,
+                    symbol,
                     context.KnownTypes.IUserType
                 )
             )
             {
-                source = FromIdAndKind(
-                    context,
-                    $"{
-                        context.GetDesignerValue(
-                            info,
-                            info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                    }.Id",
-                    kind = SelectMenuDefaultValueKind.User
-                );
+                kind |= InterpolationKind.User;
                 return true;
             }
-            
+
             if (
                 context.Compilation.HasImplicitConversion(
-                    info.Symbol,
+                    symbol,
                     context.KnownTypes.IChannelType
                 )
             )
             {
-                source = FromIdAndKind(
-                    context,
-                    $"{
-                        context.GetDesignerValue(
-                            info,
-                            info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                    }.Id",
-                    kind = SelectMenuDefaultValueKind.Channel
-                );
+                kind |= InterpolationKind.Channel;
                 return true;
             }
-            
+
             if (
                 context.Compilation.HasImplicitConversion(
-                    info.Symbol,
+                    symbol,
                     context.KnownTypes.IRoleType
                 )
             )
             {
-                source = FromIdAndKind(
-                    context,
-                    $"{
-                        context.GetDesignerValue(
-                            info,
-                            info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                    }.Id",
-                    kind = SelectMenuDefaultValueKind.Role
-                );
+                kind |= InterpolationKind.Role;
                 return true;
             }
 
             if (
                 context.Compilation.HasImplicitConversion(
-                    info.Symbol,
+                    symbol,
                     context.KnownTypes.SelectMenuDefaultValueType
                 )
             )
             {
-                kind = SelectMenuDefaultValueKind.Unknown;
-                source = context.GetDesignerValue(
-                    info,
-                    info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                );
+                kind |= InterpolationKind.LibrarySymbol;
                 return true;
             }
 
-            kind = SelectMenuDefaultValueKind.Unknown;
-            source = string.Empty;
+            kind = InterpolationKind.Unknown;
             return false;
         }
-        
-        protected override void ValidateInternal(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+
+        private string RenderKind(ComponentContext context, InterpolationKind kind)
         {
-            if (!TryGetSourceAndKind(context, out _source, out var kind))
+            var info = context.GetInterpolationInfo(interpolation);
+            var designer = context.GetDesignerValue(
+                info,
+                info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            );
+
+            var basicKind = kind & InterpolationKind.BasicKindMask;
+
+            if (kind.HasFlag(InterpolationKind.EnumerableOf))
+            {
+                if (basicKind is InterpolationKind.LibrarySymbol)
+                    return $"..{designer}";
+
+                return
+                    $"""
+                     ..{designer}.Select(x => 
+                         {FromIdAndKind(context, "x.Id", Kind).WithNewlinePadding(4)}    
+                     )
+                     """;
+            }
+
+            if (basicKind is InterpolationKind.LibrarySymbol)
+                return designer;
+
+            return FromIdAndKind(context, $"{designer}.Id", Kind);
+        }
+
+        protected override void ValidateInternal(
+            ComponentContext context,
+            SelectMenuComponentNode.SelectState selectState
+        )
+        {
+            if (!TryGetKind(context, out var kind))
             {
                 context.AddDiagnostic(
                     Diagnostics.TypeMismatch,
@@ -158,39 +211,45 @@ public abstract class SelectMenuDefaultValue
                 return;
             }
 
-            switch (selectState.Kind)
+            if (kind is not InterpolationKind.Unknown and not InterpolationKind.LibrarySymbol)
             {
-                case SelectKind.Channel when kind is not SelectMenuDefaultValueKind.Channel and not SelectMenuDefaultValueKind.Unknown:
-                case SelectKind.User when kind is not SelectMenuDefaultValueKind.User and not SelectMenuDefaultValueKind.Unknown:
-                case SelectKind.Role when kind is not SelectMenuDefaultValueKind.Role and not SelectMenuDefaultValueKind.Unknown:
-                    context.AddDiagnostic(
-                        Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu,
-                        interpolation,
-                        kind,
-                        selectState.Kind
-                    );
-                    break;
+                switch (selectState.Kind)
+                {
+                    case SelectKind.Channel when !kind.HasFlag(InterpolationKind.Channel):
+                    case SelectKind.User when !kind.HasFlag(InterpolationKind.User):
+                    case SelectKind.Role when !kind.HasFlag(InterpolationKind.Role):
+                        context.AddDiagnostic(
+                            Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu,
+                            interpolation,
+                            kind,
+                            selectState.Kind
+                        );
+                        break;
+                }
             }
+
 
             _kind = kind;
         }
 
         public override string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
         {
-            if (_kind is null || _source is null) return string.Empty;
+            if (_kind is null or InterpolationKind.Unknown) return string.Empty;
 
-            if (_kind is SelectMenuDefaultValueKind.Unknown) return _source;
-
-            return FromIdAndKind(context, _source, _kind.Value);
+            return RenderKind(context, _kind.Value);
         }
     }
-    
+
     public sealed class Element(CXElement element) : SelectMenuDefaultValue
     {
+        public override ICXNode Owner => element;
+        public override SelectMenuDefaultValueKind Kind => _kind ?? SelectMenuDefaultValueKind.Unknown;
+
         private SelectMenuDefaultValueKind? _kind;
         private CXValue? _value;
 
-        protected override void ValidateInternal(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        protected override void ValidateInternal(ComponentContext context,
+            SelectMenuComponentNode.SelectState selectState)
         {
             _kind = element.Identifier.ToLowerInvariant() switch
             {
@@ -251,7 +310,7 @@ public abstract class SelectMenuDefaultValue
         public override string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
         {
             if (_value is null || !_kind.HasValue) return string.Empty;
-            
+
             switch (_value)
             {
                 case CXValue.Scalar scalar:
@@ -280,12 +339,10 @@ public abstract class SelectMenuDefaultValue
                     )
                     {
                         return FromId(
-                            $"(global::System.UInt64){
-                                context.GetDesignerValue(
-                                    info,
-                                    info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                                )
-                            }"
+                            context.GetDesignerValue(
+                                info,
+                                info.Symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            )
                         );
                     }
 

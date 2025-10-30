@@ -198,6 +198,10 @@ public class KnownTypes
         => GetOrResolveType("Discord.SelectMenuOptionBuilder", ref _SelectMenuOptionBuilderType);
 
     private Optional<INamedTypeSymbol?> _SelectMenuOptionBuilderType;
+    public INamedTypeSymbol? SelectMenuOptionType
+        => GetOrResolveType("Discord.SelectMenuOption", ref _SelectMenuOptionType);
+
+    private Optional<INamedTypeSymbol?> _SelectMenuOptionType;
 
     public INamedTypeSymbol? SelectMenuDefaultValueType
         => GetOrResolveType("Discord.SelectMenuDefaultValue", ref _SelectMenuDefaultValueType);

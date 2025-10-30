@@ -133,6 +133,8 @@ public sealed record CXToken(
         Diagnostics: [..diagnostics]
     );
 
+    public CXDoc? Document => Parent?.Document;
+
     public void ResetCachedState()
     {
         _hasErrors = null;

@@ -35,6 +35,8 @@ public sealed class CXDoc : CXNode
         if (token.Kind is not CXTokenKind.Interpolation) return -1;
         return Array.IndexOf(InterpolationTokens, token);
     }
+
+    public bool IsInterpolation(CXToken token) => TryGetInterpolationIndex(token, out _);
     public bool TryGetInterpolationIndex(CXToken token, out int index)
     {
         index = GetInterpolationIndex(token);

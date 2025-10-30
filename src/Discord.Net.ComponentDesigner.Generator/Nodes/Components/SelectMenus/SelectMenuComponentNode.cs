@@ -17,24 +17,6 @@ public enum SelectKind
     Mentionable
 }
 
-public enum ChannelType
-{
-    Text = 0,
-    DM = 1,
-    Voice = 2,
-    Group = 3,
-    Category = 4,
-    News = 5,
-    Store = 6,
-    NewsThread = 10,
-    PublicThread = 11,
-    PrivateThread = 12,
-    Stage = 13,
-    GuildDirectory = 14,
-    Forum = 15,
-    Media = 16,
-}
-
 public sealed class SelectMenuComponentNode : ComponentNode
 {
     public sealed class MissingTypeState : ComponentState;
@@ -48,6 +30,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
     {
         public SelectKind Kind { get; init; }
         public IReadOnlyList<SelectMenuDefaultValue> Defaults { get; init; } = [];
+        public List<SelectMenuInterpolatedOption> InterpolatedOptions { get; } = [];
     }
 
     public override string Name => "select-menu";
@@ -91,13 +74,27 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 "minValues",
                 isOptional: true,
                 aliases: ["min"],
-                renderer: Renderers.Integer
+                renderer: Renderers.Integer,
+                validators:
+                [
+                    Validators.IntRange(
+                        Constants.STRING_SELECT_MIN_VALUES,
+                        Constants.STRING_SELECT_MAX_VALUES
+                    )
+                ]
             ),
             MaxValues = new(
                 "maxValues",
                 isOptional: true,
                 aliases: ["max"],
-                renderer: Renderers.Integer
+                renderer: Renderers.Integer,
+                validators:
+                [
+                    Validators.IntRange(
+                        Constants.STRING_SELECT_MIN_VALUES + 1,
+                        Constants.STRING_SELECT_MAX_VALUES
+                    )
+                ]
             ),
             Required = new(
                 "required",
@@ -136,7 +133,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         switch (kind)
         {
             case SelectKind.Channel or SelectKind.Role or SelectKind.User or SelectKind.Mentionable:
-                defaults.AddRange(element.Children.Select(SelectMenuDefaultValue.Create));
+                defaults.AddRange(element.Children.SelectMany(FlattenNode).Select(SelectMenuDefaultValue.Create));
                 break;
             case SelectKind.String:
                 context.AddChildren(element.Children);
@@ -150,10 +147,16 @@ public sealed class SelectMenuComponentNode : ComponentNode
             Defaults = defaults
         };
 
+        static IEnumerable<ICXNode> FlattenNode(CXNode node)
+            => node switch
+            {
+                CXValue.Multipart multipart => multipart.Tokens,
+                _ => [node]
+            };
 
         static bool TryGetSelectKind(string name, out SelectKind kind)
         {
-            switch (name)
+            switch (name.ToLowerInvariant())
             {
                 case "string" or "text":
                     kind = SelectKind.String;
@@ -201,22 +204,43 @@ public sealed class SelectMenuComponentNode : ComponentNode
             case SelectState selectState:
 
                 Validators.Range(context, state, MinValues, MaxValues);
-                
+
                 switch (selectState.Kind)
                 {
                     case SelectKind.String:
                         ValidateStringSelectMenu(selectState, context);
                         break;
                     default:
-                        foreach (var defaultValue in selectState.Defaults)
-                        {
-                            defaultValue.Validate(context, selectState);
-                        }
-
+                        ValidateDefaultValues(selectState, context);
                         break;
                 }
 
                 break;
+        }
+    }
+
+    private void ValidateDefaultValues(SelectState state, ComponentContext context)
+    {
+        foreach (var defaultValue in state.Defaults)
+        {
+            defaultValue.Validate(context, state);
+
+            switch (state.Kind, defaultValue.Kind)
+            {
+                // any unknown kinds don't get checked
+                case (_, SelectMenuDefaultValueKind.Unknown): continue;
+
+                case (SelectKind.Channel, not SelectMenuDefaultValueKind.Channel)
+                    or (SelectKind.User, not SelectMenuDefaultValueKind.User)
+                    or (SelectKind.Role, not SelectMenuDefaultValueKind.Role):
+                    context.AddDiagnostic(
+                        Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu,
+                        defaultValue.Owner,
+                        defaultValue.Kind,
+                        state.Kind
+                    );
+                    continue;
+            }
         }
     }
 
@@ -257,6 +281,39 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 );
                 break;
         }
+
+        // update interpolation candidates
+        state.InterpolatedOptions.Clear();
+
+        var candidates = GetCandidateInterpolationOptions(state.Source).ToArray();
+
+        if (candidates.Length is 0) return;
+
+        foreach (var candidate in candidates)
+        {
+            if (SelectMenuInterpolatedOption.TryCreate(context, candidate, out var option))
+                state.InterpolatedOptions.Add(option);
+        }
+
+
+        static IEnumerable<ICXNode> GetCandidateInterpolationOptions(ICXNode node)
+        {
+            if (node is not CXElement element) yield break;
+
+            foreach
+            (
+                var child
+                in element.Children.SelectMany(IEnumerable<ICXNode> (x) =>
+                    x is CXValue.Multipart mp ? mp.Tokens : [x]
+                )
+            )
+            {
+                if (
+                    child is CXToken { Kind: CXTokenKind.Interpolation } ||
+                    child is CXValue.Interpolation
+                ) yield return child;
+            }
+        }
     }
 
     private static bool IsValidStringSelectChild(ComponentNode node)
@@ -277,7 +334,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
         if (selectState.Defaults.Count > 0)
         {
-            props.AppendLine(",").AppendLine("defaultValues: ").AppendLine("[");
+            props.AppendLine(",").AppendLine("defaultValues:").AppendLine("[");
 
             for (var i = 0; i < selectState.Defaults.Count; i++)
             {
@@ -297,7 +354,17 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
         if (selectState.Kind is SelectKind.String)
         {
-            var children = state.RenderChildren(context);
+            var childRenderers = GetStringSelectOrderedChildrenRenderers(selectState, context)
+                .ToArray();
+
+            // something is wrong if this doesn't add up
+            if (childRenderers.Length != selectState.Children.Count + selectState.InterpolatedOptions.Count)
+                return string.Empty;
+
+            var children = string.Join(
+                $",{Environment.NewLine}",
+                childRenderers.Select(x => x(selectState, context))
+            );
 
             if (!string.IsNullOrWhiteSpace(children))
             {
@@ -316,6 +383,87 @@ public sealed class SelectMenuComponentNode : ComponentNode
                  {props.ToString().WithNewlinePadding(4)}
              )
              """;
+
+        static IEnumerable<ComponentNodeRenderer<SelectState>> GetStringSelectOrderedChildrenRenderers(
+            SelectState state,
+            ComponentContext context
+        )
+        {
+            if (state.Source is not CXElement selectElement) yield break;
+
+            var stack = new Stack<ICXNode>();
+
+            // push the children in reverse
+            for (var i = selectElement.Children.Count - 1; i >= 0; i--)
+                stack.Push(selectElement.Children[i]);
+
+            var childPointer = 0;
+            var interpPointer = 0;
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+
+                switch (current)
+                {
+                    case CXElement element:
+                        var child = state.Children.Count > childPointer
+                            ? state.Children[childPointer++]
+                            : null;
+
+                        if (ReferenceEquals(element, child?.State.Source))
+                            yield return (_, context) => child.Render(context);
+
+                        break;
+
+                    case CXValue.Multipart multi:
+                        for (var i = multi.Tokens.Count - 1; i >= 0; i--)
+                            stack.Push(multi.Tokens[i]);
+                        break;
+
+                    case CXValue.Interpolation interp
+                        when TryFromInterpolationToken(
+                            interp.Token,
+                            ref interpPointer,
+                            state,
+                            out var renderer
+                        ):
+                        yield return renderer;
+                        break;
+                    case CXToken { Kind: CXTokenKind.Interpolation } token
+                        when TryFromInterpolationToken(
+                            token,
+                            ref interpPointer,
+                            state,
+                            out var renderer
+                        ):
+                        yield return renderer;
+                        break;
+                }
+            }
+
+            static bool TryFromInterpolationToken(
+                CXToken token,
+                ref int pointer,
+                SelectState state,
+                out ComponentNodeRenderer<SelectState> renderer
+            )
+            {
+                var option = state.InterpolatedOptions.Count > pointer
+                    ? state.InterpolatedOptions[pointer++]
+                    : null;
+
+
+                if (ReferenceEquals(option?.Interpolation, token))
+                {
+                    renderer = option.Render;
+                    return true;
+                }
+
+                renderer = null!;
+                return false;
+            }
+        }
     }
 
     private static string ToDiscordComponentType(ComponentContext context, SelectKind kind)
