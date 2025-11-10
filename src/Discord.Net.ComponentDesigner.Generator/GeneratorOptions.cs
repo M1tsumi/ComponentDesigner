@@ -12,7 +12,7 @@ public sealed record GeneratorOptions(
 {
     public static readonly GeneratorOptions Default = new();
     
-    private const string ENABLE_AUTO_ROWS_KEY = "EnableAutoRows";
+    private const string ENABLE_AUTO_ROWS_KEY = "build_property.EnableAutoRows";
 
     public static IncrementalValueProvider<GeneratorOptions> CreateProvider(
         IncrementalGeneratorInitializationContext context

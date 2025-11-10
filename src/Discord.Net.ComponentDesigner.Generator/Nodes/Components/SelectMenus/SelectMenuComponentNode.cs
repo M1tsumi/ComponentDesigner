@@ -109,6 +109,21 @@ public sealed class SelectMenuComponentNode : ComponentNode
         ];
     }
 
+    public override void AddGraphNode(ComponentGraphInitializationContext context)
+    {
+        if (
+            !context.Options.EnableAutoRows ||
+            context.ParentGraphNode is  null ||
+            context.ParentGraphNode.Inner is AutoActionRowComponentNode
+        )
+        {
+            base.AddGraphNode(context);
+            return;
+        }
+        
+        context.Push(AutoActionRowComponentNode.Instance, children: [(CXNode)context.CXNode]);
+    }
+
     public override ComponentState? Create(ComponentStateInitializationContext context)
     {
         if (context.Node is not CXElement element) return null;

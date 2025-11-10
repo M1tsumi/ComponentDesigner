@@ -9,7 +9,7 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
 
-public sealed class ActionRowComponentNode : ComponentNode
+public class ActionRowComponentNode : ComponentNode
 {
     public override string Name => "action-row";
 
@@ -157,4 +157,20 @@ public sealed class ActionRowComponentNode : ComponentNode
 //                     .PostfixIfSome($"{Environment.NewLine}}}")
 //             }}
 //              """;
+}
+
+public sealed class AutoActionRowComponentNode : ActionRowComponentNode
+{
+    public static readonly AutoActionRowComponentNode Instance = new ();
+    protected override bool IsUserAccessible => false;
+
+    public override ComponentState? Create(ComponentStateInitializationContext context)
+    {
+        return new ComponentState() { Source = context.Node };
+    }
+
+    public override void Validate(ComponentState state, IComponentContext context)
+    {
+        // no validation occurs for auto rows
+    }
 }

@@ -46,6 +46,8 @@ public delegate string ComponentNodeRenderer(ComponentState state, IComponentCon
 
 public abstract class ComponentNode
 {
+    protected virtual bool IsUserAccessible => true;
+    
     public abstract string Name { get; }
     public virtual IReadOnlyList<string> Aliases { get; } = [];
 
@@ -131,7 +133,7 @@ public abstract class ComponentNode
 
     public virtual void AddGraphNode(ComponentGraphInitializationContext context)
     {
-        context.Push(this);
+        context.Push(this, cxNode: context.CXNode);
     }
 
 
@@ -148,6 +150,7 @@ public abstract class ComponentNode
                 x.GetConstructor(Type.EmptyTypes) is not null
             )
             .Select(x => (ComponentNode)Activator.CreateInstance(x)!)
+            .Where(x => x.IsUserAccessible)
             .SelectMany(x => x
                 .Aliases
                 .Prepend(x.Name)

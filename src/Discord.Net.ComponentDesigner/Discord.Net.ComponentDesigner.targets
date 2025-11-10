@@ -4,5 +4,9 @@
             <InterceptorsNamespaces>$(InterceptorsNamespaces);InlineComponent</InterceptorsNamespaces>
             <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);InlineComponent</InterceptorsPreviewNamespaces>
         </PropertyGroup>
+
+        <ItemGroup>
+            <CompilerVisibleProperty Include="EnableAutoRows" />
+        </ItemGroup>
     </Target>
 </Project>

@@ -65,18 +65,22 @@ public readonly struct CXGraph
 
         var rootNodes = ImmutableArray.CreateBuilder<Node>();
 
+        var context = new GraphInitializationContext(
+            manager,
+            parseResult.ReusedNodes,
+            this,
+            map,
+            diagnostics,
+            parseResult
+        );
+        
         foreach (var cxNode in document.RootNodes)
         {
             rootNodes.AddRange(
                 CreateNodes(
-                    manager,
                     cxNode,
                     null,
-                    parseResult.ReusedNodes,
-                    this,
-                    map,
-                    diagnostics,
-                    parseResult
+                    context
                 )
             );
         }
@@ -91,18 +95,22 @@ public readonly struct CXGraph
         var map = new Dictionary<ICXNode, Node>();
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
+        var context = new GraphInitializationContext(
+            manager,
+            [],
+            null,
+            map,
+            diagnostics,
+            null
+        );
+        
         var rootNodes = manager.Document
             .RootNodes
             .SelectMany(x =>
                 CreateNodes(
-                    manager,
                     x,
                     null,
-                    [],
-                    null,
-                    map,
-                    diagnostics,
-                    null
+                    context
                 )
             )
             .ToImmutableArray();
@@ -110,55 +118,87 @@ public readonly struct CXGraph
         return new(manager, rootNodes!, diagnostics.ToImmutable(), map);
     }
 
-    private static IEnumerable<Node> CreateNodes(
-        CXGraphManager manager,
-        CXNode cxNode,
-        Node? parent,
-        IReadOnlyList<ICXNode> reusedNodes,
-        CXGraph? oldGraph,
-        Dictionary<ICXNode, Node> map,
-        ImmutableArray<Diagnostic>.Builder diagnostics,
-        IncrementalParseResult? incrementalParseResult
+    public readonly record struct GraphInitializationContext(
+        CXGraphManager Manager,
+        IReadOnlyList<ICXNode> ReusedNodes,
+        CXGraph? OldGraph,
+        Dictionary<ICXNode, Node> Map,
+        ImmutableArray<Diagnostic>.Builder Diagnostics,
+        IncrementalParseResult? IncrementalParseResult
     )
     {
-        if (
-            oldGraph.HasValue &&
-            incrementalParseResult.HasValue &&
-            reusedNodes.Contains(cxNode) &&
-            oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing) &&
-            existing.Diagnostics.Count is 0
-        )
+        public GeneratorOptions Options => Manager.Options;
+        public Compilation Compilation => Manager.Compilation;
+        public bool IsIncremental => HasOldGraph && HasIncrementalParseResult;
+
+        public bool HasIncrementalParseResult => IncrementalParseResult is not null;
+        public bool HasOldGraph => OldGraph is not null;
+
+        public bool TryReuse(ICXNode node, Node? parent, out Node graphNode)
         {
-            var node = map[cxNode] = existing.Reuse(parent, incrementalParseResult.Value, manager);
-            return [node];
+            if (
+                IsIncremental &&
+                ReusedNodes.Contains(node) &&
+                OldGraph!.Value.NodeMap.TryGetValue(node, out graphNode) &&
+                graphNode.Diagnostics.Count is 0
+            )
+            {
+                graphNode = AddToMap(node, graphNode.Reuse(parent, IncrementalParseResult!.Value, Manager));
+                return true;
+            }
+
+            graphNode = null!;
+            return false;
+        }
+
+        public Node AddToMap(ICXNode? node, Node graphNode)
+        {
+            if (node is null) return graphNode;
+            
+            return Map[node] = graphNode;
+        }
+    }
+
+    private static IEnumerable<Node> CreateNodes(
+        CXNode cxNode,
+        Node? parent,
+        GraphInitializationContext context
+    )
+    {
+        if (context.TryReuse(cxNode, parent, out var existing))
+        {
+            return [existing];
         }
 
         switch (cxNode)
         {
             case CXValue.Interpolation interpolation:
             {
-                var info = manager.InterpolationInfos[interpolation.InterpolationIndex];
+                var info = context.Manager.InterpolationInfos[interpolation.InterpolationIndex];
 
                 if (
                     InterleavedComponentNode.TryCreate(
                         info.Symbol,
-                        manager.Compilation,
+                        context.Compilation,
                         out var inner
                     )
                 )
                 {
-                    var state = inner.Create(new(interpolation, manager.Options, []));
+                    var state = inner.Create(new(interpolation, context.Options, []));
 
                     if (state is null) return [];
 
                     return
                     [
-                        map[interpolation] = new(
-                            inner,
-                            state,
-                            [],
-                            [],
-                            parent
+                        context.AddToMap(
+                            interpolation,
+                            new(
+                                inner,
+                                state,
+                                [],
+                                [],
+                                parent
+                            )
                         )
                     ];
                 }
@@ -171,14 +211,9 @@ public readonly struct CXGraph
                 {
                     return element.Children.SelectMany(x =>
                         CreateNodes(
-                            manager,
                             x,
                             parent,
-                            reusedNodes,
-                            oldGraph,
-                            map,
-                            diagnostics,
-                            incrementalParseResult
+                            context
                         )
                     );
                 }
@@ -186,17 +221,17 @@ public readonly struct CXGraph
                 if (
                     !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
                     !ComponentNode.TryGetProviderNode(
-                        manager.Compilation.GetSemanticModel(manager.SyntaxTree),
-                        manager.ArgumentExpressionSyntax.SpanStart,
+                        context.Compilation.GetSemanticModel(context.Manager.SyntaxTree),
+                        context.Manager.ArgumentExpressionSyntax.SpanStart,
                         element.Identifier,
                         out componentNode
                     )
                 )
                 {
-                    diagnostics.Add(
+                    context.Diagnostics.Add(
                         Diagnostic.Create(
                             CX.Diagnostics.UnknownComponent,
-                            GetLocation(manager, element),
+                            GetLocation(context.Manager, element),
                             element.Identifier
                         )
                     );
@@ -204,133 +239,144 @@ public readonly struct CXGraph
                     return [];
                 }
 
-                var context = new ComponentGraphInitializationContext(element, parent, manager.Options);
-                
-                componentNode.AddGraphNode(context);
-                
-                var result = new List<Node>();
-                
-                foreach (var initialization in context.Initializations)
-                {
-                    var state = initialization.State;
-                    var nodeChildren = new List<Node>();
-                    var attributeNodes = new List<Node>();
-                    var node = map[state.Source] = state.OwningNode = new(
-                        initialization.Node,
-                        state,
-                        nodeChildren,
-                        attributeNodes,
-                        parent
+                var initContext = new ComponentGraphInitializationContext(
+                    element,
+                    parent,
+                    context
+                );
+
+                componentNode.AddGraphNode(initContext);
+
+                return initContext
+                    .Initializations
+                    .Select(x =>
+                        CreateNodeFromInitialization(
+                            x,
+                            context,
+                            parent
+                        )
                     );
 
-                    if (state.Source is CXElement { Attributes: { Count: > 0 } attributes })
-                    {
-                        foreach (var attribute in attributes)
-                        {
-                            if (attribute.Value is CXValue.Element nestedElement)
-                            {
-                                attributeNodes.AddRange(
-                                    CreateNodes(
-                                        manager,
-                                        nestedElement.Value,
-                                        node,
-                                        reusedNodes,
-                                        oldGraph,
-                                        map,
-                                        diagnostics,
-                                        incrementalParseResult
-                                    )
-                                );
-                            }
-                        }
-                    }
-                    
-                    nodeChildren.AddRange(
-                        initialization
-                            .Children
-                            .SelectMany(x => CreateNodes(
-                                    manager,
-                                    x,
-                                    node,
-                                    reusedNodes,
-                                    oldGraph,
-                                    map,
-                                    diagnostics,
-                                    incrementalParseResult
-                                )
-                            )
-                    );
-                    
-                    result.Add(node);
-                }
-
-                return result;
-
-                // var children = new List<CXNode>();
-                // var subNodes = new List<ComponentInitializationGraphNode>();
-                // var context = new ComponentStateInitializationContext(
-                //     element,
-                //     manager.Options,
-                //     children,
-                //     subNodes
-                // );
+                // var context = new ComponentGraphInitializationContext(element, parent, manager.Options);
                 //
-                // componentNode.AddGraphNode();
+                // componentNode.AddGraphNode(context);
                 //
+                // var result = new List<Node>();
                 //
-                // var state = componentNode.Create(
-                // );
-                //
-                // if (state is null) return [];
-                //
-                // var attributeNodes = new List<Node>();
-                // var nodeChildren = new List<Node>();
-                // var node = map[element] = state.OwningNode = new(
-                //     componentNode,
-                //     state,
-                //     nodeChildren,
-                //     attributeNodes,
-                //     parent
-                // );
-                //
-                // foreach (var attribute in element.Attributes)
+                // foreach (var initialization in context.Initializations)
                 // {
-                //     if (attribute.Value is CXValue.Element nestedElement)
+                //     var state = initialization.State;
+                //
+                //     var nodeChildren = new List<Node>();
+                //     var attributeNodes = new List<Node>();
+                //
+                //     var node = map[state.Source] = state.OwningNode = new(
+                //         initialization.Node,
+                //         state,
+                //         nodeChildren,
+                //         attributeNodes,
+                //         parent
+                //     );
+                //
+                //     if (state.Source is CXElement { Attributes: { Count: > 0 } attributes })
                 //     {
-                //         attributeNodes.AddRange(
-                //             CreateNodes(
-                //                 manager,
-                //                 nestedElement.Value,
-                //                 node,
-                //                 reusedNodes,
-                //                 oldGraph,
-                //                 map,
-                //                 diagnostics,
-                //                 incrementalParseResult
-                //             )
-                //         );
+                //         foreach (var attribute in attributes)
+                //         {
+                //             if (attribute.Value is CXValue.Element nestedElement)
+                //             {
+                //                 attributeNodes.AddRange(
+                //                     CreateNodes(
+                //                         manager,
+                //                         nestedElement.Value,
+                //                         node,
+                //                         reusedNodes,
+                //                         oldGraph,
+                //                         map,
+                //                         diagnostics,
+                //                         incrementalParseResult
+                //                     )
+                //                 );
+                //             }
+                //         }
                 //     }
-                // }
                 //
-                // nodeChildren.AddRange(
-                //     children
-                //         .SelectMany(x => CreateNodes(
-                //                 manager,
-                //                 x,
-                //                 node,
-                //                 reusedNodes,
-                //                 oldGraph,
-                //                 map,
-                //                 diagnostics,
-                //                 incrementalParseResult
+                //     nodeChildren.AddRange(
+                //         initialization
+                //             .Children
+                //             .SelectMany(x => CreateNodes(
+                //                     manager,
+                //                     x,
+                //                     node,
+                //                     reusedNodes,
+                //                     oldGraph,
+                //                     map,
+                //                     diagnostics,
+                //                     incrementalParseResult
+                //                 )
                 //             )
-                //         )
-                // );
+                //     );
                 //
-                // return [node];
+                //     result.Add(node);
+                // }
+
+                // return result;
             }
             default: return [];
         }
+    }
+
+    public static CXGraph.Node CreateNodeFromInitialization(
+        ComponentInitializationGraphNode initialization,
+        GraphInitializationContext context,
+        Node? parent
+    )
+    {
+        var state = initialization.State;
+
+        var nodeChildren = new List<Node>();
+        var attributeNodes = new List<Node>();
+
+        var node = state.OwningNode = context.AddToMap(
+            state.Source,
+            new(
+                initialization.Node,
+                state,
+                nodeChildren,
+                attributeNodes,
+                parent
+            )
+        );
+
+
+        if (state.Source is CXElement { Attributes: { Count: > 0 } attributes })
+        {
+            foreach (var attribute in attributes)
+            {
+                if (attribute.Value is CXValue.Element nestedElement)
+                {
+                    attributeNodes.AddRange(
+                        CreateNodes(
+                            nestedElement.Value,
+                            node,
+                            context
+                        )
+                    );
+                }
+            }
+        }
+
+        nodeChildren.AddRange(
+            initialization
+                .Children
+                .SelectMany(x => CreateNodes(
+                        x,
+                        node,
+                        context
+                    )
+                )
+        );
+
+        return node;
     }
 
     public void Validate(ComponentContext context)
@@ -345,8 +391,8 @@ public readonly struct CXGraph
     {
         public ComponentNode Inner { get; }
         public ComponentState State => _state;
-        public IReadOnlyList<Node> Children { get; }
-        public IReadOnlyList<Node> AttributeNodes { get; }
+        public List<Node> Children { get; }
+        public List<Node> AttributeNodes { get; }
         public Node? Parent { get; }
 
         public IReadOnlyList<Diagnostic> Diagnostics
@@ -367,8 +413,8 @@ public readonly struct CXGraph
         public Node(
             ComponentNode inner,
             ComponentState state,
-            IReadOnlyList<Node> children,
-            IReadOnlyList<Node> attributeNodes,
+            List<Node> children,
+            List<Node> attributeNodes,
             Node? parent = null,
             IReadOnlyList<Diagnostic>? diagnostics = null,
             bool incremental = false,
