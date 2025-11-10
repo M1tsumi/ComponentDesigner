@@ -29,7 +29,7 @@ public sealed class ActionRowComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         if (!state.HasChildren)
         {
@@ -101,7 +101,7 @@ public sealed class ActionRowComponentNode : ComponentNode
             or SelectMenuComponentNode
             or IDynamicComponentNode;
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
     {
         var props = state.RenderProperties(this, context, asInitializers: true);
         var children = state.RenderChildren(context);

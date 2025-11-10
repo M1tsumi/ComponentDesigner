@@ -55,6 +55,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             provider
                 .Combine(provider.Select(GetKeysAndUpdateCachedEntries))
+                .Combine(GeneratorOptions.CreateProvider(context))
                 .SelectMany(MapManagers)
                 .Select((x, _) => x.Render())
                 .Collect(),
@@ -123,11 +124,11 @@ public sealed class SourceGenerator : IIncrementalGenerator
     }
 
     private IEnumerable<CXGraphManager> MapManagers(
-        (ImmutableArray<Target?> targets, ImmutableArray<string?> keys) tuple,
+        ((ImmutableArray<Target?>, ImmutableArray<string?>), GeneratorOptions) tuple,
         CancellationToken token
     )
     {
-        var (targets, keys) = tuple;
+        var ((targets, keys), options) = tuple;
 
         for (var i = 0; i < targets.Length; i++)
         {
@@ -140,7 +141,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
             if (_cache.TryGetValue(key, out var manager))
             {
-                manager = _cache[key] = manager.OnUpdate(key, target, token);
+                manager = _cache[key] = manager.OnUpdate(key, target, options, token);
             }
             else
             {
@@ -148,6 +149,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
                     this,
                     key,
                     target,
+                    options,
                     token
                 );
             }

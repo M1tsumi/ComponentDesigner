@@ -80,12 +80,12 @@ public sealed class SelectMenuOptionComponentNode : ComponentNode
         return state;
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         base.Validate(state, context);
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => $"""
             new {context.KnownTypes.SelectMenuOptionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)

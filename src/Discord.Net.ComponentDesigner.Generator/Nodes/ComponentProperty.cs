@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 namespace Discord.CX.Nodes;
 
-public delegate void PropertyValidator(ComponentContext context, ComponentPropertyValue value);
-public delegate string PropertyRenderer(ComponentContext context, ComponentPropertyValue value);
-
 public sealed class ComponentProperty
 {
     public static ComponentProperty Id => new(

@@ -13,13 +13,13 @@ namespace Discord.CX.Nodes;
 public abstract class ComponentNode<TState> : ComponentNode
     where TState : ComponentState
 {
-    public abstract string Render(TState state, ComponentContext context);
+    public abstract string Render(TState state, IComponentContext context);
 
-    public virtual void UpdateState(ref TState state, ComponentContext context)
+    public virtual void UpdateState(ref TState state, IComponentContext context)
     {
     }
 
-    public sealed override void UpdateState(ref ComponentState state, ComponentContext context)
+    public sealed override void UpdateState(ref ComponentState state, IComponentContext context)
         => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state), context);
 
     public abstract TState? CreateState(ComponentStateInitializationContext context);
@@ -27,21 +27,22 @@ public abstract class ComponentNode<TState> : ComponentNode
     public sealed override ComponentState? Create(ComponentStateInitializationContext context)
         => CreateState(context);
 
-    public sealed override string Render(ComponentState state, ComponentContext context)
+    public sealed override string Render(ComponentState state, IComponentContext context)
         => Render((TState)state, context);
 
-    public virtual void Validate(TState state, ComponentContext context)
+    public virtual void Validate(TState state, IComponentContext context)
     {
         base.Validate(state, context);
     }
 
-    public sealed override void Validate(ComponentState state, ComponentContext context)
+    public sealed override void Validate(ComponentState state, IComponentContext context)
         => Validate((TState)state, context);
 }
 
-public delegate string ComponentNodeRenderer<in TState>(TState state, ComponentContext context)
+public delegate string ComponentNodeRenderer<in TState>(TState state, IComponentContext context)
     where TState : ComponentState;
-public delegate string ComponentNodeRenderer(ComponentState state, ComponentContext context);
+
+public delegate string ComponentNodeRenderer(ComponentState state, IComponentContext context);
 
 public abstract class ComponentNode
 {
@@ -53,8 +54,8 @@ public abstract class ComponentNode
     public virtual IReadOnlyList<ComponentProperty> Properties { get; } = [];
 
     protected virtual bool AllowChildrenInCX => HasChildren;
-    
-    public virtual void Validate(ComponentState state, ComponentContext context)
+
+    public virtual void Validate(ComponentState state, IComponentContext context)
     {
         // validate properties
         foreach (var property in Properties)
@@ -84,7 +85,7 @@ public abstract class ComponentNode
                     );
                 }
             }
-            
+
             // report invalid children
             if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
             {
@@ -112,9 +113,9 @@ public abstract class ComponentNode
         return false;
     }
 
-    public abstract string Render(ComponentState state, ComponentContext context);
+    public abstract string Render(ComponentState state, IComponentContext context);
 
-    public virtual void UpdateState(ref ComponentState state, ComponentContext context)
+    public virtual void UpdateState(ref ComponentState state, IComponentContext context)
     {
     }
 
@@ -126,6 +127,11 @@ public abstract class ComponentNode
         }
 
         return new ComponentState() { Source = context.Node };
+    }
+
+    public virtual void AddGraphNode(ComponentGraphInitializationContext context)
+    {
+        context.Push(this);
     }
 
 
@@ -148,6 +154,12 @@ public abstract class ComponentNode
                 .Select(y => new KeyValuePair<string, ComponentNode>(y, x)))
             .ToDictionary(x => x.Key, x => x.Value);
     }
+
+    public static bool TryGetComponentNode<T>(out T node)
+        where T : ComponentNode
+        => (node = (T?)_nodes.Values
+                .FirstOrDefault(x => x.GetType() == typeof(T))!)
+            is not null;
 
     public static T GetComponentNode<T>() where T : ComponentNode
         => _nodes.Values.OfType<T>().First();

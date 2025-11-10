@@ -36,7 +36,7 @@ public sealed class SeparatorComponentNode : ComponentNode
         ];
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => $"""
             new {context.KnownTypes.SeparatorBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)

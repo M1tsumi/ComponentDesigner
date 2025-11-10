@@ -44,7 +44,7 @@ public class ComponentState
         return _properties[property] = new(property, attribute, node);
     }
 
-    public void ReportPropertyNotAllowed(ComponentProperty property, ComponentContext context)
+    public void ReportPropertyNotAllowed(ComponentProperty property, IComponentContext context)
     {
         var propertyValue = GetProperty(property);
         if (propertyValue.IsSpecified)
@@ -58,7 +58,7 @@ public class ComponentState
         }
     }
 
-    public void RequireOneOf(ComponentContext context, params ReadOnlySpan<ComponentProperty> properties)
+    public void RequireOneOf(IComponentContext context, params ReadOnlySpan<ComponentProperty> properties)
     {
         if (properties.Length is 0) return;
 
@@ -120,7 +120,7 @@ public class ComponentState
 
     public string RenderProperties(
         ComponentNode node,
-        ComponentContext context,
+        IComponentContext context,
         bool asInitializers = false,
         Predicate<ComponentProperty>? ignorePredicate = null)
     {
@@ -149,7 +149,7 @@ public class ComponentState
 
     public string RenderInitializer(
         ComponentNode node,
-        ComponentContext context,
+        IComponentContext context,
         Predicate<ComponentProperty>? ignorePredicate = null
     )
     {
@@ -165,7 +165,7 @@ public class ComponentState
               """;
     }
 
-    public string RenderChildren(ComponentContext context, Func<CXGraph.Node, bool>? predicate = null)
+    public string RenderChildren(IComponentContext context, Func<CXGraph.Node, bool>? predicate = null)
     {
         if (OwningNode is null || !HasChildren) return string.Empty;
 

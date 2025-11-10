@@ -1,6 +1,7 @@
 ﻿using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -55,7 +56,7 @@ public static class Renderers
     }
 
     public static bool IsLoneInterpolatedLiteral(
-        ComponentContext context,
+        IComponentContext context,
         CXValue.Multipart literal,
         out DesignerInterpolationInfo info)
     {
@@ -72,7 +73,7 @@ public static class Renderers
         return false;
     }
 
-    public static string ComponentAsProperty(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string ComponentAsProperty(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -141,7 +142,7 @@ public static class Renderers
                         context.AddDiagnostic(
                             Diagnostics.InvalidChildComponentCardinality,
                             interpolation,
-                            propertyValue.Property.Name
+                            propertyValue.PropertyName
                         );
                     }
                 }
@@ -161,26 +162,35 @@ public static class Renderers
         }
     }
 
-    public static string UnfurledMediaItem(ComponentContext context, ComponentPropertyValue propertyValue)
-        =>
-            $"new {context.KnownTypes.UnfurledMediaItemPropertiesType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({String(context, propertyValue)})";
+    public static string UnfurledMediaItem(IComponentContext context, IComponentPropertyValue propertyValue)
+        => $"new {
+            context.KnownTypes
+                .UnfurledMediaItemPropertiesType
+                !.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({String(context, propertyValue)
+            })";
 
-    public static string Integer(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string Integer(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
             case CXValue.Scalar scalar:
-                return FromText(scalar.Value);
+                return FromText(scalar, scalar.Value);
 
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
 
             case CXValue.Multipart literal:
                 if (!literal.HasInterpolations)
-                    return FromText(literal.Tokens.ToString().Trim());
+                    return FromText(literal, literal.Tokens.ToString().Trim());
 
                 if (IsLoneInterpolatedLiteral(context, literal, out var info))
                     return FromInterpolation(literal, info);
+
+                context.AddDiagnostic(
+                    Diagnostics.FallbackToRuntimeValueParsing,
+                    literal,
+                    "int.Parse"
+                );
 
                 return $"int.Parse({RenderStringLiteral(literal)})";
             default: return "default";
@@ -211,18 +221,30 @@ public static class Renderers
                 return context.GetDesignerValue(info, "int");
             }
 
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "int.Parse"
+            );
+
             return $"int.Parse({context.GetDesignerValue(info)})";
         }
 
-        string FromText(string text)
+        string FromText(ICXNode owner, string text)
         {
             if (int.TryParse(text, out _)) return text;
+
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "int.Parse"
+            );
 
             return $"int.Parse({ToCSharpString(text)})";
         }
     }
 
-    public static string Boolean(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string Boolean(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -239,9 +261,15 @@ public static class Renderers
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
 
+                context.AddDiagnostic(
+                    Diagnostics.FallbackToRuntimeValueParsing,
+                    stringLiteral,
+                    "bool.Parse"
+                );
+
                 return $"bool.Parse({context.GetDesignerValue(info)})";
 
-            case null when !propertyValue.Property.RequiresValue:
+            case null when !propertyValue.RequiresValue:
                 return "true";
 
             default: return "default";
@@ -249,6 +277,9 @@ public static class Renderers
 
         string FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
         {
+            if (info.Constant.Value is bool b) return b ? "true" : "false";
+
+
             if (
                 context.Compilation.HasImplicitConversion(
                     info.Symbol,
@@ -259,10 +290,14 @@ public static class Renderers
                 return context.GetDesignerValue(info, "bool");
             }
 
-            if (info.Constant.Value is bool b) return b ? "true" : "false";
-
             if (info.Constant.Value?.ToString().Trim().ToLowerInvariant() is { } str and ("true" or "false"))
                 return str;
+
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                node,
+                "bool.Parse"
+            );
 
             return $"bool.Parse({context.GetDesignerValue(info)})";
         }
@@ -286,7 +321,7 @@ public static class Renderers
     private static readonly Dictionary<string, string> _colorPresets = [];
 
     private static bool TryGetColorPreset(
-        ComponentContext context,
+        IComponentContext context,
         string value,
         out string fieldName)
     {
@@ -317,7 +352,7 @@ public static class Renderers
         return _colorPresets.TryGetValue(value.ToLowerInvariant(), out fieldName);
     }
 
-    public static string Color(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string Color(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         var colorSymbol = context.KnownTypes.ColorType;
         var qualifiedColor = colorSymbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -325,60 +360,110 @@ public static class Renderers
         switch (propertyValue.Value)
         {
             case CXValue.Interpolation interpolation:
-                var info = context.GetInterpolationInfo(interpolation);
+                return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
 
-                if (
-                    info.Symbol is not null &&
-                    context.Compilation.HasImplicitConversion(
-                        info.Symbol,
-                        colorSymbol
-                    )
-                )
-                {
-                    return context.GetDesignerValue(
-                        interpolation,
-                        qualifiedColor
-                    );
-                }
-
-                if (
-                    context.Compilation.HasImplicitConversion(
-                        info.Symbol,
-                        context.Compilation.GetSpecialType(SpecialType.System_UInt32)
-                    )
-                )
-                {
-                    return $"new {qualifiedColor}({context.GetDesignerValue(interpolation, "uint")})";
-                }
-
-
-                if (info.Constant.Value is string str)
-                {
-                    if (TryGetColorPreset(context, str, out var preset))
-                        return $"{qualifiedColor}.{preset}";
-
-                    if (TryParseHexColor(str, out var hexColor))
-                        return $"new {qualifiedColor}({hexColor})";
-                }
-                else if (info.Constant.HasValue && uint.TryParse(info.Constant.Value?.ToString(), out var hexColor))
-                {
-                    return $"new {qualifiedColor}({hexColor})";
-                }
-
-                return $"{qualifiedColor}.Parse({context.GetDesignerValue(interpolation)})";
             case CXValue.Scalar scalar:
-                return UseLibraryParser(scalar.Value);
+                return FromText(scalar, scalar.Value);
 
             case CXValue.Multipart stringLiteral:
-                if (
-                    !stringLiteral.HasInterpolations &&
-                    TryGetColorPreset(context, stringLiteral.Tokens.ToString(), out var presetName)
-                ) return $"{qualifiedColor}.{presetName}";
+
+                if (!stringLiteral.HasInterpolations)
+                    return FromText(stringLiteral, stringLiteral.Tokens.ToString());
+
+                if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
+                    return FromInterpolation(stringLiteral, info);
+
+                context.AddDiagnostic(
+                    Diagnostics.FallbackToRuntimeValueParsing,
+                    stringLiteral,
+                    "Discord.Color.Parse"
+                );
 
                 return UseLibraryParser(RenderStringLiteral(stringLiteral));
             default: return "default";
         }
 
+        string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        {
+            if (
+                info.Symbol is not null &&
+                context.Compilation.HasImplicitConversion(
+                    info.Symbol,
+                    colorSymbol
+                )
+            )
+            {
+                return context.GetDesignerValue(
+                    info,
+                    qualifiedColor
+                );
+            }
+
+            uint hexColor;
+            
+            if (info.Constant.Value is string str)
+            {
+                if (TryGetColorPreset(context, str, out var preset))
+                    return $"{qualifiedColor}.{preset}";
+
+                if (TryParseHexColor(str, out hexColor))
+                    return $"new {qualifiedColor}({hexColor})";
+            }
+            else if (info.Constant.HasValue && uint.TryParse(info.Constant.Value?.ToString(), out hexColor))
+            {
+                return $"new {qualifiedColor}({hexColor})";
+            }
+            
+            if (
+                context.Compilation.HasImplicitConversion(
+                    info.Symbol,
+                    context.Compilation.GetSpecialType(SpecialType.System_UInt32)
+                )
+            )
+            {
+                return $"new {qualifiedColor}({context.GetDesignerValue(info, "uint")})";
+            }
+            
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "Discord.Color.Parse"
+            );
+
+            return $"{qualifiedColor}.Parse({context.GetDesignerValue(info)})";
+        }
+
+        string FromText(ICXNode owner, string rawValue)
+        {
+            if (TryGetColorPreset(context, rawValue, out var presetName))
+            {
+                return $"{qualifiedColor}.{presetName}";
+            }
+
+            // maybe hex?
+            var hex = rawValue;
+
+            if (hex.StartsWith("#"))
+                hex = hex.Substring(1);
+
+            if (
+                uint.TryParse(
+                    hex,
+                    NumberStyles.HexNumber,
+                    null,
+                    out var hexCode
+                )
+            )
+                return $"new {qualifiedColor}({hexCode})";
+
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "Discord.Color.Parse"
+            );
+
+            return UseLibraryParser(ToCSharpString(rawValue));
+        }
 
         string UseLibraryParser(string source)
             => $"{qualifiedColor}.Parse({source})";
@@ -400,44 +485,71 @@ public static class Renderers
         }
     }
 
-    public static string Snowflake(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string Snowflake(IComponentContext context, IComponentPropertyValue propertyValue)
         => Snowflake(context, propertyValue.Value);
 
-    public static string Snowflake(ComponentContext context, CXValue? value)
+    public static string Snowflake(IComponentContext context, CXValue? value)
     {
         switch (value)
         {
             case CXValue.Interpolation interpolation:
-                var targetType = context.Compilation.GetSpecialType(SpecialType.System_UInt64);
-
-                var interpolationInfo = context.GetInterpolationInfo(interpolation);
-
-                if (
-                    interpolationInfo.Symbol is not null &&
-                    context.Compilation.HasImplicitConversion(interpolationInfo.Symbol, targetType)
-                )
-                {
-                    return $"designer.GetValue<ulong>({interpolation.InterpolationIndex})";
-                }
-
-                return UseParseMethod($"designer.GetValueAsString({interpolation.InterpolationIndex})");
+                return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
 
             case CXValue.Scalar scalar:
-                return FromText(scalar.Value.Trim());
+                return FromText(scalar, scalar.Value.Trim());
 
             case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral.Tokens.ToString().Trim());
+                    return FromText(stringLiteral, stringLiteral.Tokens.ToString().Trim());
 
+                if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
+                    return FromInterpolation(stringLiteral, info);
+                
+                context.AddDiagnostic(
+                    Diagnostics.FallbackToRuntimeValueParsing,
+                    stringLiteral,
+                    "ulong.Parse"
+                );
+                
                 return UseParseMethod(RenderStringLiteral(stringLiteral));
 
             default: return "default";
         }
 
-        string FromText(string text)
+        string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        {
+            var targetType = context.Compilation.GetSpecialType(SpecialType.System_UInt64);
+
+            if (info.Constant is { HasValue: true, Value: ulong ul })
+                return ul.ToString();
+            
+            if (
+                info.Symbol is not null &&
+                context.Compilation.HasImplicitConversion(info.Symbol, targetType)
+            )
+            {
+                return context.GetDesignerValue(info, "ulong");
+            }
+
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "ulong.Parse"
+            );
+            
+            return UseParseMethod(context.GetDesignerValue(info));
+        }
+
+        string FromText(ICXNode owner, string text)
         {
             if (ulong.TryParse(text, out _)) return text;
 
+            context.AddDiagnostic(
+                Diagnostics.FallbackToRuntimeValueParsing,
+                owner,
+                "ulong.Parse"
+            );
+            
             return UseParseMethod(ToCSharpString(text));
         }
 
@@ -445,7 +557,7 @@ public static class Renderers
             => $"ulong.Parse({input})";
     }
 
-    public static string String(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string String(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -481,15 +593,14 @@ public static class Renderers
 
         var quoteCount = parts.Select(x => x.Count(x => x is '"')).Max() + 1;
 
-        var dollars = new string(
-            '$',
-            parts.Select(GetInterpolationDollarRequirement).Max() +
-            (
-                literal.Tokens.Any(x => x.Kind is CXTokenKind.Interpolation)
-                    ? 1
-                    : 0
+        var hasInterpolations = literal.Tokens.Any(x => x.Kind is CXTokenKind.Interpolation);
+
+        var dollars = hasInterpolations
+            ? new string(
+                '$',
+                Math.Max(1, parts.Select(GetInterpolationDollarRequirement).Max())
             )
-        );
+            : string.Empty;
 
         var startInterpolation = dollars.Length > 0
             ? new string('{', dollars.Length)
@@ -532,6 +643,11 @@ public static class Renderers
         // normalize the value indentation
         var value = sb.ToString().NormalizeIndentation().Trim(['\r', '\n']);
 
+        // pad the value to the amount of dollar signs we have to properly align the value text to the 
+        // multi-line string literal
+        if (hasInterpolations && isMultiline)
+            value = value.Indent(dollars.Length);
+
         sb.Clear();
 
         if (isMultiline)
@@ -548,7 +664,11 @@ public static class Renderers
 
         sb.Append(value);
 
+        // ending quotes are on a different line 
         if (isMultiline) sb.AppendLine();
+
+        // if it has interpolations, offset the ending quotes by the amount of dollar signs
+        if (hasInterpolations && isMultiline) sb.Append("".PadLeft(dollars.Length));
         sb.Append(quotes);
 
         return sb.ToString();
@@ -734,7 +854,7 @@ public static class Renderers
         };
     }
 
-    public static string Emoji(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static string Emoji(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         bool isDiscordEmote = false;
         bool isEmoji = false;

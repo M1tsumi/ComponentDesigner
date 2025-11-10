@@ -14,15 +14,15 @@ public abstract class SelectMenuDefaultValue
     public abstract ICXNode Owner { get; }
     public abstract SelectMenuDefaultValueKind Kind { get; }
 
-    public void Validate(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+    public void Validate(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
     {
         this.ValidateInternal(context, selectState);
     }
 
-    protected abstract void ValidateInternal(ComponentContext context, SelectMenuComponentNode.SelectState selectState);
-    public abstract string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState);
+    protected abstract void ValidateInternal(IComponentContext context, SelectMenuComponentNode.SelectState selectState);
+    public abstract string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState);
 
-    private static string FromIdAndKind(ComponentContext context, string id, SelectMenuDefaultValueKind kind)
+    private static string FromIdAndKind(IComponentContext context, string id, SelectMenuDefaultValueKind kind)
     {
         var dotnetType = context.KnownTypes
             .SelectMenuDefaultValueType!
@@ -57,7 +57,7 @@ public abstract class SelectMenuDefaultValue
         public override ICXNode Owner => node;
         public override SelectMenuDefaultValueKind Kind => SelectMenuDefaultValueKind.Unknown;
 
-        protected override void ValidateInternal(ComponentContext context,
+        protected override void ValidateInternal(IComponentContext context,
             SelectMenuComponentNode.SelectState selectState)
         {
             context.AddDiagnostic(
@@ -67,7 +67,7 @@ public abstract class SelectMenuDefaultValue
             );
         }
 
-        public override string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
             => string.Empty;
     }
 
@@ -101,7 +101,7 @@ public abstract class SelectMenuDefaultValue
         private InterpolationKind? _kind;
 
         private bool TryGetKind(
-            ComponentContext context,
+            IComponentContext context,
             out InterpolationKind kind
         )
         {
@@ -165,7 +165,7 @@ public abstract class SelectMenuDefaultValue
             return false;
         }
 
-        private string RenderKind(ComponentContext context, InterpolationKind kind)
+        private string RenderKind(IComponentContext context, InterpolationKind kind)
         {
             var info = context.GetInterpolationInfo(interpolation);
             var designer = context.GetDesignerValue(
@@ -195,7 +195,7 @@ public abstract class SelectMenuDefaultValue
         }
 
         protected override void ValidateInternal(
-            ComponentContext context,
+            IComponentContext context,
             SelectMenuComponentNode.SelectState selectState
         )
         {
@@ -232,7 +232,7 @@ public abstract class SelectMenuDefaultValue
             _kind = kind;
         }
 
-        public override string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
         {
             if (_kind is null or InterpolationKind.Unknown) return string.Empty;
 
@@ -248,7 +248,7 @@ public abstract class SelectMenuDefaultValue
         private SelectMenuDefaultValueKind? _kind;
         private CXValue? _value;
 
-        protected override void ValidateInternal(ComponentContext context,
+        protected override void ValidateInternal(IComponentContext context,
             SelectMenuComponentNode.SelectState selectState)
         {
             _kind = element.Identifier.ToLowerInvariant() switch
@@ -307,7 +307,7 @@ public abstract class SelectMenuDefaultValue
             _value = value;
         }
 
-        public override string Render(ComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
         {
             if (_value is null || !_kind.HasValue) return string.Empty;
 

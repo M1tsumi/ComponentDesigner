@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace Discord.CX.Nodes;
 
-public sealed class ComponentContext
+public sealed class ComponentContext : IComponentContext
 {
     private sealed record DiagnosticScope(
         List<Diagnostic> Bag,
@@ -41,38 +41,22 @@ public sealed class ComponentContext
 
     public IDisposable CreateDiagnosticScope(List<Diagnostic> bag)
         => _scope = new(bag, _scope, this);
-    
-    public string GetDesignerValue(CXValue.Interpolation interpolation, string? type = null)
-        => GetDesignerValue(interpolation.InterpolationIndex, type);
-
-    public string GetDesignerValue(DesignerInterpolationInfo interpolation, string? type = null)
-        => GetDesignerValue(interpolation.Id, type);
 
     public string GetDesignerValue(int index, string? type = null)
         => type is not null ? $"designer.GetValue<{type}>({index})" : $"designer.GetValueAsString({index})";
 
-
-    public Location GetLocation(ICXNode node)
-        => _graph.GetLocation(node);
     public Location GetLocation(TextSpan span)
         => _graph.GetLocation(span);
-
-    public void AddDiagnostic(DiagnosticDescriptor descriptor, ICXNode node, params object?[]? args)
-        => AddDiagnostic(Diagnostic.Create(descriptor, GetLocation(node), args));
-
-    public void AddDiagnostic(DiagnosticDescriptor descriptor, TextSpan span, params object?[]? args)
-        => AddDiagnostic(Diagnostic.Create(descriptor, GetLocation(span), args));
-
+    
     public DesignerInterpolationInfo GetInterpolationInfo(CXToken token)
         => GetInterpolationInfo(_graph.Manager.Document.GetInterpolationIndex(token));
-    
-    public DesignerInterpolationInfo GetInterpolationInfo(CXValue.Interpolation interpolation)
-        => GetInterpolationInfo(interpolation.InterpolationIndex);
-
     public DesignerInterpolationInfo GetInterpolationInfo(int index) => _graph.Manager.InterpolationInfos[index];
 
     public void AddDiagnostic(Diagnostic diagnostics)
     {
         _scope.Bag.Add(diagnostics);
     }
+
+    IReadOnlyList<Diagnostic> IComponentContext.GlobalDiagnostics => GlobalDiagnostics;
+
 }

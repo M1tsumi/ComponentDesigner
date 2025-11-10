@@ -40,7 +40,7 @@ public sealed class ContainerComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         foreach (var child in state.Children)
         {
@@ -66,7 +66,7 @@ public sealed class ContainerComponentNode : ComponentNode
             or SeparatorComponentNode
             or FileComponentNode;
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
     {
         var props = state.RenderProperties(this, context, asInitializers: true);
         var children = state.RenderChildren(context);
@@ -98,27 +98,4 @@ public sealed class ContainerComponentNode : ComponentNode
               }}
               """;
     }
-//         => $$"""
-//              new {{context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
-//                  $"{
-//                      state
-//                          .RenderProperties(this, context, asInitializers: true)
-//                          .PostfixIfSome(Environment.NewLine)
-//                  }{
-//                      state.RenderChildren(context)
-//                          .Map(x =>
-//                              $"""
-//                               Components =
-//                               [
-//                                   {x.WithNewlinePadding(4)}
-//                               ]
-//                               """
-//                          )
-//                  }"
-//                      .TrimEnd()
-//                      .WithNewlinePadding(4)
-//                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
-//                      .PostfixIfSome($"{Environment.NewLine}}}")
-//              }}
-//              """;
 }

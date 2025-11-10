@@ -13,15 +13,16 @@ namespace Discord.CX;
 public readonly struct CXGraph
 {
     public bool HasErrors => Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
+
     public IReadOnlyList<Diagnostic> Diagnostics
         => [.._diagnostics, ..RootNodes.SelectMany(x => x.Diagnostics)];
-    
+
     public readonly CXGraphManager Manager;
     public readonly ImmutableArray<Node> RootNodes;
     public readonly IReadOnlyDictionary<ICXNode, Node> NodeMap;
 
     private readonly ImmutableArray<Diagnostic> _diagnostics;
-    
+
     public CXGraph(
         CXGraphManager manager,
         ImmutableArray<Node> rootNodes,
@@ -56,7 +57,7 @@ public readonly struct CXGraph
          * We try to reuse any ComponentNodes who's source is a reused node within the 'parseResult' AND contain no
          * diagnostics. Any nodes with errors are not reused.
          */
-        
+
         if (manager == Manager) return this;
 
         var map = new Dictionary<ICXNode, Node>();
@@ -124,7 +125,7 @@ public readonly struct CXGraph
             oldGraph.HasValue &&
             incrementalParseResult.HasValue &&
             reusedNodes.Contains(cxNode) &&
-            oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing) && 
+            oldGraph.Value.NodeMap.TryGetValue(cxNode, out var existing) &&
             existing.Diagnostics.Count is 0
         )
         {
@@ -146,7 +147,7 @@ public readonly struct CXGraph
                     )
                 )
                 {
-                    var state = inner.Create(new ComponentStateInitializationContext(interpolation, []));
+                    var state = inner.Create(new(interpolation, manager.Options, []));
 
                     if (state is null) return [];
 
@@ -203,57 +204,130 @@ public readonly struct CXGraph
                     return [];
                 }
 
-                var children = new List<CXNode>();
-
-                var state = componentNode.Create(new(element, children));
-
-                if (state is null) return [];
-
-                var attributeNodes = new List<Node>();
-                var nodeChildren = new List<Node>();
-                var node = map[element] = state.OwningNode = new(
-                    componentNode,
-                    state,
-                    nodeChildren,
-                    attributeNodes,
-                    parent
-                );
+                var context = new ComponentGraphInitializationContext(element, parent, manager.Options);
                 
-                foreach (var attribute in element.Attributes)
+                componentNode.AddGraphNode(context);
+                
+                var result = new List<Node>();
+                
+                foreach (var initialization in context.Initializations)
                 {
-                    if (attribute.Value is CXValue.Element nestedElement)
+                    var state = initialization.State;
+                    var nodeChildren = new List<Node>();
+                    var attributeNodes = new List<Node>();
+                    var node = map[state.Source] = state.OwningNode = new(
+                        initialization.Node,
+                        state,
+                        nodeChildren,
+                        attributeNodes,
+                        parent
+                    );
+
+                    if (state.Source is CXElement { Attributes: { Count: > 0 } attributes })
                     {
-                        attributeNodes.AddRange(
-                            CreateNodes(
-                                manager,
-                                nestedElement.Value,
-                                node,
-                                reusedNodes,
-                                oldGraph,
-                                map,
-                                diagnostics,
-                                incrementalParseResult
-                            )
-                        );
+                        foreach (var attribute in attributes)
+                        {
+                            if (attribute.Value is CXValue.Element nestedElement)
+                            {
+                                attributeNodes.AddRange(
+                                    CreateNodes(
+                                        manager,
+                                        nestedElement.Value,
+                                        node,
+                                        reusedNodes,
+                                        oldGraph,
+                                        map,
+                                        diagnostics,
+                                        incrementalParseResult
+                                    )
+                                );
+                            }
+                        }
                     }
+                    
+                    nodeChildren.AddRange(
+                        initialization
+                            .Children
+                            .SelectMany(x => CreateNodes(
+                                    manager,
+                                    x,
+                                    node,
+                                    reusedNodes,
+                                    oldGraph,
+                                    map,
+                                    diagnostics,
+                                    incrementalParseResult
+                                )
+                            )
+                    );
+                    
+                    result.Add(node);
                 }
 
-                nodeChildren.AddRange(
-                    children
-                        .SelectMany(x => CreateNodes(
-                                manager,
-                                x,
-                                node,
-                                reusedNodes,
-                                oldGraph,
-                                map,
-                                diagnostics,
-                                incrementalParseResult
-                            )
-                        )
-                );
+                return result;
 
-                return [node];
+                // var children = new List<CXNode>();
+                // var subNodes = new List<ComponentInitializationGraphNode>();
+                // var context = new ComponentStateInitializationContext(
+                //     element,
+                //     manager.Options,
+                //     children,
+                //     subNodes
+                // );
+                //
+                // componentNode.AddGraphNode();
+                //
+                //
+                // var state = componentNode.Create(
+                // );
+                //
+                // if (state is null) return [];
+                //
+                // var attributeNodes = new List<Node>();
+                // var nodeChildren = new List<Node>();
+                // var node = map[element] = state.OwningNode = new(
+                //     componentNode,
+                //     state,
+                //     nodeChildren,
+                //     attributeNodes,
+                //     parent
+                // );
+                //
+                // foreach (var attribute in element.Attributes)
+                // {
+                //     if (attribute.Value is CXValue.Element nestedElement)
+                //     {
+                //         attributeNodes.AddRange(
+                //             CreateNodes(
+                //                 manager,
+                //                 nestedElement.Value,
+                //                 node,
+                //                 reusedNodes,
+                //                 oldGraph,
+                //                 map,
+                //                 diagnostics,
+                //                 incrementalParseResult
+                //             )
+                //         );
+                //     }
+                // }
+                //
+                // nodeChildren.AddRange(
+                //     children
+                //         .SelectMany(x => CreateNodes(
+                //                 manager,
+                //                 x,
+                //                 node,
+                //                 reusedNodes,
+                //                 oldGraph,
+                //                 map,
+                //                 diagnostics,
+                //                 incrementalParseResult
+                //             )
+                //         )
+                // );
+                //
+                // return [node];
             }
             default: return [];
         }
@@ -276,8 +350,9 @@ public readonly struct CXGraph
         public Node? Parent { get; }
 
         public IReadOnlyList<Diagnostic> Diagnostics
-            => [
-                .._diagnostics, 
+            =>
+            [
+                .._diagnostics,
                 ..AttributeNodes.SelectMany(x => x.Diagnostics),
                 ..Children.SelectMany(x => x.Diagnostics)
             ];
@@ -314,14 +389,14 @@ public readonly struct CXGraph
         {
             foreach (var attributeNode in AttributeNodes)
                 attributeNode.UpdateState(context);
-            
+
             foreach (var node in Children)
                 node.UpdateState(context);
-            
+
             Inner.UpdateState(ref _state, context);
         }
-        
-        public string Render(ComponentContext context)
+
+        public string Render(IComponentContext context)
         {
             if (_render is not null) return _render;
 
@@ -331,7 +406,7 @@ public readonly struct CXGraph
             }
         }
 
-        public void Validate(ComponentContext context)
+        public void Validate(IComponentContext context)
         {
             using (context.CreateDiagnosticScope(_diagnostics))
             {

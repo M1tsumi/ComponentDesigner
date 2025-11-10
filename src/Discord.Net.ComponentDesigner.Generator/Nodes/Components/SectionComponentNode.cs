@@ -29,7 +29,7 @@ public sealed class SectionComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         var accessoryPropertyValue = state.GetProperty(Accessory);
         
@@ -116,7 +116,7 @@ public sealed class SectionComponentNode : ComponentNode
             => node is TextDisplayComponentNode or IDynamicComponentNode;
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
     {
         var accessoryPropertyValue = state.GetProperty(Accessory);
 
@@ -150,7 +150,7 @@ public sealed class AccessoryComponentNode : ComponentNode
 
     public override bool HasChildren => true;
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         if (!state.HasChildren)
         {
@@ -193,6 +193,6 @@ public sealed class AccessoryComponentNode : ComponentNode
     private static bool IsAllowedChild(ComponentNode node)
         => node is ButtonComponentNode or ThumbnailComponentNode;
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => state.RenderChildren(context);
 }

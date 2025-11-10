@@ -102,7 +102,7 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
     private string MethodReference =>
         $"{_method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{_method.Name}";
 
-    public override string Render(FunctionalComponentNodeState state, ComponentContext context)
+    public override string Render(FunctionalComponentNodeState state, IComponentContext context)
         => InterleavedComponentNode.ExtrapolateKindToBuilders(
             _kind,
             $"{MethodReference}({

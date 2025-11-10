@@ -23,7 +23,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
     public const string BUTTON_STYLE_ENUM = "Discord.ButtonStyle";
     public const int BUTTON_STYLE_LINK_VALUE = 5;
     public const int BUTTON_STYLE_PREMIUM_VALUE = 6;
-    
+
     public override string Name => "button";
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
@@ -90,6 +90,19 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         ];
     }
 
+    public override void AddGraphNode(ComponentGraphInitializationContext context)
+    {
+        /*
+         * Auto row semantics:
+         * We only want to insert rows 
+         */
+        if (!context.Options.EnableAutoRows || context.ParentGraphNode is null)
+        {
+            base.AddGraphNode(context);
+            return;
+        }
+    }
+
     public override ButtonComponentState? CreateState(ComponentStateInitializationContext context)
     {
         if (context.Node is not CXElement element) return null;
@@ -103,11 +116,11 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             state.SubstitutePropertyValue(Label, value);
 
         InferButtonKind(state);
-        
+
         return state;
     }
 
-    public override void UpdateState(ref ButtonComponentState state, ComponentContext context)
+    public override void UpdateState(ref ButtonComponentState state, IComponentContext context)
     {
         state.InferredKind = FurtherInferredButtonKindWithContext(state, context);
     }
@@ -141,10 +154,10 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         }
     }
 
-    private ButtonKind FurtherInferredButtonKindWithContext(ButtonComponentState state, ComponentContext context)
+    private ButtonKind FurtherInferredButtonKindWithContext(ButtonComponentState state, IComponentContext context)
     {
         if (state.InferredKind is not ButtonKind.Default) return state.InferredKind;
-        
+
         // check for interpolated constants
         var style = state.GetProperty(Style);
 
@@ -155,7 +168,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(context.GetInterpolationInfo(interpolation));
         }
-        
+
         return state.InferredKind;
 
         ButtonKind FromInterpolation(DesignerInterpolationInfo info)
@@ -172,6 +185,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                         case "link": return ButtonKind.Link;
                         case "premium": return ButtonKind.Premium;
                     }
+
                     break;
                 case int i:
                     switch (i)
@@ -182,12 +196,12 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
                     break;
             }
-            
+
             return state.InferredKind;
         }
     }
 
-    public override void Validate(ButtonComponentState state, ComponentContext context)
+    public override void Validate(ButtonComponentState state, IComponentContext context)
     {
         var label = state.GetProperty(Label);
 
@@ -218,7 +232,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
                 state.ReportPropertyNotAllowed(CustomId, context);
                 state.ReportPropertyNotAllowed(SkuId, context);
-                
+
                 state.RequireOneOf(context, Label, Emoji);
                 break;
             case ButtonKind.Premium:
@@ -243,17 +257,17 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                     optional: false,
                     requiresValue: true
                 );
-                
+
                 state.ReportPropertyNotAllowed(SkuId, context);
                 state.ReportPropertyNotAllowed(Url, context);
                 state.RequireOneOf(context, Label, Emoji);
                 break;
         }
-        
+
         base.Validate(state, context);
     }
 
-    public override string Render(ButtonComponentState state, ComponentContext context)
+    public override string Render(ButtonComponentState state, IComponentContext context)
     {
         string style;
 
@@ -280,7 +294,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                 )
             ]
         );
-        
+
         return $"""
                 new {context.KnownTypes.ButtonBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                     props

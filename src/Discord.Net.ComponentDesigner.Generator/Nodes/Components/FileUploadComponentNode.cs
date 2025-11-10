@@ -46,7 +46,7 @@ public sealed class FileUploadComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         if (context.KnownTypes.FileUploadComponentBuilderType is null)
         {
@@ -67,7 +67,7 @@ public sealed class FileUploadComponentNode : ComponentNode
         }
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => $"""
             new {context.KnownTypes.FileUploadComponentBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)

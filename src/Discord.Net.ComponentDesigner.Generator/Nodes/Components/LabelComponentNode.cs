@@ -90,7 +90,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
         return state;
     }
 
-    public override void Validate(LabelComponentState state, ComponentContext context)
+    public override void Validate(LabelComponentState state, IComponentContext context)
     {
         base.Validate(state, context);
 
@@ -147,7 +147,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
             or TextInputComponentNode
             or FileUploadComponentNode;
 
-    public override string Render(LabelComponentState state, ComponentContext context)
+    public override string Render(LabelComponentState state, IComponentContext context)
     {
         var props = string.Join(
             $",{Environment.NewLine}",

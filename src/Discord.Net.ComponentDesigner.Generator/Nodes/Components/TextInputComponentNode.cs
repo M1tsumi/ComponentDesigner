@@ -91,14 +91,14 @@ public sealed class TextInputComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         base.Validate(state, context);
 
         Validators.Range(context, state, MinLength, MaxLength);
     }
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => $"""
             new {context.KnownTypes.TextInputBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
                 state.RenderProperties(this, context)

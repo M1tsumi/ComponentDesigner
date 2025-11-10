@@ -4,20 +4,19 @@ using Microsoft.CodeAnalysis;
 
 namespace UnitTests.ComponentTests;
 
-public abstract class BaseComponentTest
+public abstract class BaseComponentTest : BaseTestWithDiagnostics
 {
     protected CXGraph CurrentGraph => _graph!.Value;
     
     private CXGraph? _graph;
     private ComponentContext? _context;
     private IEnumerator<CXGraph.Node>? _nodeEnumerator;
-    private readonly Queue<Diagnostic> _diagnostics = [];
-    private readonly HashSet<Diagnostic> _expectedDiagnostics = [];
 
     public void Graph(
         string cx,
         string? pretext = null,
-        bool allowParsingErrors = false
+        bool allowParsingErrors = false,
+        GeneratorOptions? options = null
     )
     {
         if(_graph is not null) EOF();
@@ -25,8 +24,8 @@ public abstract class BaseComponentTest
         _graph = null;
         _context = null;
         _nodeEnumerator = null;
-        _diagnostics.Clear();
-        _expectedDiagnostics.Clear();
+        
+        ClearDiagnostics();
         
         var source =
             $""""
@@ -45,6 +44,7 @@ public abstract class BaseComponentTest
             new SourceGenerator(),
             "<global>:0",
             target,
+            options ?? GeneratorOptions.Default,
             CancellationToken.None
         );
 
@@ -78,9 +78,9 @@ public abstract class BaseComponentTest
         if (hasErrors.HasValue)
             Assert.Equal(hasErrors.Value, _graph.Value.HasErrors);
 
-        Assert.Empty(_diagnostics);
-
-        PushDiagnostics();
+        AssertEmptyDiagnostics();
+        
+        PushDiagnostics([.._context.GlobalDiagnostics, .._graph.Value.Diagnostics]);
     }
 
     protected void Renders(string? expected = null)
@@ -88,48 +88,13 @@ public abstract class BaseComponentTest
         Assert.NotNull(_graph);
         Assert.NotNull(_context);
 
-        Assert.Empty(_diagnostics);
+        AssertEmptyDiagnostics();
 
         var result = _graph.Value.Render(_context);
 
-        PushDiagnostics();
+        PushDiagnostics([.._context.GlobalDiagnostics, .._graph.Value.Diagnostics]);
 
         if (expected is not null) Assert.Equal(expected, result);
-    }
-
-    private void PushDiagnostics()
-    {
-        Assert.NotNull(_graph);
-        Assert.NotNull(_context);
-
-        IEnumerable<Diagnostic> diag = [.._context.GlobalDiagnostics, .._graph.Value.Diagnostics];
-        foreach (var diagnostic in diag)
-            if(!_expectedDiagnostics.Contains(diagnostic))
-                _diagnostics.Enqueue(diagnostic);
-    }
-
-    protected Diagnostic Diagnostic(
-        string id,
-        string? title = null,
-        string? message = null,
-        DiagnosticSeverity? severity = null,
-        Location? location = null
-    )
-    {
-        Assert.NotEmpty(_diagnostics);
-        
-        var diagnostic = _diagnostics.Dequeue();
-
-        Assert.Equal(id, diagnostic.Id);
-
-        if (title is not null) Assert.Equal(title, diagnostic.Descriptor.Title);
-        if (message is not null) Assert.Equal(message, diagnostic.GetMessage());
-        if (severity is not null) Assert.Equal(severity, diagnostic.Severity);
-        if (location is not null) Assert.Equal(location, diagnostic.Location);
-
-        _expectedDiagnostics.Add(diagnostic);
-        
-        return diagnostic;
     }
 
 
@@ -140,11 +105,12 @@ public abstract class BaseComponentTest
         return _nodeEnumerator.Current;
     }
 
-    protected void EOF()
+    protected override void EOF()
     {
         Assert.NotNull(_nodeEnumerator);
         Assert.False(_nodeEnumerator.MoveNext());
-        Assert.Empty(_diagnostics);
+
+        base.EOF();
     }
 
     protected T Node<T>() where T : ComponentNode

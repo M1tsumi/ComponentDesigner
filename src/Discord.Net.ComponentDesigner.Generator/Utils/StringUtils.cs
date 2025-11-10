@@ -7,6 +7,22 @@ namespace Discord.CX;
 
 public static class StringUtils
 {
+    public static string Indent(this string value, int size)
+    {
+        if (size is 0) return value;
+
+        var padStr = new string(' ', size);
+        
+        var split = value.Split('\n');
+
+        if (split.Length is 1) return $"{padStr}{value}";
+
+        return string.Join(
+            "\n",
+            split.Select(x => $"{padStr}{x}")
+        );
+    }
+    
     public static string Prefix(this string str, int count, char prefixChar = ' ')
         => count > 0 ? $"{new string(prefixChar, count)}{str}" : str;
 

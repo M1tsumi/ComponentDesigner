@@ -389,31 +389,35 @@ public sealed partial class CXParser
             return value;
         }
 
-        switch (CurrentToken.Kind)
+        using (Lexer.SetMode(CXLexer.LexMode.Attribute))
         {
-            case CXTokenKind.OpenParenthesis:
-                return new CXValue.Element(
-                    Eat(),
-                    ParseElement(),
-                    Expect(CXTokenKind.CloseParenthesis)
-                );
+            switch (CurrentToken.Kind)
+            {
+                case CXTokenKind.OpenParenthesis:
+                    return new CXValue.Element(
+                        Eat(),
+                        ParseElement(),
+                        Expect(CXTokenKind.CloseParenthesis)
+                    );
 
-            case CXTokenKind.Interpolation:
-                return new CXValue.Interpolation(
-                    Eat(),
-                    Lexer.InterpolationIndex!.Value
-                );
-            case CXTokenKind.StringLiteralStart:
-                return ParseStringLiteral();
-            default:
-                return new CXValue.Invalid()
-                {
-                    Diagnostics =
-                    [
-                        CXDiagnostic.InvalidAttributeValue(CurrentToken)
-                    ]
-                };
+                case CXTokenKind.Interpolation:
+                    return new CXValue.Interpolation(
+                        Eat(),
+                        Lexer.InterpolationIndex!.Value
+                    );
+                case CXTokenKind.StringLiteralStart:
+                    return ParseStringLiteral();
+                default:
+                    return new CXValue.Invalid()
+                    {
+                        Diagnostics =
+                        [
+                            CXDiagnostic.InvalidAttributeValue(CurrentToken)
+                        ]
+                    };
+            }
         }
+       
     }
 
     internal CXValue ParseStringLiteral()

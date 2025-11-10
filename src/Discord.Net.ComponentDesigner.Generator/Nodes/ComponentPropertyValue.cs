@@ -8,7 +8,7 @@ public sealed record ComponentPropertyValue(
     ComponentProperty Property,
     CXAttribute? Attribute,
     CXGraph.Node? Node = null
-)
+) : IComponentPropertyValue
 {
     private CXValue? _value;
 
@@ -21,6 +21,13 @@ public sealed record ComponentPropertyValue(
     public bool IsSpecified => Attribute is not null || HasValue;
 
     public bool HasValue => Value is not null;
+    
+    public bool IsAttributeValue => Attribute is not null;
+
+    public bool RequiresValue => Property.RequiresValue;
+
+    public bool IsOptional => Property.IsOptional;
+    public string PropertyName => Property.Name;
 
     public bool CanOmitFromSource => Property.Synthetic || ( Property.IsOptional && !IsSpecified);
 
@@ -42,7 +49,7 @@ public sealed record ComponentPropertyValue(
     }
 
     public void ReportPropertyConfigurationDiagnostics(
-        ComponentContext context,
+        IComponentContext context,
         ComponentState state,
         bool? optional = null,
         bool? requiresValue = null

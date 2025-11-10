@@ -18,6 +18,7 @@ public sealed record CXGraphManager(
     SourceGenerator Generator,
     string Key,
     Target Target,
+    GeneratorOptions Options,
     CXDoc Document
 )
 {
@@ -68,7 +69,13 @@ public sealed record CXGraphManager(
         Document = other.Document;
     }
 
-    public static CXGraphManager Create(SourceGenerator generator, string key, Target target, CancellationToken token)
+    public static CXGraphManager Create(
+        SourceGenerator generator,
+        string key,
+        Target target,
+        GeneratorOptions options,
+        CancellationToken token
+    )
     {
         var reader = new CXSourceReader(
             new CXSourceText.StringSource(target.CXDesigner),
@@ -83,16 +90,27 @@ public sealed record CXGraphManager(
             generator,
             key,
             target,
+            options,
             doc
         );
     }
 
-    public CXGraphManager OnUpdate(string key, Target target, CancellationToken token)
+    public CXGraphManager OnUpdate(
+        string key,
+        Target target,
+        GeneratorOptions options,
+        CancellationToken token
+    )
     {
-        var result = this with { Key = key, Target = target };
+        var result = this with
+        {
+            Key = key,
+            Target = target,
+            Options = options
+        };
 
         result.DoReparse(target, this, ref result, token);
-        
+
         return result;
     }
 
@@ -167,7 +185,7 @@ public sealed record CXGraphManager(
                 UsesDesigner
             );
         }
-        
+
         var context = new ComponentContext(Graph);
 
         foreach (var node in Graph.RootNodes)

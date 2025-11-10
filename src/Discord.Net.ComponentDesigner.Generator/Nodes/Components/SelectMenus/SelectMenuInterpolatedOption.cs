@@ -24,7 +24,7 @@ public sealed class SelectMenuInterpolatedOption
         IsBuilder = isBuilder;
     }
 
-    public string Render(SelectMenuComponentNode.SelectState state, ComponentContext context)
+    public string Render(SelectMenuComponentNode.SelectState state, IComponentContext context)
     {
         var source = context.GetDesignerValue(
             InterpolationId,
@@ -59,7 +59,7 @@ public sealed class SelectMenuInterpolatedOption
     }
 
     public static bool TryCreate(
-        ComponentContext context,
+        IComponentContext context,
         ICXNode interpolation,
         out SelectMenuInterpolatedOption option
     )

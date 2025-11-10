@@ -180,7 +180,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    public override void Validate(ComponentState state, ComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context)
     {
         base.Validate(state, context);
 
@@ -219,7 +219,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    private void ValidateDefaultValues(SelectState state, ComponentContext context)
+    private void ValidateDefaultValues(SelectState state, IComponentContext context)
     {
         foreach (var defaultValue in state.Defaults)
         {
@@ -244,7 +244,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    private void ValidateStringSelectMenu(SelectState state, ComponentContext context)
+    private void ValidateStringSelectMenu(SelectState state, IComponentContext context)
     {
         var validChildrenCount = 0;
 
@@ -319,7 +319,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
     private static bool IsValidStringSelectChild(ComponentNode node)
         => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
 
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
     {
         if (state is not SelectState selectState) return string.Empty;
 
@@ -386,7 +386,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
         static IEnumerable<ComponentNodeRenderer<SelectState>> GetStringSelectOrderedChildrenRenderers(
             SelectState state,
-            ComponentContext context
+            IComponentContext context
         )
         {
             if (state.Source is not CXElement selectElement) yield break;
@@ -466,7 +466,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    private static string ToDiscordComponentType(ComponentContext context, SelectKind kind)
+    private static string ToDiscordComponentType(IComponentContext context, SelectKind kind)
         => $"{context.KnownTypes.ComponentTypeEnumType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{
             kind switch {
                 SelectKind.Channel => "ChannelSelect",

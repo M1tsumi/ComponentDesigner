@@ -485,4 +485,15 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
+    
+    public static readonly DiagnosticDescriptor FallbackToRuntimeValueParsing = new(
+        "DC0054",
+        "Using a runtime parse method",
+        "The value may be invalid or out of range, falling back to the runtime parsing method '{0}'",
+        "Components",
+        DiagnosticSeverity.Warning,
+        true
+    );
+
+
 }

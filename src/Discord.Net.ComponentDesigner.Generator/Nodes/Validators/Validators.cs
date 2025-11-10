@@ -10,7 +10,7 @@ namespace Discord.CX.Nodes;
 
 public static class Validators
 {
-    public static void Snowflake(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static void Snowflake(IComponentContext context, ComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -47,7 +47,7 @@ public static class Validators
         }
     }
 
-    public static void Emote(ComponentContext context, ComponentPropertyValue propertyValue)
+    public static void Emote(IComponentContext context, ComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -59,7 +59,7 @@ public static class Validators
         }
     }
 
-    public static void Range(ComponentContext context, ComponentState state, ComponentProperty lower,
+    public static void Range(IComponentContext context, ComponentState state, ComponentProperty lower,
         ComponentProperty upper)
     {
         var lowerValue = state.GetProperty(lower);
@@ -190,7 +190,7 @@ public static class Validators
         };
     }
 
-    private static bool TryGetIntValue(ComponentContext context, CXValue? value, out int result)
+    private static bool TryGetIntValue(IComponentContext context, CXValue? value, out int result)
     {
         switch (value)
         {

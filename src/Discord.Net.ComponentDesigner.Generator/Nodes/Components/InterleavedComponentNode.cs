@@ -311,7 +311,7 @@ public sealed class InterleavedComponentNode : ComponentNode, IDynamicComponentN
 
 
     // TODO: extrapolate the kind to correct buidler conversion
-    public override string Render(ComponentState state, ComponentContext context)
+    public override string Render(ComponentState state, IComponentContext context)
         => context.GetDesignerValue(
             (CXValue.Interpolation)state.Source,
             context.KnownTypes.IMessageComponentBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)

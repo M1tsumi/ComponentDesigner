@@ -11,7 +11,7 @@ namespace Discord.CX.Nodes.Components.Custom;
 public sealed class ComponentChildrenAdapter
 {
     public delegate string Renderer(
-        ComponentContext context,
+        IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
     );
@@ -136,7 +136,7 @@ public sealed class ComponentChildrenAdapter
     }
 
     private string RenderComponent(
-        ComponentContext context,
+        IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
     )
@@ -265,7 +265,7 @@ public sealed class ComponentChildrenAdapter
 
     private string RenderComponentInner(
         InterleavedKind kind,
-        ComponentContext context,
+        IComponentContext context,
         ComponentChild child,
         ComponentState state,
         bool spreadCollections = false
@@ -355,7 +355,7 @@ public sealed class ComponentChildrenAdapter
     }
 
     private string RenderNonComponent(
-        ComponentContext context,
+        IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
     )
@@ -482,7 +482,7 @@ public sealed class ComponentChildrenAdapter
 
     private string RenderNonComponentInner(
         ITypeSymbol target,
-        ComponentContext context,
+        IComponentContext context,
         ComponentChild child
     )
     {

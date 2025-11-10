@@ -21,7 +21,7 @@ public abstract partial class CXSourceText
         {
             var slice = new char[length];
 
-            for(var i = 0; i < length; i++)
+            for (var i = 0; i < length; i++)
                 slice[i] = this[position + i];
 
             return new string(slice);
@@ -30,9 +30,12 @@ public abstract partial class CXSourceText
 
     public TextLineCollection Lines => _lines ??= ComputeLines();
     private TextLineCollection? _lines;
-    
-    public CXSourceReader CreateReader(TextSpan? span = null, TextSpan[]? interpolations = null,
-        int? wrappingQuoteCount = null)
+
+    public CXSourceReader CreateReader(
+        TextSpan? span = null,
+        TextSpan[]? interpolations = null,
+        int? wrappingQuoteCount = null
+    )
         => new(
             this,
             span ?? new(0, Length),
@@ -149,7 +152,7 @@ public abstract partial class CXSourceText
     {
         if (Length == 0) return [0];
 
-        var lineStarts = new List<int>(Length / 64) {0};
+        var lineStarts = new List<int>(Length / 64) { 0 };
 
         for (var i = 0; i < Length; i++)
         {
