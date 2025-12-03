@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <LangVersion>preview</LangVersion>
         <RootNamespace>Discord.CX</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>

@@ -525,12 +525,8 @@ public sealed partial class CXParser
                     if (current.Kind == kind) return Eat();
                 }
 
-                return new CXToken(
+                return CXToken.CreateMissing(
                     kinds[0],
-                    0,
-                    0,
-                    Flags: CXTokenFlags.Missing,
-                    FullValue: string.Empty,
                     CXDiagnostic.UnexpectedToken(current, kinds.ToArray())
                 );
         }
@@ -542,12 +538,8 @@ public sealed partial class CXParser
 
         if (token.Kind != kind)
         {
-            return new CXToken(
+            return CXToken.CreateMissing(
                 kind,
-                0,
-                0,
-                Flags: CXTokenFlags.Missing,
-                FullValue: string.Empty,
                 CXDiagnostic.UnexpectedToken(token, kind)
             );
         }

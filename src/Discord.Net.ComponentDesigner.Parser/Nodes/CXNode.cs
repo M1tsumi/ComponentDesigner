@@ -47,8 +47,8 @@ public abstract partial class CXNode : ICXNode
 
     public virtual CXParser Parser => Document.Parser;
 
-    public string? LeadingTrivia => FirstTerminal?.LeadingTrivia;
-    public string? TrailingTrivia => LastTerminal?.TrailingTrivia;
+    public LexedCXTrivia LeadingTrivia => FirstTerminal?.LeadingTrivia ?? LexedCXTrivia.Empty;
+    public LexedCXTrivia TrailingTrivia => LastTerminal?.TrailingTrivia ?? LexedCXTrivia.Empty;
     
     public CXToken? FirstTerminal
     {

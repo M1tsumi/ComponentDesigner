@@ -9,51 +9,35 @@ namespace Discord.CX.Parser;
 
 public sealed record CXToken(
     CXTokenKind Kind,
-    int LeadingTriviaLength,
-    int TrailingTriviaLength,
+    LexedCXTrivia LeadingTrivia,
+    LexedCXTrivia TrailingTrivia,
     CXTokenFlags Flags,
-    string FullValue,
+    string Value,
     params IReadOnlyList<CXDiagnostic> Diagnostics
 ) : ICXNode
 {
-    public string Value => FullValue.Substring(
-        LeadingTriviaLength,
-        FullValue.Length - LeadingTriviaLength - TrailingTriviaLength
-    );
-
-    public TextSpan Span => new(
-        FullSpan.Start + LeadingTriviaLength,
-        FullValue.Length - LeadingTriviaLength - TrailingTriviaLength
-    );
-
-    public TextSpan FullSpan
+    public int Width => LeadingTrivia.Length + Value.Length + TrailingTrivia.Length;
+    
+    public int Offset
     {
         get
         {
-            return new TextSpan(
-                GetOffset(),
-                FullValue.Length
-            );
-            
-            int GetOffset()
-            {
-                if(Parent is null) return 0;
-                
-                var parentOffset = Parent.Offset;
-                var parentSlotIndex = GetParentSlotIndex();
+            if (Parent is null) return 0;
 
-                return parentSlotIndex switch
+            var parentOffset = Parent.Offset;
+            var parentSlotIndex = GetParentSlotIndex();
+
+            return parentSlotIndex switch
+            {
+                -1 => throw new InvalidOperationException(),
+                0 => parentOffset,
+                _ => Parent.Slots[parentSlotIndex - 1].Value switch
                 {
-                    -1 => throw new InvalidOperationException(),
-                    0 => parentOffset,
-                    _ => Parent.Slots[parentSlotIndex - 1].Value switch
-                    {
-                        CXNode sibling => sibling.Offset + sibling.Width,
-                        CXToken token => token.FullSpan.End,
-                        _ => throw new InvalidOperationException()
-                    }
-                };
-            }
+                    CXNode sibling => sibling.Offset + sibling.Width,
+                    CXToken token => token.Offset + token.Width,
+                    _ => throw new InvalidOperationException()
+                }
+            };
 
             int GetParentSlotIndex()
             {
@@ -67,7 +51,10 @@ public sealed record CXToken(
             }
         }
     }
-    
+
+    public TextSpan Span => new(Offset + LeadingTrivia.Length, Value.Length);
+    public TextSpan FullSpan => new(Offset, Width);
+
     public CXNode? Parent { get; set; }
 
     public bool HasErrors
@@ -83,18 +70,6 @@ public sealed record CXToken(
 
     public bool IsInvalid => Kind is CXTokenKind.Invalid;
 
-    public int Width => FullSpan.Length;
-
-    public string LeadingTrivia
-        => LeadingTriviaLength is 0 
-            ? string.Empty 
-            : FullValue.Substring(0, LeadingTriviaLength);
-
-    public string TrailingTrivia
-        => TrailingTriviaLength is 0
-            ? string.Empty
-            : FullValue.Substring(FullValue.Length - TrailingTriviaLength);
-
     private bool? _hasErrors;
 
     public static CXToken CreateSynthetic(
@@ -107,8 +82,8 @@ public sealed record CXToken(
     {
         return new CXToken(
             kind,
-            0,
-            0,
+            LexedCXTrivia.Empty, 
+            LexedCXTrivia.Empty, 
             CXTokenFlags.Synthetic | (flags ?? CXTokenFlags.None),
             value ?? string.Empty,
             [..diagnostics ?? []]
@@ -126,10 +101,10 @@ public sealed record CXToken(
         params IEnumerable<CXDiagnostic> diagnostics
     ) => new(
         kind,
-        0,
-        0,
+        LexedCXTrivia.Empty, 
+        LexedCXTrivia.Empty, 
         Flags: CXTokenFlags.Missing,
-        FullValue: value,
+        Value: value,
         Diagnostics: [..diagnostics]
     );
 
@@ -147,9 +122,9 @@ public sealed record CXToken(
         => (includeLeadingTrivia, includeTrailingTrivia) switch
         {
             (false, false) => Value,
-            (true, true) => FullValue,
-            (false, true) => FullValue.Substring(LeadingTriviaLength),
-            (true, false) => FullValue.Substring(0, FullValue.Length - TrailingTriviaLength)
+            (true, true) => $"{LeadingTrivia}{Value}{TrailingTrivia}",
+            (false, true) => $"{Value}{TrailingTrivia}",
+            (true, false) => $"{LeadingTrivia}{Value}"
         };
 
     public bool Equals(CXToken? other)
@@ -161,8 +136,8 @@ public sealed record CXToken(
         return
             Kind == other.Kind &&
             Span.Equals(other.Span) &&
-            LeadingTriviaLength == other.LeadingTriviaLength &&
-            TrailingTriviaLength == other.TrailingTriviaLength &&
+            LeadingTrivia.Equals(other.LeadingTrivia) &&
+            TrailingTrivia.Equals(other.TrailingTrivia) &&
             Flags == other.Flags &&
             Diagnostics.SequenceEqual(other.Diagnostics);
     }
@@ -174,8 +149,8 @@ public sealed record CXToken(
             var hashCode = Diagnostics.Aggregate(0, (a, b) => (a * 397) ^ b.GetHashCode());
             hashCode = (hashCode * 397) ^ (int)Kind;
             hashCode = (hashCode * 397) ^ Span.GetHashCode();
-            hashCode = (hashCode * 397) ^ LeadingTriviaLength;
-            hashCode = (hashCode * 397) ^ TrailingTriviaLength;
+            hashCode = (hashCode * 397) ^ LeadingTrivia.GetHashCode();
+            hashCode = (hashCode * 397) ^ TrailingTrivia.GetHashCode();
             hashCode = (hashCode * 397) ^ (int)Flags;
             return hashCode;
         }

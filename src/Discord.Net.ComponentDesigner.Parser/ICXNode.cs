@@ -22,8 +22,8 @@ public interface ICXNode
     
     CXDoc? Document { get; }
 
-    string? LeadingTrivia { get; }
-    string? TrailingTrivia { get; }
+    LexedCXTrivia LeadingTrivia { get; }
+    LexedCXTrivia TrailingTrivia { get; }
     
     void ResetCachedState();
 

@@ -610,7 +610,11 @@ public static class Renderers
             ? new string('}', dollars.Length)
             : string.Empty;
 
-        var isMultiline = literal.Tokens.Any(x => x.FullValue.Contains("\n"));
+        var isMultiline = literal.Tokens.Any(x =>
+            x.LeadingTrivia.ContainsNewlines ||
+            x.TrailingTrivia.ContainsNewlines ||
+            x.Value.Contains('\n')
+        );
 
         foreach (var token in literal.Tokens)
         {

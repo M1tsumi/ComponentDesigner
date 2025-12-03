@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace Discord.CX.Parser;
@@ -14,8 +15,7 @@ public sealed class CXLexer
         public CXTokenKind Kind;
         public CXTokenFlags Flags;
 
-        public int LeadingTriviaLength;
-        public int TrailingTriviaLength;
+        public string? Text;
     }
 
     public enum LexMode
@@ -49,6 +49,9 @@ public sealed class CXLexer
 
     public const char OPEN_PAREN = '(';
     public const char CLOSE_PAREN = ')';
+
+    public static readonly CXTrivia.Token CommentStartTrivia = new(CXTriviaTokenKind.CommentStart, COMMENT_START);
+    public static readonly CXTrivia.Token CommentEndTrivia = new(CXTriviaTokenKind.CommentEnd, COMMENT_END);
 
     public CXSourceReader Reader { get; }
 
@@ -102,7 +105,7 @@ public sealed class CXLexer
             }
 
             if (interpolationSpan.Start <= Reader.Position) return null;
-            
+
             return interpolationSpan;
         }
     }
@@ -176,26 +179,27 @@ public sealed class CXLexer
 
         var info = default(TokenInfo);
 
+
+        //GetTrivia(isTrailing: false, ref info.LeadingTriviaLength);
+        var leading = LexLeadingTrivia();
+
         info.Start = Reader.Position;
-
-        GetTrivia(isTrailing: false, ref info.LeadingTriviaLength);
-
         Scan(ref info);
-
-        GetTrivia(isTrailing: true, ref info.TrailingTriviaLength);
-
         info.End = Reader.Position;
-        
-        var fullSpan = TextSpan.FromBounds(info.Start, info.End);
 
+        var trailing = LexTrailingTrivia();
+
+        if (info.Text is null && !info.Kind.TryGetText(out info.Text))
+        {
+            info.Text = info.Start == info.End ? string.Empty : Reader[info.Start, info.End - info.Start];
+        }
+        
         var token = new CXToken(
             info.Kind,
-            info.LeadingTriviaLength,
-            info.TrailingTriviaLength,
+            leading,
+            trailing,
             info.Flags,
-            fullSpan.IsEmpty 
-                ? string.Empty 
-                : Reader[fullSpan]
+            info.Text
         );
 
         if (info.Kind is CXTokenKind.Interpolation && InterpolationIndex.HasValue)
@@ -265,7 +269,7 @@ public sealed class CXLexer
                 if (
                     Mode is LexMode.Attribute && (
                         TryScanAttributeValue(ref info) ||
-                        
+
                         // when we're scanning an attributes value, and it doesn't have a value, the next logical
                         // token should be an identifier, so we scan for that.
                         TryScanIdentifier(ref info)
@@ -319,13 +323,9 @@ public sealed class CXLexer
             info.Kind = CXTokenKind.EOF;
             return;
         }
-
-
-        if (TryScanInterpolation(ref info))
-        {
-            return;
-        }
         
+        if (TryScanInterpolation(ref info)) return;
+
         var interpolationUpperBounds = InterpolationBoundary;
 
         if (
@@ -368,7 +368,7 @@ public sealed class CXLexer
 
         // we've reached the end
         info.Kind = CXTokenKind.Text;
-        return;
+        info.Text = Reader.GetInternedText(info.Start, Reader.Position - info.Start);
     }
 
     private bool TryScanAttributeValue(ref TokenInfo info)
@@ -393,6 +393,7 @@ public sealed class CXLexer
         QuoteChar = quoteTestChar;
         Reader.Advance(isEscaped ? 2 : 1);
         info.Kind = CXTokenKind.StringLiteralStart;
+        info.Text = Reader.Intern([quoteTestChar]);
         return true;
     }
 
@@ -406,13 +407,18 @@ public sealed class CXLexer
         do
         {
             Reader.Advance();
-        } while (IsValidIdentifierChar(Reader.Current) && Reader.Position < upperBounds &&
-                 !CancellationToken.IsCancellationRequested);
+        } while (
+            IsValidIdentifierChar(Reader.Current) &&
+            Reader.Position < upperBounds &&
+            !CancellationToken.IsCancellationRequested
+        );
 
         CancellationToken.ThrowIfCancellationRequested();
+        
         info.Kind = CXTokenKind.Identifier;
+        info.Text = Reader.GetInternedText(info.Start, Reader.Position - info.Start);
+        
         return true;
-
 
         static bool IsValidIdentifierChar(char c)
             => c is UNDERSCORE_CHAR or HYPHEN_CHAR or PERIOD_CHAR || char.IsLetterOrDigit(c);
@@ -437,11 +443,19 @@ public sealed class CXLexer
         return false;
     }
 
-    private void GetTrivia(bool isTrailing, ref int trivia)
-    {
-        if (Mode is LexMode.StringLiteral) return;
+    private LexedCXTrivia LexLeadingTrivia() => LexTrivia(isTrailing: false);
+    private LexedCXTrivia LexTrailingTrivia() => LexTrivia(isTrailing: true);
 
-        for (;; trivia++, Reader.Advance())
+    private LexedCXTrivia LexTrivia(bool isTrailing)
+    {
+        if(Mode is LexMode.StringLiteral) return LexedCXTrivia.Empty;
+        
+        List<CXTrivia>? result = null;
+        var flags = LexedTriviaFlags.None;
+        
+        var startPos = Reader.Position;
+
+        for (;; Reader.Advance())
         {
             start:
 
@@ -449,65 +463,132 @@ public sealed class CXLexer
 
             var current = Reader.Current;
 
-            if (CurrentInterpolationSpan is not null) return;
-            
+            if (CurrentInterpolationSpan is not null) goto end;
+
+            // windows newline
             if (current is CARRIAGE_RETURN_CHAR && Reader.Next is NEWLINE_CHAR)
             {
-                trivia += 2;
-                Reader.Advance(2);
+                Add(
+                    new CXTrivia.Token(
+                        CXTriviaTokenKind.Newline,
+                        Reader.ReadInternedText(2)
+                    )
+                );
 
+                flags |= LexedTriviaFlags.HasNewlines;
+
+                // don't consume any more trivia if its trailing
                 if (isTrailing) break;
 
                 goto start;
             }
 
+            // basic newline
             if (current is NEWLINE_CHAR)
             {
-                if (isTrailing)
-                {
-                    trivia++;
-                    Reader.Advance();
-                    break;
-                }
+                Add(
+                    new CXTrivia.Token(
+                        CXTriviaTokenKind.Newline,
+                        Reader.ReadInternedText(1)
+                    )
+                );
+                
+                flags |= LexedTriviaFlags.HasNewlines;
 
-                continue;
+                // don't consume any more trivia if its trailing
+                if (isTrailing) break;
+
+                goto start;
             }
-            
-            if (IsWhitespace(current)) continue;
+
+            if (IsWhitespace(current))
+            {
+                var start = Reader.Position;
+
+                do
+                {
+                    Reader.Advance();
+                } while (IsWhitespace(Reader.Current));
+
+                Add(
+                    new CXTrivia.Token(
+                        CXTriviaTokenKind.Whitespace,
+                        Reader.GetInternedText(start, Reader.Position - start)
+                    )
+                );
+                
+                flags |= LexedTriviaFlags.HasWhitespace;
+
+                goto start;
+            }
 
             if (current is LESS_THAN_CHAR && IsCurrentlyAtCommentStart())
             {
+                Reader.Advance(COMMENT_START.Length);
+
+                var commentValueStart = Reader.Position;
+                
                 while (!Reader.IsEOF && !IsCurrentlyAtCommentEnd() && !CancellationToken.IsCancellationRequested)
                 {
-                    trivia++;
                     Reader.Advance();
                 }
 
+
+                var value = new CXTrivia.Token(
+                    CXTriviaTokenKind.Comment,
+                    Reader.GetInternedText(commentValueStart, Reader.Position - commentValueStart)
+                );
+
+                CXTrivia.Token? end = null;
+                
                 if (IsCurrentlyAtCommentEnd())
                 {
-                    trivia += COMMENT_END.Length;
                     Reader.Advance(COMMENT_END.Length);
-                    
-                    goto start;
+                    end = CommentEndTrivia;
                 }
+
+                Add(
+                    new CXTrivia.XmlComment(
+                        CommentStartTrivia,
+                        value,
+                        end
+                    )
+                );
+
+                flags |= LexedTriviaFlags.HasComments;
+                
+                goto start;
             }
 
-            return;
+            break;
         }
-    }
 
+        end:
+        if (result is null) return LexedCXTrivia.Empty;
+
+        return new LexedCXTrivia(result, Reader.GetInternedText(startPos, Reader.Position - startPos), flags);
+
+        void Add(CXTrivia trivia)
+            => (result ??= []).Add(trivia);
+    }
+    
     private bool IsCurrentlyAtCommentStart()
         => IsCommentStart(Reader.Peek(COMMENT_START.Length));
 
     private bool IsCurrentlyAtCommentEnd()
-        => IsCommentEnd(Reader.Peek(COMMENT_END.Length));
+        => Reader.Current is '-' && IsCommentEnd(Reader.Peek(COMMENT_END.Length));
 
     internal static bool IsCommentEnd(string ch)
         => ch is COMMENT_END;
-    
+
     internal static bool IsCommentStart(string ch)
         => ch is COMMENT_START;
-    
+
     public static bool IsWhitespace(char ch)
-        => char.IsWhiteSpace(ch);
+        => ch
+            is '\t'
+            or '\v'
+            or '\f'
+            or '\u001A'
+            or ' ';
 }

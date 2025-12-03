@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
+using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
@@ -18,6 +19,8 @@ public sealed class CXDoc : CXNode
     public IReadOnlyList<CXNode> RootNodes { get; private set; }
 
     public readonly CXToken[] InterpolationTokens;
+
+    internal StringInternTable StringTable => Parser.Reader.StringTable;
 
     public CXDoc(
         CXParser parser,

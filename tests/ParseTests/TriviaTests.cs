@@ -174,7 +174,7 @@ public sealed class TriviaTests : BaseParsingTest
     {
         Assert.Empty(_trivia);
 
-        foreach (var trivia in CXTriviaLexer.GetLeadingTrivia(node).SelectMany(Enumerate))
+        foreach (var trivia in node.LeadingTrivia.SelectMany(Enumerate))
         {
             _trivia.Enqueue(trivia);
         }
@@ -184,7 +184,7 @@ public sealed class TriviaTests : BaseParsingTest
     {
         Assert.Empty(_trivia);
 
-        foreach (var trivia in CXTriviaLexer.GetTrailingTrivia(node).SelectMany(Enumerate))
+        foreach (var trivia in node.TrailingTrivia.SelectMany(Enumerate))
         {
             _trivia.Enqueue(trivia);
         }
@@ -203,52 +203,44 @@ public sealed class TriviaTests : BaseParsingTest
             _ => [trivia]
         };
 
-    private CXTrivia.XmlComment XmlComment(TextSpan? span = null)
+    private CXTrivia.XmlComment XmlComment()
     {
         Assert.NotEmpty(_trivia);
 
         var trivia = _trivia.Dequeue();
 
         Assert.IsType<CXTrivia.XmlComment>(trivia);
-
-        if (span is not null) Assert.Equal(span.Value, trivia.Span);
-
+        
         return (CXTrivia.XmlComment)trivia;
     }
 
     private CXTrivia.Token CommentStart(
-        TextSpan? span = null,
         string? value = null,
         int? length = null
-    ) => TriviaToken(CXTriviaTokenKind.CommentStart, span, value, length);
+    ) => TriviaToken(CXTriviaTokenKind.CommentStart, value, length);
 
     private CXTrivia.Token CommentEnd(
-        TextSpan? span = null,
         string? value = null,
         int? length = null
-    ) => TriviaToken(CXTriviaTokenKind.CommentEnd, span, value, length);
+    ) => TriviaToken(CXTriviaTokenKind.CommentEnd, value, length);
 
     private CXTrivia.Token Comment(
-        TextSpan? span = null,
         string? value = null,
         int? length = null
-    ) => TriviaToken(CXTriviaTokenKind.Comment, span, value, length);
+    ) => TriviaToken(CXTriviaTokenKind.Comment, value, length);
 
     private CXTrivia.Token Newline(
-        TextSpan? span = null,
         string? value = null,
         int? length = null
-    ) => TriviaToken(CXTriviaTokenKind.Newline, span, value, length);
+    ) => TriviaToken(CXTriviaTokenKind.Newline, value, length);
 
     private CXTrivia.Token Whitespace(
-        TextSpan? span = null,
         string? value = null,
         int? length = null
-    ) => TriviaToken(CXTriviaTokenKind.Whitespace, span, value, length);
+    ) => TriviaToken(CXTriviaTokenKind.Whitespace, value, length);
 
     private CXTrivia.Token TriviaToken(
         CXTriviaTokenKind kind,
-        TextSpan? span = null,
         string? value = null,
         int? length = null
     )
@@ -262,9 +254,6 @@ public sealed class TriviaTests : BaseParsingTest
         var triviaToken = (CXTrivia.Token)trivia;
 
         Assert.Equal(kind, triviaToken.Kind);
-
-        if (span is not null)
-            Assert.Equal(span.Value, triviaToken.Span);
 
         if (value is not null)
             Assert.Equal(value, triviaToken.Value);

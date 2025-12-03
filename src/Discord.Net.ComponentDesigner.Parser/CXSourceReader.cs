@@ -1,5 +1,7 @@
 ﻿using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Text;
+using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
@@ -9,10 +11,13 @@ public sealed class CXSourceReader
         => SourceSpan.Contains(index)
             ? Source[Normalize(index)]
             : CXLexer.NULL_CHAR;
-    
+
     public string this[TextSpan span]
         => Source[Normalize(span)];
 
+    public string this[int index, int count]
+        => this[new TextSpan(index, count)];
+    
     public bool IsEOF => Position >= SourceSpan.End;
 
     public char Current => this[Position];
@@ -27,25 +32,29 @@ public sealed class CXSourceReader
     public CXSourceText Source { get; }
 
     public TextSpan SourceSpan { get; }
-    
+
     public TextSpan[] Interpolations { get; }
-    
+
     public int WrappingQuoteCount { get; }
-    
+
+    public StringInternTable StringTable { get; }
+
     public CXSourceReader(
         CXSourceText source,
         TextSpan sourceSpan,
         TextSpan[] interpolations,
         int wrappingQuoteCount
-        )
+    )
     {
         Source = source;
         Position = sourceSpan.Start;
         SourceSpan = sourceSpan;
         Interpolations = interpolations;
         WrappingQuoteCount = wrappingQuoteCount;
+
+        StringTable = new();
     }
-    
+
     public bool IsAtInterpolation(int index)
     {
         for (var i = 0; i < Interpolations.Length; i++)
@@ -78,4 +87,22 @@ public sealed class CXSourceReader
             Normalize(upper))
         ];
     }
+
+    public string ReadInternedText(int count) => ReadInternedText(count, out _);
+    public string ReadInternedText(int count, out TextSpan span)
+    {
+        var text = this[Position, count];
+        span = new TextSpan(Position, text.Length);
+        Advance(count);
+        return Intern(text);
+    }
+
+    public string GetInternedText(int start, int count)
+        => Intern(this[start, count]);
+    
+    public string Intern(StringBuilder builder)
+        => StringTable.Add(builder);
+
+    public string Intern(ReadOnlySpan<char> chars)
+        => StringTable.Add(chars);
 }

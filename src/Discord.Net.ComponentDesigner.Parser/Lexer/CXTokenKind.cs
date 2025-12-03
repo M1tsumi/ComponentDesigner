@@ -22,3 +22,25 @@ public enum CXTokenKind : byte
 
     Identifier,
 }
+
+public static class CXTokenKindExtensions
+{
+    public static bool TryGetText(this CXTokenKind kind, out string text)
+    {
+        text = kind switch
+        {
+            CXTokenKind.LessThan => "<",
+            CXTokenKind.GreaterThan => ">",
+            CXTokenKind.ForwardSlashGreaterThan => "/>",
+            CXTokenKind.LessThanForwardSlash => "</",
+            CXTokenKind.Equals => "=",
+            CXTokenKind.OpenParenthesis => "(",
+            CXTokenKind.CloseParenthesis => ")",
+            CXTokenKind.EOF or CXTokenKind.Invalid => string.Empty,
+            _ => null!
+        };
+        
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        return text is not null;
+    }
+}
