@@ -497,11 +497,17 @@ public sealed class CXLexer
     }
 
     private bool IsCurrentlyAtCommentStart()
-        => Reader.Peek(COMMENT_START.Length) == COMMENT_START;
+        => IsCommentStart(Reader.Peek(COMMENT_START.Length));
 
     private bool IsCurrentlyAtCommentEnd()
-        => Reader.Peek(COMMENT_END.Length) == COMMENT_END;
+        => IsCommentEnd(Reader.Peek(COMMENT_END.Length));
 
-    private static bool IsWhitespace(char ch)
+    internal static bool IsCommentEnd(string ch)
+        => ch is COMMENT_END;
+    
+    internal static bool IsCommentStart(string ch)
+        => ch is COMMENT_START;
+    
+    public static bool IsWhitespace(char ch)
         => char.IsWhiteSpace(ch);
 }

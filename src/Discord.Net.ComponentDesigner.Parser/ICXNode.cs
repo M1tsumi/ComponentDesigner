@@ -22,7 +22,11 @@ public interface ICXNode
     
     CXDoc? Document { get; }
 
+    string? LeadingTrivia { get; }
+    string? TrailingTrivia { get; }
+    
     void ResetCachedState();
 
     string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia);
+    
 }

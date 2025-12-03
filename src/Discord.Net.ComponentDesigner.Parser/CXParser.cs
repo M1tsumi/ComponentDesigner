@@ -153,7 +153,7 @@ public sealed partial class CXParser
                     end,
                     out var endStart,
                     out var endIdent,
-                    out var endClose, 
+                    out var endClose,
                     out var onCreate
                 );
 
@@ -167,7 +167,7 @@ public sealed partial class CXParser
                     endIdent,
                     endClose
                 ) { Diagnostics = diagnostics };
-                
+
                 onCreate?.Invoke(element);
 
                 return element;
@@ -221,10 +221,7 @@ public sealed partial class CXParser
                 missingStructure
             )
             {
-                onCreate = node =>
-                {
-                    node.AddDiagnostic(CXDiagnostic.MissingElementClosingTag(identifier, node));
-                };
+                onCreate = node => { node.AddDiagnostic(CXDiagnostic.MissingElementClosingTag(identifier, node)); };
 
                 elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash);
                 elementEndIdent = identifier is not null
@@ -236,32 +233,32 @@ public sealed partial class CXParser
                 _tokenIndex = sentinel;
             }
         }
+    }
 
-        CXCollection<CXNode> ParseElementChildren()
+    internal CXCollection<CXNode> ParseElementChildren()
+    {
+        if (IsIncremental && CurrentNode is CXCollection<CXNode> incrementalChildren)
         {
-            if (IsIncremental && CurrentNode is CXCollection<CXNode> incrementalChildren)
-            {
-                EatNode();
-                return incrementalChildren;
-            }
-
-            // valid children are:
-            //  - other elements
-            //  - interpolations
-            //  - text
-            var children = new List<CXNode>();
-            var diagnostics = new List<CXDiagnostic>();
-
-            using (Lexer.SetMode(CXLexer.LexMode.ElementValue))
-            {
-                while (TryParseElementChild(diagnostics, out var child))
-                    children.Add(child);
-
-                CancellationToken.ThrowIfCancellationRequested();
-            }
-
-            return new CXCollection<CXNode>(children) { Diagnostics = diagnostics };
+            EatNode();
+            return incrementalChildren;
         }
+
+        // valid children are:
+        //  - other elements
+        //  - interpolations
+        //  - text
+        var children = new List<CXNode>();
+        var diagnostics = new List<CXDiagnostic>();
+
+        using (Lexer.SetMode(CXLexer.LexMode.ElementValue))
+        {
+            while (TryParseElementChild(diagnostics, out var child))
+                children.Add(child);
+
+            CancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return new CXCollection<CXNode>(children) { Diagnostics = diagnostics };
     }
 
     internal bool TryParseElementChild(List<CXDiagnostic> diagnostics, out CXNode node)
@@ -417,7 +414,6 @@ public sealed partial class CXParser
                     };
             }
         }
-       
     }
 
     internal CXValue ParseStringLiteral()

@@ -55,17 +55,28 @@ public static class StringUtils
         var rawLines = str.Split('\n');
         var lines = new List<string>(rawLines);
 
+        var leadingNewLineCount = 0;
+        var trailingNewLineCount = 0;
+
         // remove leading empty lines
         foreach (var line in rawLines)
         {
-            if (string.IsNullOrWhiteSpace(line)) lines.Remove(line);
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                lines.Remove(line);
+                leadingNewLineCount++;
+            }
             else break;
         }
         
         // remove trailing empty lines
         for (var i = rawLines.Length - 1; i >= 0; i--)
         {
-            if (string.IsNullOrWhiteSpace(rawLines[i])) lines.Remove(rawLines[i]);
+            if (string.IsNullOrWhiteSpace(rawLines[i]))
+            {
+                lines.Remove(rawLines[i]);
+                trailingNewLineCount++;
+            }
             else break;
         }
         
@@ -74,13 +85,39 @@ public static class StringUtils
         );
 
         if (minSpacing is 0 or int.MaxValue) return str;
-        
-        return string.Join(
-            "\n",
-            lines.Select(x =>
-                x.Length > minSpacing ? x.Substring(minSpacing) : string.Empty
-            )
-        );
+
+        var sb = new StringBuilder();
+
+        for (var i = 0; i < leadingNewLineCount; i++)
+            sb.AppendLine();
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (i is not 0) sb.AppendLine();
+
+            var line = lines[i];
+
+            // for windows, remove the carriage return character which can linger due to the split only
+            // splitting by the newline character
+            if (line.EndsWith("\r")) line = line.Substring(0, line.Length - 1);
+
+            sb.Append(
+                line.Length > minSpacing ? line.Substring(minSpacing) : string.Empty
+            );
+        }
+
+        for (var i = 0; i < trailingNewLineCount; i++)
+            sb.AppendLine();
+
+        return sb.ToString();
+
+        //
+        // return string.Join(
+        //     "\n",
+        //     lines.Select(x =>
+        //         x.Length > minSpacing ? x.Substring(minSpacing) : string.Empty
+        //     )
+        // );
     }
     
     public static void NormalizeIndentation(this StringBuilder str)

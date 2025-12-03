@@ -159,7 +159,7 @@ public abstract class BaseParsingTest
         return token;
     }
 
-    protected void EOF()
+    protected virtual void EOF()
     {
         Assert.NotNull(_enumerator);
         Assert.False(_enumerator.MoveNext());

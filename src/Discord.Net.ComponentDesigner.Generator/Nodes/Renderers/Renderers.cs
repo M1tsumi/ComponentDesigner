@@ -574,7 +574,7 @@ public static class Renderers
         }
     }
 
-    private static string RenderStringLiteral(CXValue.Multipart literal)
+    public static string RenderStringLiteral(CXValue.Multipart literal)
     {
         if (literal.Tokens.Count is 0) return "string.Empty";
 
@@ -673,41 +673,43 @@ public static class Renderers
 
         return sb.ToString();
 
-        static int GetInterpolationDollarRequirement(string part)
+        
+    }
+    
+    public static int GetInterpolationDollarRequirement(string part)
+    {
+        var result = 0;
+
+        var count = 0;
+        char? last = null;
+
+        foreach (var ch in part)
         {
-            var result = 0;
-
-            var count = 0;
-            char? last = null;
-
-            foreach (var ch in part)
+            if (ch is '{' or '}')
             {
-                if (ch is '{' or '}')
+                if (last is null)
                 {
-                    if (last is null)
-                    {
-                        last = ch;
-                        count = 1;
-                        continue;
-                    }
-
-                    if (last == ch)
-                    {
-                        count++;
-                        continue;
-                    }
+                    last = ch;
+                    count = 1;
+                    continue;
                 }
 
-                if (count > 0)
+                if (last == ch)
                 {
-                    result = Math.Max(result, count);
-                    last = null;
-                    count = 0;
+                    count++;
+                    continue;
                 }
             }
 
-            return result;
+            if (count > 0)
+            {
+                result = Math.Max(result, count);
+                last = null;
+                count = 0;
+            }
         }
+
+        return result;
     }
 
     public static string ToCSharpString(string text)
@@ -748,7 +750,7 @@ public static class Renderers
     private static string EscapeBackslashes(string text)
         => text.Replace("\\", @"\\");
 
-    private static int GetSequentialQuoteCount(string text)
+    public static int GetSequentialQuoteCount(string text)
     {
         var result = 0;
         var count = 0;
