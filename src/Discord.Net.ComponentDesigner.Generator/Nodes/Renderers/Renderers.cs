@@ -118,7 +118,7 @@ public static class Renderers
 
                 // ensure we can convert it to a builder
                 var target = options.TypingContext?.ConformingType ?? ComponentBuilderKind.IMessageComponentBuilder;
-                
+
                 if (
                     !ComponentBuilderKindUtils.TryConvert(
                         source,
@@ -894,12 +894,13 @@ public static class Renderers
                 }
 
                 return UseLibraryParser(
+                    context,
                     context.GetDesignerValue(interpolation)
                 );
 
             case CXValue.Scalar scalar:
                 LightlyValidateEmote(scalar.Value, scalar, out isDiscordEmote, out isEmoji);
-                return UseLibraryParser(ToCSharpString(scalar.Value), isEmoji, isDiscordEmote);
+                return UseLibraryParser(context, ToCSharpString(scalar.Value), isEmoji, isDiscordEmote);
 
             case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
@@ -910,7 +911,7 @@ public static class Renderers
                         out isEmoji
                     );
 
-                return UseLibraryParser(RenderStringLiteral(stringLiteral), isEmoji, isDiscordEmote);
+                return UseLibraryParser(context, RenderStringLiteral(stringLiteral), isEmoji, isDiscordEmote);
 
             default: return "null";
         }
@@ -930,7 +931,12 @@ public static class Renderers
             }
         }
 
-        static string UseLibraryParser(string source, bool? isEmoji = null, bool? isDiscordEmote = null)
+        static string UseLibraryParser(
+            IComponentContext context,
+            string source,
+            bool? isEmoji = null,
+            bool? isDiscordEmote = null
+        )
         {
             if (isEmoji is true)
                 return $"global::Discord.Emoji.Parse({source})";
@@ -938,10 +944,12 @@ public static class Renderers
             if (isDiscordEmote is true)
                 return $"global::Discord.Emote.Parse({source})";
 
+            var varName = context.GetVariableName("emoji");
+
             return
                 $"""
-                 global::Discord.Emoji.TryParse({source}, out var emoji)
-                     ? (global::Discord.IEmote)emoji
+                 global::Discord.Emoji.TryParse({source}, out var {varName})
+                     ? (global::Discord.IEmote){varName}
                      : global::Discord.Emote.Parse({source})
                  """;
         }

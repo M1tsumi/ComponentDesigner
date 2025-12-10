@@ -1,8 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Discord;
 
-public sealed class CXMessageComponent : INestedComponent
+public sealed class CXMessageComponent : INestedComponent, IComponentContainer
 {
     public static readonly CXMessageComponent Empty = new(Array.Empty<IMessageComponent>());
     
@@ -42,4 +43,30 @@ public sealed class CXMessageComponent : INestedComponent
 
     public static implicit operator CXMessageComponent(MessageComponent comp)
         => new(comp);
+    
+    public static CXMessageComponent operator +(CXMessageComponent left, CXMessageComponent right)
+        => new([..left.Builders, ..right.Builders]);
+    
+    ImmutableArray<ComponentType> IComponentContainer.SupportedComponentTypes => [
+        ComponentType.ActionRow,
+        ComponentType.Section,
+        ComponentType.MediaGallery,
+        ComponentType.Separator,
+        ComponentType.Container,
+        ComponentType.File,
+        ComponentType.TextDisplay
+    ];
+
+    int IComponentContainer.MaxChildCount => ComponentBuilderV2.MaxChildCount;
+
+    List<IMessageComponentBuilder> IComponentContainer.Components => [..Builders];
+
+    IComponentContainer IComponentContainer.AddComponent(IMessageComponentBuilder component)
+        => new CXMessageComponent([..Builders, component]);
+
+    IComponentContainer IComponentContainer.AddComponents(params IMessageComponentBuilder[] components)
+        => new CXMessageComponent([..Builders, ..components]);
+
+    IComponentContainer IComponentContainer.WithComponents(IEnumerable<IMessageComponentBuilder> components)
+        => new CXMessageComponent(components);
 }

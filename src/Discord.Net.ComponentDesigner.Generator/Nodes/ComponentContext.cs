@@ -31,11 +31,13 @@ public sealed class ComponentContext : IComponentContext
     public List<Diagnostic> GlobalDiagnostics { get; init; } = [];
 
     public ComponentTypingContext RootTypingContext { get; }
-    
+
     private readonly CXGraph _graph;
 
     private DiagnosticScope _scope;
 
+    private readonly Dictionary<string, int> _varsCount = [];
+    
     public ComponentContext(CXGraph graph, ComponentTypingContext? typingContext = null)
     {
         _graph = graph;
@@ -44,6 +46,18 @@ public sealed class ComponentContext : IComponentContext
         RootTypingContext = typingContext ?? ComponentTypingContext.Default;
     }
 
+    public string GetVariableName(string? hint = null)
+    {
+        hint ??= "local_";
+
+        if (!_varsCount.TryGetValue(hint, out var count))
+            _varsCount[hint] = 1;
+        else
+            _varsCount[hint] = count + 1;
+
+        return $"{hint}{count}";
+    }
+    
     public IDisposable CreateDiagnosticScope(List<Diagnostic> bag)
         => _scope = new(bag, _scope, this);
 

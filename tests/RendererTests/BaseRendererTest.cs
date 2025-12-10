@@ -44,7 +44,7 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
             var source = CXSourceText.From(cx);
 
             var interpolationSpans = interpolations?.Select(x => x.Span).ToArray();
-        
+
             parser = new CXParser(source.CreateReader(
                 wrappingQuoteCount: wrappingQuoteCount,
                 interpolations: interpolationSpans
@@ -71,7 +71,7 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
                 [value]
             );
         }
-       
+
 
         var context = new MockComponentContext(
             Compilation,
@@ -112,6 +112,7 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
     {
         private readonly CXToken[] _interpolationMap;
         private readonly DesignerInterpolationInfo[] _interpolations;
+        private readonly Dictionary<string, int> _varsCount = [];
 
         private sealed record Scope(
             List<Diagnostic> Bag,
@@ -133,8 +134,20 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
         public bool HasErrors => GlobalDiagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
 
         public IReadOnlyList<Diagnostic> GlobalDiagnostics => _globalDiagnostics;
-        
+
         public ComponentTypingContext RootTypingContext => ComponentTypingContext.Default;
+
+        public string GetVariableName(string? hint = null)
+        {
+            hint ??= "local_";
+
+            if (!_varsCount.TryGetValue(hint, out var count))
+                _varsCount[hint] = 1;
+            else
+                _varsCount[hint] = count + 1;
+
+            return $"{hint}{count}";
+        }
 
         public List<Diagnostic> AllDiagnostics { get; }
         private readonly List<Diagnostic> _globalDiagnostics;

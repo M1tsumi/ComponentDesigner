@@ -28,6 +28,8 @@ public interface IComponentContext
     DesignerInterpolationInfo GetInterpolationInfo(CXToken token);
     
     ComponentTypingContext RootTypingContext { get; }
+
+    string GetVariableName(string? hint = null);
 }
 
 public static class ComponentContextExtensions
