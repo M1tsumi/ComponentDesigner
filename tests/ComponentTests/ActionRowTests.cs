@@ -192,7 +192,7 @@ public sealed class ActionRowTests : BaseComponentTest
                     Components =
                     [
                         new global::Discord.SelectMenuBuilder(
-                            type: global::Discord.ComponentType.StringSelect,
+                            type: global::Discord.ComponentType.SelectMenu,
                             customId: "abc",
                             options: 
                             [

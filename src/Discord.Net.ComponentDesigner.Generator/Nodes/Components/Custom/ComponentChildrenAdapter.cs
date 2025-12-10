@@ -17,7 +17,7 @@ public sealed class ComponentChildrenAdapter
     );
 
     public Renderer ChildrenRenderer { get; }
-    
+
     public bool IsOptional { get; }
 
     public bool IsCollectionType
@@ -68,16 +68,18 @@ public sealed class ComponentChildrenAdapter
         ComponentNode owner
     )
     {
-        var inner = target
-            .AllInterfaces
-            .FirstOrDefault(x =>
-                x.IsGenericType &&
-                x.ConstructedFrom.Equals(
-                    compilation.GetKnownTypes().IEnumerableOfTType,
-                    SymbolEqualityComparer.Default
+        var inner = target.SpecialType is SpecialType.System_String
+            ? null
+            : target
+                .AllInterfaces
+                .FirstOrDefault(x =>
+                    x.IsGenericType &&
+                    x.ConstructedFrom.Equals(
+                        compilation.GetKnownTypes().IEnumerableOfTType,
+                        SymbolEqualityComparer.Default
+                    )
                 )
-            )
-            ?.TypeArguments[0];
+                ?.TypeArguments[0];
 
         ComponentBuilderKindUtils.IsValidComponentBuilderType(inner ?? target, compilation, out var kind);
 

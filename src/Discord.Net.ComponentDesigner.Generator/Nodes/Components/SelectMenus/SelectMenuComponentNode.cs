@@ -104,7 +104,8 @@ public sealed class SelectMenuComponentNode : ComponentNode
             Disabled = new(
                 "disabled",
                 isOptional: true,
-                renderer: Renderers.Boolean
+                renderer: Renderers.Boolean,
+                dotnetParameterName: "isDisabled"
             )
         ];
     }
@@ -488,7 +489,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 SelectKind.Role => "RoleSelect",
                 SelectKind.User => "UserSelect",
                 SelectKind.Mentionable => "MentionableSelect",
-                SelectKind.String => "StringSelect",
+                SelectKind.String => "SelectMenu",
                 _ => throw new ArgumentOutOfRangeException(nameof(kind))
             }
         }";

@@ -592,25 +592,30 @@ public static class Renderers
 
         var sb = new StringBuilder();
 
-        var parts = literal.Tokens
+        var literalParts = literal.Tokens
             .Where(x => x.Kind is CXTokenKind.Text)
             .Select(x => x.Value)
             .ToArray();
 
-        if (parts.Length is 0) return string.Empty;
+        if (literalParts.Length > 0)
+        {
+            literalParts[0] = literalParts[0].TrimStart();
 
-        parts[0] = parts[0].TrimStart();
+            literalParts[literalParts.Length - 1] = literalParts[literalParts.Length - 1].TrimEnd();
+        }
 
-        parts[parts.Length - 1] = parts[parts.Length - 1].TrimEnd();
-
-        var quoteCount = parts.Select(x => x.Count(x => x is '"')).Max() + 1;
+        var quoteCount = literalParts.Length is 0
+            ? 1
+            : literalParts.Select(x => x.Count(x => x is '"')).Max() + 1;
 
         var hasInterpolations = literal.Tokens.Any(x => x.Kind is CXTokenKind.Interpolation);
 
         var dollars = hasInterpolations
             ? new string(
                 '$',
-                Math.Max(1, parts.Select(GetInterpolationDollarRequirement).Max())
+                literalParts.Length is 0
+                    ? 1
+                    : Math.Max(1, literalParts.Select(GetInterpolationDollarRequirement).Max())
             )
             : string.Empty;
 

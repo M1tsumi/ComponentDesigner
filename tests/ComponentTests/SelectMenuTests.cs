@@ -108,7 +108,7 @@ public sealed class SelectMenuTests : BaseComponentTest
             Renders(
                 """
                 new global::Discord.SelectMenuBuilder(
-                    type: global::Discord.ComponentType.StringSelect,
+                    type: global::Discord.ComponentType.SelectMenu,
                     customId: "abc",
                     options: 
                     [
@@ -195,7 +195,7 @@ public sealed class SelectMenuTests : BaseComponentTest
             Renders(
                 """
                 new global::Discord.SelectMenuBuilder(
-                    type: global::Discord.ComponentType.StringSelect,
+                    type: global::Discord.ComponentType.SelectMenu,
                     customId: "abc",
                     options: 
                     [

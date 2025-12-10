@@ -6,6 +6,44 @@ namespace UnitTests.ComponentTests;
 public sealed class TextDisplayTests : BaseComponentTest
 {
     [Fact]
+    public void MultipartInterpolatedText()
+    {
+        Graph(
+            """
+            <text>
+                {a}
+                {b}
+            </text>
+            """,
+            pretext:
+            // prevent constants with random numbers
+            """
+            string a = Random.Shared.Next().ToString();
+            string b = Random.Shared.Next().ToString();
+            """
+        );
+        {
+            Node<TextDisplayComponentNode>();
+            
+            Validate(hasErrors: false);
+
+            Renders(
+                """"
+                new global::Discord.TextDisplayBuilder(
+                    content: 
+                    $"""
+                     {designer.GetValueAsString(0)}
+                     {designer.GetValueAsString(1)}
+                     """
+                )
+                """"
+            );
+            
+            EOF();
+        }
+    }
+
+    [Fact]
     public void EmptyTextDisplay()
     {
         Graph(
@@ -15,14 +53,14 @@ public sealed class TextDisplayTests : BaseComponentTest
         );
         {
             Node<TextDisplayComponentNode>();
-            
+
             Validate(hasErrors: true);
 
             Diagnostic(
                 Diagnostics.MissingRequiredProperty.Id,
                 message: "'text-display' requires the property 'content' to be specified"
             );
-            
+
             EOF();
         }
     }
@@ -41,7 +79,7 @@ public sealed class TextDisplayTests : BaseComponentTest
             var content = textNode.State.GetProperty(text.Content);
 
             Assert.True(content is { IsSpecified: true, HasValue: true });
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -51,7 +89,7 @@ public sealed class TextDisplayTests : BaseComponentTest
                 )
                 """
             );
-            
+
             EOF();
         }
     }
@@ -72,7 +110,7 @@ public sealed class TextDisplayTests : BaseComponentTest
             var content = textNode.State.GetProperty(text.Content);
 
             Assert.True(content is { IsSpecified: true, HasValue: true });
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -82,7 +120,7 @@ public sealed class TextDisplayTests : BaseComponentTest
                 )
                 """
             );
-            
+
             EOF();
         }
     }
@@ -107,7 +145,7 @@ public sealed class TextDisplayTests : BaseComponentTest
         );
         {
             Node<TextDisplayComponentNode>();
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -128,7 +166,7 @@ public sealed class TextDisplayTests : BaseComponentTest
                 )
                 """"
             );
-            
+
             EOF();
         }
     }
