@@ -52,5 +52,5 @@ public static class TypeUtils
     }
 
     private static bool IsEnumerableType(this INamedTypeSymbol symbol)
-        => symbol.IsGenericType && symbol.ConstructedFrom.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) is "IEnumerable<>";
+        => symbol.IsGenericType && symbol.ConstructedFrom.SpecialType is SpecialType.System_Collections_Generic_IEnumerable_T;
 }

@@ -6,6 +6,44 @@ namespace UnitTests.ComponentTests;
 public sealed class ContainerTests : BaseComponentTest
 {
     [Fact]
+    public void EnumerableChildren()
+    {
+        Graph(
+            """
+            <container>
+                {a.Select((CXMessageComponent x) => CXMessageComponent.Empty)}
+            </container>
+            """,
+            pretext:
+            """
+            List<CXMessageComponent> a = null!;
+            """
+        );
+        {
+            Node<ContainerComponentNode>();
+            {
+                Node<InterleavedComponentNode>();
+            }
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                new global::Discord.ContainerBuilder()
+                {
+                    Components =
+                    [
+                        ..designer.GetValue<global::System.Collections.Generic.IEnumerable<global::Discord.CXMessageComponent>>(0).SelectMany(x => x.Builders)
+                    ]
+                }
+                """
+            );
+            
+            EOF();
+        }
+    }
+
+    [Fact]
     public void ContainerWithInterpolatedChildren()
     {
         Graph(
@@ -33,7 +71,7 @@ public sealed class ContainerTests : BaseComponentTest
                 Node<InterleavedComponentNode>();
                 Node<InterleavedComponentNode>();
             }
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -54,7 +92,7 @@ public sealed class ContainerTests : BaseComponentTest
             EOF();
         }
     }
-    
+
     [Fact]
     public void EmptyContainer()
     {
@@ -329,7 +367,7 @@ public sealed class ContainerTests : BaseComponentTest
             }
 
             Validate();
-            
+
             Diagnostic(
                 Diagnostics.InvalidContainerChild.Id,
                 message: "'container' is not a valid child component of 'container'"
@@ -338,7 +376,7 @@ public sealed class ContainerTests : BaseComponentTest
                 Diagnostics.InvalidContainerChild.Id,
                 message: "'button' is not a valid child component of 'container'"
             );
-            
+
             EOF();
         }
     }

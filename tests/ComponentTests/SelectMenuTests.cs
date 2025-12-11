@@ -203,7 +203,7 @@ public sealed class SelectMenuTests : BaseComponentTest
                             label: "1",
                             value: "1"
                         ),
-                        ..designer.GetValue<IEnumerable<global::Discord.SelectMenuOptionBuilder>>(0).Select(x => 
+                        ..designer.GetValue<global::System.Collections.Generic.IEnumerable<global::Discord.SelectMenuOptionBuilder>>(0).Select(x => 
                             new global::Discord.SelectMenuOptionBuilder(x)
                         ),
                         new global::Discord.SelectMenuOptionBuilder(
@@ -619,19 +619,19 @@ public sealed class SelectMenuTests : BaseComponentTest
                     customId: "abc",
                     defaultValues:
                     [
-                        ..designer.GetValue<IEnumerable<global::Discord.IUser>>(0).Select(x => 
+                        ..designer.GetValue<global::System.Collections.Generic.IEnumerable<global::Discord.IUser>>(0).Select(x => 
                             new global::Discord.SelectMenuDefaultValue(
                                 id: x.Id,
                                 type: global::Discord.SelectDefaultValueType.User
                             )    
                         ),
-                        ..designer.GetValue<IEnumerable<global::Discord.IChannel>>(1).Select(x => 
+                        ..designer.GetValue<global::System.Collections.Generic.IEnumerable<global::Discord.IChannel>>(1).Select(x => 
                             new global::Discord.SelectMenuDefaultValue(
                                 id: x.Id,
                                 type: global::Discord.SelectDefaultValueType.Channel
                             )    
                         ),
-                        ..designer.GetValue<IEnumerable<global::Discord.SelectMenuDefaultValue>>(2)
+                        ..designer.GetValue<global::System.Collections.Generic.IEnumerable<global::Discord.SelectMenuDefaultValue>>(2)
                     ]
                 )
                 """

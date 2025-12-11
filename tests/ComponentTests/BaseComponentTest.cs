@@ -33,6 +33,8 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
         var source =
             $$""""
               using Discord;
+              using System.Collections.Generic;
+              using System.Linq;
 
               public class {{testClassName}}
               {

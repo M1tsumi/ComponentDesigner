@@ -44,6 +44,9 @@ public sealed class CXMessageComponent : INestedComponent, IComponentContainer
     public static implicit operator CXMessageComponent(MessageComponent comp)
         => new(comp);
     
+    public static implicit operator Optional<MessageComponent>(CXMessageComponent self)
+        => self.ToDiscordComponents();
+    
     public static CXMessageComponent operator +(CXMessageComponent left, CXMessageComponent right)
         => new([..left.Builders, ..right.Builders]);
     

@@ -56,7 +56,7 @@ public sealed class ComponentChildrenAdapter
         _componentBuilderKind = componentBuilderKind;
         _owner = owner;
 
-        ChildrenRenderer = componentBuilderKind is not ComponentBuilderKind.None
+        ChildrenRenderer = (componentBuilderKind & ComponentBuilderKind.ComponentMask) is not ComponentBuilderKind.None
             ? RenderComponent
             : RenderNonComponent;
     }

@@ -48,21 +48,15 @@ public static class ComponentBuilderKindUtils
         if (symbol is null) return false;
 
         var current = symbol;
+        ITypeSymbol? enumerableType = null;
 
-        var enumerableType = current
-            .AllInterfaces
-            .FirstOrDefault(x =>
-                x.IsGenericType &&
-                x.ConstructedFrom.Equals(
-                    compilation.GetKnownTypes().IEnumerableOfTType!,
-                    SymbolEqualityComparer.Default
-                )
-            );
-
+        if (current.SpecialType is not SpecialType.System_String)
+            current.TryGetEnumerableType(out enumerableType);
+        
         if (enumerableType is not null)
         {
             kind |= ComponentBuilderKind.CollectionOf;
-            current = enumerableType.TypeArguments[0];
+            current = enumerableType;
         }
 
         if (current.IsInTypeTree(compilation.GetKnownTypes().MessageComponentType))
@@ -150,15 +144,15 @@ public static class ComponentBuilderKindUtils
                 {
                     case (ComponentBuilderKind.MessageComponent or ComponentBuilderKind.CXMessageComponent, ComponentBuilderKind
                         .IMessageComponent):
-                        return $"{source}.SelectMany(x => x.Components)";
+                        return $"{spread}{source}.SelectMany(x => x.Components)";
                     case (ComponentBuilderKind.MessageComponent, ComponentBuilderKind.IMessageComponentBuilder):
-                        return $"{source}.SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
+                        return $"{spread}{source}.SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
                     case (ComponentBuilderKind.CXMessageComponent, ComponentBuilderKind.IMessageComponentBuilder):
-                        return $"{source}.SelectMany(x => x.Builders)";
+                        return $"{spread}{source}.SelectMany(x => x.Builders)";
                     default:
                         var converter = ConvertBasic("x", fromBasicKind, toBasicKind);
                         return converter is not null
-                            ? $"{source}.Select(x => {converter})"
+                            ? $"{spread}{source}.Select(x => {converter})"
                             : null;
                 }
         }
