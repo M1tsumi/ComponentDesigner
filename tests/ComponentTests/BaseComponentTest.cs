@@ -1,4 +1,5 @@
-﻿using Discord.CX;
+﻿using System.Text;
+using Discord.CX;
 using Discord.CX.Nodes;
 using Microsoft.CodeAnalysis;
 
@@ -19,7 +20,9 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
         GeneratorOptions? options = null,
         string? additionalMethods = null,
         string testClassName = "TestClass",
-        string testFuncName = "Run"
+        string testFuncName = "Run",
+        bool hasInterpolations = true,
+        int quoteCount = 3
     )
     {
         if (_graph is not null) EOF();
@@ -30,6 +33,30 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
 
         ClearDiagnostics();
 
+        var quotes = new string('"', quoteCount);
+        var dollar = hasInterpolations ? "$" : string.Empty;
+        var pad = hasInterpolations ? new(' ', dollar.Length) : string.Empty;
+        var cxString = new StringBuilder();
+
+        cxString.Append(dollar).Append(quotes);
+
+        if (quoteCount >= 3)
+        {
+            cxString.AppendLine();
+            cxString.Append(pad);
+        }
+        
+       
+        cxString.Append(quoteCount >= 3 ? cx.WithNewlinePadding(pad.Length) : cx);
+        
+        if (quoteCount >= 3)
+        {
+            cxString.AppendLine();
+            cxString.Append(pad);
+        }
+        
+        cxString.Append(quotes);
+        
         var source =
             $$""""
               using Discord;
@@ -42,9 +69,7 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
                   {
                       {{pretext}}
                       ComponentDesigner.cx(
-                          $"""
-                           {{cx.WithNewlinePadding(5)}}
-                           """
+                          {{cxString.ToString().WithNewlinePadding(4)}}
                       );
                   }
                   {{additionalMethods?.WithNewlinePadding(4)}}

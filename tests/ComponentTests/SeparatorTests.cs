@@ -7,6 +7,31 @@ namespace UnitTests.ComponentTests;
 public sealed class SeparatorTests : BaseComponentTest
 {
     [Fact]
+    public void SingleQuoteSpacing()
+    {
+        Graph(
+            "<separator spacing='large'/>",
+            quoteCount: 1,
+            hasInterpolations: false
+        );
+        {
+            Node<SeparatorComponentNode>();
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                new global::Discord.SeparatorBuilder(
+                    spacing: global::Discord.SeparatorSpacingSize.Large
+                )
+                """
+            );
+            
+            EOF();
+        }
+    }
+
+    [Fact]
     public void EmptySeparator()
     {
         Graph(
@@ -78,11 +103,11 @@ public sealed class SeparatorTests : BaseComponentTest
         );
         {
             var separator = Node<SeparatorComponentNode>(out var separatorNode);
-            
-            var spacing =  separatorNode.State.GetProperty(separator.Spacing);
+
+            var spacing = separatorNode.State.GetProperty(separator.Spacing);
 
             Assert.NotNull(spacing.Value);
-            
+
             Validate();
 
             Renders(
@@ -97,7 +122,7 @@ public sealed class SeparatorTests : BaseComponentTest
                 Diagnostics.InvalidEnumVariant.Id,
                 location: CurrentGraph.GetLocation(spacing.Value)
             );
-            
+
             EOF();
         }
     }

@@ -328,17 +328,19 @@ public sealed class CXLexer
 
         var interpolationUpperBounds = InterpolationBoundary;
 
+        var forcesEscapedQuotes = ForcedEscapedQuotes && QuoteChar is DOUBLE_QUOTE_CHAR;
+
         if (
-            ForcedEscapedQuotes
+            forcesEscapedQuotes
                 ? Reader.Current is BACK_SLASH_CHAR && Reader.Next == QuoteChar
                 : Reader.Current == QuoteChar
         )
         {
-            Reader.Advance(ForcedEscapedQuotes ? 2 : 1);
+            Reader.Advance(forcesEscapedQuotes ? 2 : 1);
 
             info.Kind = CXTokenKind.StringLiteralEnd;
+            info.Text = Reader.GetInternedText(info.Start, Reader.Position - info.Start);
             QuoteChar = null;
-
             return;
         }
 
