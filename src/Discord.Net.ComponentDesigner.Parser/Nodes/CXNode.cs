@@ -111,23 +111,6 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
-    public int Key
-    {
-        get
-        {
-            var result = 0;
-
-            var current = this;
-            foreach (var ancestor in Ancestors)
-            {
-                result = (result * 397) ^ ancestor.GetIndexOfSlot(current);
-                current = ancestor;
-            }
-
-            return result;
-        }
-    }
-
     public TextSpan FullSpan => new(Offset, Width);
 
     public TextSpan Span
@@ -138,7 +121,7 @@ public abstract partial class CXNode : ICXNode
     // TODO:
     // this could be cached, a caveat though is if we incrementally parse, we need to update the
     // offset/width of any nodes right of the change
-    public int Offset => _offset ??= ComputeOffset();
+    public int Offset => ComputeOffset();
 
     public IReadOnlyList<ParseSlot> Slots => _slots;
 
@@ -146,7 +129,6 @@ public abstract partial class CXNode : ICXNode
     private readonly List<CXDiagnostic> _diagnostics;
 
     // cached state
-    private int? _offset;
     private CXToken? _firstTerminal;
     private CXToken? _lastTerminal;
     private CXDoc? _doc;
@@ -361,7 +343,6 @@ public abstract partial class CXNode : ICXNode
 
     public void ResetCachedState()
     {
-        _offset = null;
         _firstTerminal = null;
         _lastTerminal = null;
         _doc = null;

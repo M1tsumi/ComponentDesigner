@@ -1,31 +1,49 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 
 namespace Discord.CX.Parser;
 
-public class CXTreeWalker(CXDoc doc)
+public static class CXTreeWalker
 {
-    public ICXNode? Current => IsAtEnd ? null : _graph[Position];
-
-    private readonly List<ICXNode> _graph = doc.GetFlatGraph();
-
-    public int Position { get; set; }
-    public bool IsAtEnd => Position >= _graph.Count || Position < 0;
-
-    public CXNode? NextNode()
+    public static IReadOnlyList<ICXNode> Walk(this ICXNode root)
     {
-        if (IsAtEnd) return null;
+        var result = new List<ICXNode>();
 
-        while (!IsAtEnd && Current is not CXNode) Position++;
+        var stack = new Stack<(ICXNode Node, int SlotIndex)>([(root, 0)]);
 
-        return (CXNode?)Current;
-    }
+        while (stack.Count > 0)
+        {
+            var (node, index) = stack.Pop();
 
-    public CXToken? NextToken()
-    {
-        if (IsAtEnd) return null;
+            if (node is CXToken token)
+            {
+                result.Add(token);
+                continue;
+            }
 
-        while (!IsAtEnd && Current is not CXToken) Position++;
+            if (node is CXNode concreteNode)
+            {
+                if(index is 0) result.Add(node);
 
-        return (CXToken?)Current;
+                if (concreteNode.Slots.Count > index)
+                {
+                    // enqueue self
+                    stack.Push(
+                        (concreteNode, index + 1)
+                    );
+
+                    // enqueue child
+                    stack.Push(
+                        (concreteNode.Slots[index].Value, 0)
+                    );
+
+                    continue;
+                }
+
+                // we do nothing
+            }
+        }
+
+        return result;
     }
 }
