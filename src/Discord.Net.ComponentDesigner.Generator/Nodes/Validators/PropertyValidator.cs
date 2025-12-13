@@ -1,3 +1,9 @@
-﻿namespace Discord.CX.Nodes;
+﻿using System.Collections.Generic;
 
-public delegate void PropertyValidator(IComponentContext context, ComponentPropertyValue value);
+namespace Discord.CX.Nodes;
+
+public delegate void PropertyValidator(
+    IComponentContext context,
+    ComponentPropertyValue value,
+    IList<DiagnosticInfo> diagnostics
+);

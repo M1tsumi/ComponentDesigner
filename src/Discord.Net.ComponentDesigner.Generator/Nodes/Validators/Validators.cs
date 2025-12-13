@@ -10,57 +10,13 @@ namespace Discord.CX.Nodes;
 
 public static class Validators
 {
-    public static void Snowflake(IComponentContext context, ComponentPropertyValue propertyValue)
-    {
-        switch (propertyValue.Value)
-        {
-            case null or CXValue.Invalid: return;
-
-            case CXValue.Scalar scalar:
-                if (!ulong.TryParse(scalar.Value, out _))
-                {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        scalar,
-                        scalar.Value,
-                        "Snowflake"
-                    );
-                }
-
-                return;
-            case CXValue.Interpolation interpolation:
-                var symbol = context.GetInterpolationInfo(interpolation).Symbol;
-
-                if (
-                    symbol?.SpecialType is not SpecialType.System_UInt64
-                )
-                {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        interpolation,
-                        symbol,
-                        "Snowflake"
-                    );
-                }
-
-                return;
-        }
-    }
-
-    public static void Emote(IComponentContext context, ComponentPropertyValue propertyValue)
-    {
-        switch (propertyValue.Value)
-        {
-            case null or CXValue.Invalid: return;
-
-            case CXValue.Scalar scalar:
-
-                return;
-        }
-    }
-
-    public static void Range(IComponentContext context, ComponentState state, ComponentProperty lower,
-        ComponentProperty upper)
+    public static void Range(
+        IComponentContext context,
+        ComponentState state,
+        ComponentProperty lower,
+        ComponentProperty upper,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         var lowerValue = state.GetProperty(lower);
         var upperValue = state.GetProperty(upper);
@@ -74,11 +30,9 @@ public static class Validators
 
         if (lowerInt > upperInt)
         {
-            context.AddDiagnostic(
-                Diagnostics.InvalidRange,
-                (ICXNode?)lowerValue.Attribute ?? lowerValue.Value!,
-                lower.Name,
-                upper.Name
+            diagnostics.Add(
+                Diagnostics.InvalidRange(lower.Name, upper.Name),
+                (ICXNode?)lowerValue.Attribute ?? lowerValue.Value!
             );
         }
     }
@@ -87,12 +41,12 @@ public static class Validators
         int? lower = null,
         int? upper = null
     ) => Range(false, lower, upper);
-    
+
     public static PropertyValidator StringRange(
         int? lower = null,
         int? upper = null
     ) => Range(true, lower, upper);
-    
+
     public static PropertyValidator Range(
         bool asString,
         int? lower = null,
@@ -109,7 +63,7 @@ public static class Validators
             _ => string.Empty
         };
 
-        return (context, propertyValue) =>
+        return (context, propertyValue, diagnostics) =>
         {
             switch (propertyValue.Value)
             {
@@ -125,11 +79,11 @@ public static class Validators
                         Check(integer);
                     break;
 
-                case CXValue.Multipart {HasInterpolations: false, Tokens: var tokens} when !asString:
-                    if(int.TryParse(tokens.ToString(), out var val))
+                case CXValue.Multipart { HasInterpolations: false, Tokens: var tokens } when !asString:
+                    if (int.TryParse(tokens.ToString(), out var val))
                         Check(val);
                     break;
-                
+
                 case CXValue.Multipart literal when asString:
                 {
                     int? length = null;
@@ -166,7 +120,7 @@ public static class Validators
                     if (asString) length = scalar.Value.Length;
                     else if (!int.TryParse(scalar.Value, out length))
                         return;
-                    
+
                     Check(length);
 
                     return;
@@ -179,11 +133,12 @@ public static class Validators
                     length > upper || length < lower
                 )
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.OutOfRange,
-                        propertyValue.Value,
-                        propertyValue.Property.Name,
-                        bounds + (asString ? " characters in length" : string.Empty)
+                    diagnostics.Add(
+                        Diagnostics.OutOfRange(
+                            propertyValue.Property.Name,
+                            bounds + (asString ? " characters in length" : string.Empty)
+                        ),
+                        propertyValue.Value
                     );
                 }
             }
@@ -218,66 +173,5 @@ public static class Validators
 
         result = 0;
         return false;
-    }
-
-    public static PropertyValidator EnumVariant(string fullyQualifiedName)
-    {
-        ITypeSymbol? symbol = null;
-        IFieldSymbol[]? variants = null;
-
-        return (context, propertyValue) =>
-        {
-            if (symbol is null || variants is null)
-            {
-                symbol = context.Compilation.GetTypeByMetadataName(fullyQualifiedName);
-
-                if (symbol is null) throw new InvalidOperationException($"Unknown type '{fullyQualifiedName}'");
-
-                if (symbol.TypeKind is not TypeKind.Enum)
-                    throw new InvalidOperationException($"'{symbol}' is not an enum type.");
-
-                variants = symbol
-                    .GetMembers()
-                    .OfType<IFieldSymbol>()
-                    .ToArray();
-            }
-
-            switch (propertyValue.Value)
-            {
-                case null or CXValue.Invalid: return;
-
-                case CXValue.Scalar scalar:
-                    if (variants.All(x =>
-                            !string.Equals(x.Name, scalar.Value, StringComparison.InvariantCultureIgnoreCase)))
-                    {
-                        context.AddDiagnostic(
-                            Diagnostics.InvalidEnumVariant,
-                            scalar,
-                            scalar.Value,
-                            string.Join(", ", variants.Select(x => x.Name))
-                        );
-                    }
-
-                    return;
-                case CXValue.Interpolation interpolation:
-                    // verify the value is the correct type
-                    var interpolationInfo = context.GetInterpolationInfo(interpolation);
-
-                    if (
-                        interpolationInfo.Symbol is not null &&
-                        !symbol.Equals(interpolationInfo.Symbol, SymbolEqualityComparer.Default)
-                    )
-                    {
-                        context.AddDiagnostic(
-                            Diagnostics.TypeMismatch,
-                            interpolation,
-                            interpolationInfo.Symbol,
-                            symbol
-                        );
-                    }
-
-                    return;
-            }
-        };
     }
 }

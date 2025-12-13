@@ -119,8 +119,8 @@ public sealed class SeparatorTests : BaseComponentTest
             );
 
             Diagnostic(
-                Diagnostics.InvalidEnumVariant.Id,
-                location: CurrentGraph.GetLocation(spacing.Value)
+                Diagnostics.InvalidEnumVariant("abc", "Discord.SeparatorSpacingSize"),
+                spacing.Value
             );
 
             EOF();

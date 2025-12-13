@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Discord.CX.Parser;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -22,14 +23,14 @@ public sealed class SectionComponentNode : ComponentNode
             ConformingType: ComponentBuilderKind.CollectionOfIMessageComponentBuilders
         )
     );
-    
+
     private static readonly ComponentRenderingOptions AccessoryRenderingOptions = new(
         TypingContext: new(
             CanSplat: false,
             ConformingType: ComponentBuilderKind.IMessageComponentBuilder
         )
     );
-    
+
     public SectionComponentNode()
     {
         Properties =
@@ -43,18 +44,18 @@ public sealed class SectionComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         var accessoryPropertyValue = state.GetProperty(Accessory);
-        
+
         if (!state.HasChildren && !accessoryPropertyValue.HasValue)
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.EmptySection,
                 state.Source
             );
 
-            base.Validate(state, context);
+            base.Validate(state, context, diagnostics);
             return;
         }
 
@@ -65,7 +66,7 @@ public sealed class SectionComponentNode : ComponentNode
         {
             foreach (var accessory in state.Children.Where(x => x.Inner is AccessoryComponentNode))
             {
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.TooManyAccessories,
                     accessory.State.Source
                 );
@@ -76,7 +77,7 @@ public sealed class SectionComponentNode : ComponentNode
             switch (accessoryCount)
             {
                 case 0:
-                    context.AddDiagnostic(
+                    diagnostics.Add(
                         Diagnostics.MissingAccessory,
                         state.Source
                     );
@@ -84,7 +85,7 @@ public sealed class SectionComponentNode : ComponentNode
                 case > 1:
                     foreach (var accessory in state.Children.Where(x => x.Inner is AccessoryComponentNode).Skip(1))
                     {
-                        context.AddDiagnostic(
+                        diagnostics.Add(
                             Diagnostics.TooManyAccessories,
                             accessory.State.Source
                         );
@@ -97,7 +98,7 @@ public sealed class SectionComponentNode : ComponentNode
         switch (nonAccessoryCount)
         {
             case 0:
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.MissingSectionChild,
                     state.Source
                 );
@@ -105,7 +106,7 @@ public sealed class SectionComponentNode : ComponentNode
             case > 3:
                 foreach (var child in state.Children.Where(x => x.Inner is not AccessoryComponentNode).Skip(3))
                 {
-                    context.AddDiagnostic(
+                    diagnostics.Add(
                         Diagnostics.TooManySectionChildren,
                         child.State.Source
                     );
@@ -118,10 +119,9 @@ public sealed class SectionComponentNode : ComponentNode
         {
             if (!IsValidChildType(child.Inner))
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidSectionChildComponentType,
-                    child.State.Source,
-                    child.Inner.Name
+                diagnostics.Add(
+                    Diagnostics.InvalidSectionChildComponentType(child.Inner.Name),
+                    child.State.Source
                 );
             }
         }
@@ -130,31 +130,39 @@ public sealed class SectionComponentNode : ComponentNode
             => node is TextDisplayComponentNode or IDynamicComponentNode;
     }
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    )
     {
         var accessoryPropertyValue = state.GetProperty(Accessory);
 
-        var renderedAccessory = accessoryPropertyValue.HasValue
-            ? Accessory.Renderer(context, accessoryPropertyValue)
-            : state
-                .Children
-                .FirstOrDefault(x => x.Inner is AccessoryComponentNode)
-                ?.Render(context);
+        var renderedAccessory = (
+            accessoryPropertyValue.HasValue
+                ? Accessory.Renderer(context, accessoryPropertyValue)
+                : (
+                    state
+                        .Children
+                        .FirstOrDefault(x => x.Inner is AccessoryComponentNode)
+                        ?.Render(context) ?? default
+                )
+        ).Or("null");
 
-        return
-            $"""
-             new {context.KnownTypes.SectionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
-                 accessory: {renderedAccessory?.WithNewlinePadding(4) ?? "null"},
-                 components:
-                 [
-                     {
-                         state
-                             .RenderChildren(context, x => x.Inner is not AccessoryComponentNode)
-                             .WithNewlinePadding(8)
-                     }
-                 ]
-             ){state.RenderInitializer(this, context, x => x == Accessory).PrefixIfSome(Environment.NewLine)}
-             """;
+        return renderedAccessory
+            .Combine(state.RenderChildren(context, x => x.Inner is not AccessoryComponentNode))
+            .Combine(state.RenderInitializer(this, context, x => x == Accessory))
+            .Map(x =>
+                $"""
+                 new {context.KnownTypes.SectionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
+                     accessory: {x.Left.Left.WithNewlinePadding(4)},
+                     components:
+                     [
+                         {x.Left.Right.WithNewlinePadding(8)}
+                     ]
+                 ){x.Right.PrefixIfSome(Environment.NewLine)}
+                 """
+            );
     }
 }
 
@@ -164,16 +172,16 @@ public sealed class AccessoryComponentNode : ComponentNode
 
     public override bool HasChildren => true;
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         if (!state.HasChildren)
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.EmptyAccessory,
                 state.Source
             );
 
-            base.Validate(state, context);
+            base.Validate(state, context, diagnostics);
             return;
         }
 
@@ -183,30 +191,30 @@ public sealed class AccessoryComponentNode : ComponentNode
             var start = state.OwningNode!.Children[0].State.Source.Span.Start;
             var end = state.OwningNode!.Children[state.Children.Count - 1].State.Source.Span.End;
 
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.TooManyAccessoryChildren,
                 TextSpan.FromBounds(start, end)
             );
 
-            base.Validate(state, context);
+            base.Validate(state, context, diagnostics);
             return;
         }
 
         if (!IsAllowedChild(state.Children[0].Inner))
         {
-            context.AddDiagnostic(
-                Diagnostics.InvalidAccessoryChild,
-                state.Children[0].State.Source,
-                state.Children[0].Inner.Name
+            diagnostics.Add(
+                Diagnostics.InvalidAccessoryChild(state.Children[0].Inner.Name),
+                state.Children[0].State.Source
             );
         }
 
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
     private static bool IsAllowedChild(ComponentNode node)
         => node is ButtonComponentNode or ThumbnailComponentNode;
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
+    public override Result<string> Render(ComponentState state, IComponentContext context,
+        ComponentRenderingOptions options)
         => state.RenderChildren(context);
 }

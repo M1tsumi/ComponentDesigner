@@ -10,7 +10,7 @@ namespace Discord.CX.Nodes.Components.Custom;
 
 public sealed class ComponentChildrenAdapter
 {
-    public delegate string Renderer(
+    public delegate Result<string> Renderer(
         IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
@@ -137,7 +137,7 @@ public sealed class ComponentChildrenAdapter
         return children;
     }
 
-    private string RenderComponent(
+    private Result<string> RenderComponent(
         IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
@@ -155,13 +155,10 @@ public sealed class ComponentChildrenAdapter
                 case 0:
                     if (IsOptional) return "default";
 
-                    context.AddDiagnostic(
-                        Diagnostics.MissingRequiredProperty,
-                        state.Source,
-                        _owner.Name,
-                        "children"
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.MissingRequiredProperty(_owner.Name, "children"),
+                        state.Source
                     );
-                    return string.Empty;
                 case 1:
                     return RenderComponentInner(_componentBuilderKind, context, children[0], state);
                 default:
@@ -169,12 +166,10 @@ public sealed class ComponentChildrenAdapter
                     var lower = children[1].Node.Span.Start;
                     var upper = children.Last().Node.Span.End;
 
-                    context.AddDiagnostic(
-                        Diagnostics.InvalidChildComponentCardinality,
-                        TextSpan.FromBounds(lower, upper),
-                        "children"
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.InvalidChildComponentCardinality("children"),
+                        TextSpan.FromBounds(lower, upper)
                     );
-                    return string.Empty;
             }
         }
 
@@ -184,13 +179,10 @@ public sealed class ComponentChildrenAdapter
             {
                 if (IsOptional) return "[]";
 
-                context.AddDiagnostic(
-                    Diagnostics.MissingRequiredProperty,
-                    state.Source,
-                    _owner.Name,
-                    "children"
+                return Result<string>.FromDiagnostic(
+                    Diagnostics.MissingRequiredProperty(_owner.Name, "children"),
+                    state.Source
                 );
-                return string.Empty;
             }
 
             return RenderChildrenAsCollection(_componentBuilderKind);
@@ -217,55 +209,48 @@ public sealed class ComponentChildrenAdapter
             {
                 if (IsOptional) return $"{typeName}.Empty";
 
-                context.AddDiagnostic(
-                    Diagnostics.MissingRequiredProperty,
-                    state.Source,
-                    _owner.Name,
-                    "children"
+                return Result<string>.FromDiagnostic(
+                    Diagnostics.MissingRequiredProperty(_owner.Name, "children"),
+                    state.Source
                 );
-                return string.Empty;
             }
 
-            var components = RenderChildrenAsCollection(ComponentBuilderKind.IMessageComponentBuilder);
-
-            if (components == string.Empty) return string.Empty;
-
-            return $"new {typeName}({components})";
+            return RenderChildrenAsCollection(ComponentBuilderKind.IMessageComponentBuilder)
+                .Map(x => $"new {typeName}({x})");
         }
 
-        string RenderChildrenAsCollection(ComponentBuilderKind kind)
+        Result<string> RenderChildrenAsCollection(ComponentBuilderKind kind)
         {
-            var parts = new List<string>();
+            var parts = new List<Result<string>>();
 
             foreach (var child in children)
             {
-                var part = RenderComponentInner(
-                    kind,
-                    context,
-                    child,
-                    state,
-                    spreadCollections: true
+                parts.Add(
+                    RenderComponentInner(
+                        kind,
+                        context,
+                        child,
+                        state,
+                        spreadCollections: true
+                    )
                 );
-
-                if (part == string.Empty) return string.Empty;
-                parts.Add(part);
             }
 
-            return $"[{
-                string
-                    .Join(
-                        ",\n",
-                        parts.Select(x => x
-                            .Prefix(4)
-                            .WithNewlinePadding(4)
+            return parts
+                .FlattenAll()
+                .Map(x =>
+                    $"[{
+                        string.Join(
+                            Environment.NewLine,
+                            x.Select(x => x.Prefix(4).WithNewlinePadding(4))
                         )
-                    )
-                    .WrapIfSome("\n")
-            }]";
+                        .WrapIfSome(Environment.NewLine)
+                    }]"
+                );
         }
     }
 
-    private string RenderComponentInner(
+    private Result<string> RenderComponentInner(
         ComponentBuilderKind kind,
         IComponentContext context,
         ComponentChild child,
@@ -304,14 +289,10 @@ public sealed class ComponentChildrenAdapter
                     )
                 )
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        token,
-                        info.Symbol!.ToDisplayString(),
-                        kind
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.TypeMismatch(kind.ToString(), info.Symbol!.ToDisplayString()),
+                        token
                     );
-
-                    return string.Empty;
                 }
 
                 return converted;
@@ -322,41 +303,38 @@ public sealed class ComponentChildrenAdapter
                     return string.Empty;
                 }
 
-                var builder = childNode.Render(context);
+                return childNode
+                    .Render(context)
+                    .Map(x =>
+                    {
+                        if (
+                            !ComponentBuilderKindUtils.TryConvert(
+                                x,
+                                ComponentBuilderKind.IMessageComponentBuilder,
+                                kind,
+                                out converted,
+                                spreadCollections
+                            )
+                        )
+                        {
+                            return Result<string>.FromDiagnostic(
+                                Diagnostics.TypeMismatch(kind.ToString(), "CX"),
+                                element
+                            );
+                        }
 
-                if (
-                    !ComponentBuilderKindUtils.TryConvert(
-                        builder,
-                        ComponentBuilderKind.IMessageComponentBuilder,
-                        kind,
-                        out converted,
-                        spreadCollections
-                    )
-                )
-                {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        element,
-                        "CX",
-                        kind
-                    );
-                    return string.Empty;
-                }
-
-                return converted;
+                        return converted;
+                    });
             case ComponentChild.Text(var token):
-                context.AddDiagnostic(
-                    Diagnostics.TypeMismatch,
-                    token,
-                    "text",
-                    kind
+                return Result<string>.FromDiagnostic(
+                    Diagnostics.TypeMismatch(kind.ToString(), "text"),
+                    token
                 );
-                return string.Empty;
             default: throw new ArgumentOutOfRangeException(nameof(child));
         }
     }
 
-    private string RenderNonComponent(
+    private Result<string> RenderNonComponent(
         IComponentContext context,
         ComponentState state,
         IReadOnlyList<ComponentChild> children
@@ -370,13 +348,10 @@ public sealed class ComponentChildrenAdapter
                 case 0:
                     if (IsOptional) return "default";
 
-                    context.AddDiagnostic(
-                        Diagnostics.MissingRequiredProperty,
-                        state.Source,
-                        _owner.Name,
-                        "children"
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.MissingRequiredProperty(_owner.Name, "children"),
+                        state.Source
                     );
-                    return string.Empty;
                 case 1:
                     return RenderNonComponentInner(_targetSymbol, context, children[0]);
                 default:
@@ -384,12 +359,10 @@ public sealed class ComponentChildrenAdapter
                     var lower = children[1].Node.Span.Start;
                     var upper = children.Last().Node.Span.End;
 
-                    context.AddDiagnostic(
-                        Diagnostics.InvalidChildComponentCardinality,
-                        TextSpan.FromBounds(lower, upper),
-                        "children"
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.InvalidChildComponentCardinality("children"),
+                        TextSpan.FromBounds(lower, upper)
                     );
-                    return string.Empty;
             }
         }
 
@@ -400,16 +373,13 @@ public sealed class ComponentChildrenAdapter
         {
             if (IsOptional) return "[]";
 
-            context.AddDiagnostic(
-                Diagnostics.MissingRequiredProperty,
-                state.Source,
-                _owner.Name,
-                "children"
+            return Result<string>.FromDiagnostic(
+                Diagnostics.MissingRequiredProperty(_owner.Name, "children"),
+                state.Source
             );
-            return string.Empty;
         }
 
-        var parts = new List<string>();
+        var parts = new List<Result<string>>();
 
         foreach (var child in children)
         {
@@ -439,14 +409,13 @@ public sealed class ComponentChildrenAdapter
                     )
                     {
                         // cant spread, element types don't match
-                        context.AddDiagnostic(
-                            Diagnostics.TypeMismatch,
-                            token,
-                            enumerableType.TypeArguments[0].ToDisplayString(),
-                            _collectionInnerTypeSymbol.ToDisplayString()
+                        return Result<string>.FromDiagnostic(
+                            Diagnostics.TypeMismatch(
+                                _collectionInnerTypeSymbol.ToDisplayString(),
+                                enumerableType.TypeArguments[0].ToDisplayString()
+                            ),
+                            token
                         );
-
-                        return string.Empty;
                     }
 
                     parts.Add(
@@ -462,27 +431,23 @@ public sealed class ComponentChildrenAdapter
                 }
             }
 
-            var part = RenderNonComponentInner(_collectionInnerTypeSymbol, context, child);
-
-            if (part == string.Empty) return string.Empty;
-
-            parts.Add(part);
+            parts.Add(RenderNonComponentInner(_collectionInnerTypeSymbol, context, child));
         }
 
-        return $"[{
-            string
-                .Join(
-                    ",\n",
-                    parts.Select(x => x
-                        .Prefix(4)
-                        .WithNewlinePadding(4)
-                    )
-                )
-                .WrapIfSome("\n")
-        }]";
+        return parts
+            .FlattenAll()
+            .Map(x =>
+                $"[{
+                    string.Join(
+                            Environment.NewLine,
+                            x.Select(x => x.Prefix(4).WithNewlinePadding(4))
+                        )
+                        .WrapIfSome(Environment.NewLine)
+                }]"
+            );
     }
 
-    private string RenderNonComponentInner(
+    private Result<string> RenderNonComponentInner(
         ITypeSymbol target,
         IComponentContext context,
         ComponentChild child
@@ -492,13 +457,10 @@ public sealed class ComponentChildrenAdapter
         {
             case ComponentChild.Element(var element):
                 // TODO: maybe check for conversion from message builder to the target?
-                context.AddDiagnostic(
-                    Diagnostics.TypeMismatch,
-                    element,
-                    "CX",
-                    target.ToDisplayString()
+                return Result<string>.FromDiagnostic(
+                    Diagnostics.TypeMismatch(target.ToDisplayString(), "CX"),
+                    element
                 );
-                return string.Empty;
             case ComponentChild.Interpolation(var token):
                 // validate the type
                 var info = context.GetInterpolationInfo(token);
@@ -509,20 +471,20 @@ public sealed class ComponentChildrenAdapter
                     )
                 )
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        token,
-                        info.Symbol!.ToDisplayString(),
-                        target.ToDisplayString()
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.TypeMismatch(target.ToDisplayString(), info.Symbol!.ToDisplayString()),
+                        token
                     );
                 }
 
                 // return out the designer value
                 return context.GetDesignerValue(info, target.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
             case ComponentChild.Text(var token):
-                // TODO: we could make use of the renderers for this, ex parsing colors, ints, etc
-                // for now, check if strings are allowed
-                // validate the type
+                /*
+                 * TODO: we could make use of the renderers for this, ex parsing colors, ints, etc
+                 * for now, check if strings are allowed
+                 */
+
                 if (
                     !context.Compilation.HasImplicitConversion(
                         context.Compilation.GetKnownTypes().StringType,
@@ -530,11 +492,12 @@ public sealed class ComponentChildrenAdapter
                     )
                 )
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        token,
-                        context.Compilation.GetKnownTypes().StringType,
-                        target.ToDisplayString()
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.TypeMismatch(
+                            context.Compilation.GetKnownTypes().StringType.ToDisplayString(),
+                            target.ToDisplayString()
+                        ),
+                        token
                     );
                 }
 

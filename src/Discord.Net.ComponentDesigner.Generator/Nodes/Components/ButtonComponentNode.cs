@@ -73,7 +73,6 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                 "skuId",
                 aliases: ["sku"],
                 isOptional: true,
-                validators: [Validators.Snowflake],
                 renderer: Renderers.Snowflake
             ),
             Url = new(
@@ -119,7 +118,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             context.Push(this, parent: sibling);
             return;
         }
-        
+
         // we can create an auto row
         context.Push(AutoActionRowComponentNode.Instance, children: [(CXNode)context.CXNode]);
 
@@ -234,7 +233,11 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         }
     }
 
-    public override void Validate(ButtonComponentState state, IComponentContext context)
+    public override void Validate(
+        ButtonComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         var label = state.GetProperty(Label);
 
@@ -244,11 +247,9 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             label.Value != label.Attribute.Value
         )
         {
-            context.AddDiagnostic(
-                Diagnostic.Create(
-                    Diagnostics.ButtonLabelDuplicate,
-                    context.GetLocation(label.Value!)
-                )
+            diagnostics.Add(
+                Diagnostics.ButtonLabelDuplicate,
+                label.Value
             );
         }
 
@@ -259,51 +260,57 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                 state.GetProperty(Url).ReportPropertyConfigurationDiagnostics(
                     context,
                     state,
+                    diagnostics,
                     optional: false,
                     requiresValue: true
                 );
 
-                state.ReportPropertyNotAllowed(CustomId, context);
-                state.ReportPropertyNotAllowed(SkuId, context);
+                state.ReportPropertyNotAllowed(CustomId, context, diagnostics);
+                state.ReportPropertyNotAllowed(SkuId, context, diagnostics);
 
-                state.RequireOneOf(context, Label, Emoji);
+                state.RequireOneOf(context, diagnostics, Label, Emoji);
                 break;
             case ButtonKind.Premium:
                 // url is required
                 state.GetProperty(SkuId).ReportPropertyConfigurationDiagnostics(
                     context,
                     state,
+                    diagnostics,
                     optional: false,
                     requiresValue: true
                 );
 
-                state.ReportPropertyNotAllowed(CustomId, context);
-                state.ReportPropertyNotAllowed(Url, context);
-                state.ReportPropertyNotAllowed(Label, context);
-                state.ReportPropertyNotAllowed(Emoji, context);
+                state.ReportPropertyNotAllowed(CustomId, context, diagnostics);
+                state.ReportPropertyNotAllowed(Url, context, diagnostics);
+                state.ReportPropertyNotAllowed(Label, context, diagnostics);
+                state.ReportPropertyNotAllowed(Emoji, context, diagnostics);
                 break;
             case ButtonKind.Default:
                 // custom id is required
                 state.GetProperty(CustomId).ReportPropertyConfigurationDiagnostics(
                     context,
                     state,
+                    diagnostics,
                     optional: false,
                     requiresValue: true
                 );
 
-                state.ReportPropertyNotAllowed(SkuId, context);
-                state.ReportPropertyNotAllowed(Url, context);
-                state.RequireOneOf(context, Label, Emoji);
+                state.ReportPropertyNotAllowed(SkuId, context, diagnostics);
+                state.ReportPropertyNotAllowed(Url, context, diagnostics);
+                state.RequireOneOf(context, diagnostics, Label, Emoji);
                 break;
         }
 
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
-    public override string Render(ButtonComponentState state, IComponentContext context,
-        ComponentRenderingOptions options)
+    public override Result<string> Render(
+        ButtonComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    )
     {
-        string style;
+        Result<string> style;
 
         if (state.InferredKind is not ButtonKind.Default)
             style = $"global::{BUTTON_STYLE_ENUM}.{state.InferredKind}";
@@ -317,25 +324,16 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                 : Style.Renderer(context, stylePropertyValue);
         }
 
-        var props = string.Join(
-            $",{Environment.NewLine}",
-            [
-                $"style: {style}",
-                state.RenderProperties(
-                    this,
-                    context,
-                    ignorePredicate: x => x == Style
-                )
-            ]
-        );
-
-        return $"""
-                new {context.KnownTypes.ButtonBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                    props
+        return style
+            .Map(x => $"style: {x}")
+            .Combine(state.RenderProperties(this, context, ignorePredicate: x => x == Style))
+            .Map(x =>
+                $"new {context.KnownTypes.ButtonBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                    string.Join($",{Environment.NewLine}", [x.Left, x.Right])
                         .WithNewlinePadding(4)
                         .PrefixIfSome(4)
                         .WrapIfSome(Environment.NewLine)
-                })
-                """;
+                })"
+            );
     }
 }

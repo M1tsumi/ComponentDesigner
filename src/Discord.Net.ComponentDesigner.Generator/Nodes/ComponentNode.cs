@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes;
 
-public delegate string ComponentNodeRenderer<in TState>(
+public delegate Result<string> ComponentNodeRenderer<in TState>(
     TState state,
     IComponentContext context,
     ComponentRenderingOptions options = default
@@ -25,7 +25,7 @@ public delegate string ComponentNodeRenderer(
 public abstract class ComponentNode<TState> : ComponentNode
     where TState : ComponentState
 {
-    public abstract string Render(TState state, IComponentContext context, ComponentRenderingOptions options);
+    public abstract Result<string> Render(TState state, IComponentContext context, ComponentRenderingOptions options);
 
     public virtual void UpdateState(ref TState state, IComponentContext context)
     {
@@ -39,19 +39,19 @@ public abstract class ComponentNode<TState> : ComponentNode
     public sealed override ComponentState? Create(ComponentStateInitializationContext context)
         => CreateState(context);
 
-    public sealed override string Render(
+    public sealed override Result<string> Render(
         ComponentState state,
         IComponentContext context,
         ComponentRenderingOptions options
     ) => Render((TState)state, context, options);
 
-    public virtual void Validate(TState state, IComponentContext context)
+    public virtual void Validate(TState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
-    public sealed override void Validate(ComponentState state, IComponentContext context)
-        => Validate((TState)state, context);
+    public sealed override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
+        => Validate((TState)state, context, diagnostics);
 }
 
 public abstract class ComponentNode
@@ -67,18 +67,22 @@ public abstract class ComponentNode
 
     protected virtual bool AllowChildrenInCX => HasChildren;
 
-    public virtual void Validate(ComponentState state, IComponentContext context)
+    public virtual void Validate(
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         // validate properties
         foreach (var property in Properties)
         {
             var propertyValue = state.GetProperty(property);
 
-            propertyValue.ReportPropertyConfigurationDiagnostics(context, state);
+            propertyValue.ReportPropertyConfigurationDiagnostics(context, state, diagnostics);
 
             foreach (var validator in property.Validators)
             {
-                validator(context, propertyValue);
+                validator(context, propertyValue, diagnostics);
             }
         }
 
@@ -89,11 +93,12 @@ public abstract class ComponentNode
             {
                 if (!TryGetPropertyFromName(attribute.Identifier.Value, out _))
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.UnknownProperty,
-                        attribute,
-                        attribute.Identifier.Value,
-                        Name
+                    diagnostics.Add(
+                        Diagnostics.UnknownProperty(
+                            attribute.Identifier.Value,
+                            Name
+                        ),
+                        attribute
                     );
                 }
             }
@@ -101,10 +106,9 @@ public abstract class ComponentNode
             // report invalid children
             if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
             {
-                context.AddDiagnostic(
-                    Diagnostics.ComponentDoesntAllowChildren,
-                    element.Children,
-                    Name
+                diagnostics.Add(
+                    Diagnostics.ComponentDoesntAllowChildren(Name),
+                    element.Children
                 );
             }
         }
@@ -125,7 +129,7 @@ public abstract class ComponentNode
         return false;
     }
 
-    public abstract string Render(
+    public abstract Result<string> Render(
         ComponentState state,
         IComponentContext context,
         ComponentRenderingOptions options

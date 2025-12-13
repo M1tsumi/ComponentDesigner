@@ -55,10 +55,10 @@ public sealed class BooleanTests : BaseRendererTest
         AssertRenders(
             "'blah'",
             Renderers.Boolean,
-            "blah"
+            null
         );
         {
-            Diagnostic(Diagnostics.TypeMismatch.Id);
+            Diagnostic(Diagnostics.TypeMismatch(expected: "bool", actual: "string"));
             
             EOF();
         }

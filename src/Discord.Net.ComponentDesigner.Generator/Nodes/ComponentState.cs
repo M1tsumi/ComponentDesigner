@@ -46,27 +46,40 @@ public class ComponentState
         return _properties[property] = new(property, attribute, node);
     }
 
-    public void ReportPropertyNotAllowed(ComponentProperty property, IComponentContext context)
+    public void ReportPropertyNotAllowed(
+        ComponentProperty property,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         var propertyValue = GetProperty(property);
         if (propertyValue.IsSpecified)
         {
-            context.AddDiagnostic(
-                Diagnostics.PropertyNotAllowed,
-                propertyValue.Attribute!,
-                OwningNode?.Inner.Name,
-                propertyValue.Attribute!.Identifier.Value
+            diagnostics.Add(
+                Diagnostics.PropertyNotAllowed(
+                    OwningNode?.Inner.Name ?? "Unknown",
+                    propertyValue.Attribute!.Identifier.Value
+                ),
+                propertyValue.Attribute
             );
         }
     }
 
-    public void RequireOneOf(IComponentContext context, params ReadOnlySpan<ComponentProperty> properties)
+    public void RequireOneOf(
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics,
+        params ReadOnlySpan<ComponentProperty> properties)
     {
         if (properties.Length is 0) return;
 
         if (properties.Length is 1)
         {
-            GetProperty(properties[0]).ReportPropertyConfigurationDiagnostics(context, this, optional: false);
+            GetProperty(properties[0]).ReportPropertyConfigurationDiagnostics(
+                context,
+                this,
+                diagnostics,
+                optional: false
+            );
             return;
         }
 
@@ -89,11 +102,9 @@ public class ComponentState
             if (i < properties.Length - 1) sb.Append('\'');
         }
 
-        context.AddDiagnostic(
-            Diagnostics.MissingRequiredProperty,
-            Source,
-            OwningNode?.Inner.Name,
-            sb.ToString()
+        diagnostics.Add(
+            Diagnostics.MissingRequiredProperty(OwningNode?.Inner.Name, sb.ToString()),
+            Source
         );
     }
 
@@ -120,7 +131,7 @@ public class ComponentState
             _properties[property] = _properties[property] with { Value = value };
     }
 
-    public string RenderProperties(
+    public Result<string> RenderProperties(
         ComponentNode node,
         IComponentContext context,
         bool asInitializers = false,
@@ -130,6 +141,9 @@ public class ComponentState
         if (Source is not CXElement element) return string.Empty;
 
         var values = new List<string>();
+        var result = new Result<string>.Builder();
+
+        var success = true;
 
         foreach (var property in node.Properties)
         {
@@ -139,35 +153,40 @@ public class ComponentState
 
             if (propertyValue.CanOmitFromSource) continue;
 
-            var prefix = asInitializers
-                ? $"{property.DotnetPropertyName} = "
-                : $"{property.DotnetParameterName}: ";
+            var propertyResult = property.Renderer(context, propertyValue);
 
-            values.Add($"{prefix}{property.Renderer(context, propertyValue)}");
+            if (propertyResult.HasResult)
+            {
+                var prefix = asInitializers
+                    ? $"{property.DotnetPropertyName} = "
+                    : $"{property.DotnetParameterName}: ";
+
+                values.Add($"{prefix}{propertyResult.Value}");
+            }
+            else success = false;
+
+            result.AddDiagnostics(propertyResult.Diagnostics);
         }
 
-        return string.Join($",{Environment.NewLine}", values);
+        if (success)
+            result.WithValue(string.Join($",{Environment.NewLine}", values));
+
+        return result;
     }
 
-    public string RenderInitializer(
+    public Result<string> RenderInitializer(
         ComponentNode node,
         IComponentContext context,
         Predicate<ComponentProperty>? ignorePredicate = null
-    )
-    {
-        var props = RenderProperties(node, context, asInitializers: true, ignorePredicate);
+    ) => RenderProperties(node, context, asInitializers: true, ignorePredicate)
+        .Map(x =>
+            x.PrefixIfSome(4)
+                .WithNewlinePadding(4)
+                .PrefixIfSome($"{{{Environment.NewLine}")
+                .PostfixIfSome($"{Environment.NewLine}}}")
+        );
 
-        if (string.IsNullOrWhiteSpace(props)) return string.Empty;
-
-        return
-            $$"""
-              {
-                  {{props.WithNewlinePadding(4)}}
-              }
-              """;
-    }
-
-    public string RenderChildren(
+    public Result<string> RenderChildren(
         IComponentContext context,
         Func<CXGraph.Node, bool>? predicate = null,
         ComponentRenderingOptions options = default
@@ -179,9 +198,9 @@ public class ComponentState
 
         if (predicate is not null) children = children.Where(predicate);
 
-        return string.Join(
-            $",{Environment.NewLine}",
-            children.Select(x => x.Render(context, options))
-        );
+        return children
+            .Select(x => x.Render(context, options))
+            .FlattenAll()
+            .Map(x => string.Join($",{Environment.NewLine}", x));
     }
 }

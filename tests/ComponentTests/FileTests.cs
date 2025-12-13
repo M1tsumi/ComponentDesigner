@@ -20,8 +20,7 @@ public sealed class FileTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'file' requires the property 'url' to be specified"
+                Diagnostics.MissingRequiredProperty("file", "url")
             );
             
             EOF();
@@ -40,8 +39,7 @@ public sealed class FileTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'file' requires the property 'url' to be specified"
+                Diagnostics.MissingRequiredProperty("file", "url")
             );
             
             EOF();
@@ -105,9 +103,8 @@ public sealed class FileTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.ComponentDoesntAllowChildren.Id,
-                message: "'file' doesn't allow children",
-                location: CurrentGraph.GetLocation(((CXElement)fileNode.State.Source).Children)
+                Diagnostics.ComponentDoesntAllowChildren("file"),
+                ((CXElement)fileNode.State.Source).Children
             );
             
             EOF();

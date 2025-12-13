@@ -24,7 +24,7 @@ public sealed class ContainerComponentNode : ComponentNode
             ConformingType: ComponentBuilderKind.CollectionOfIMessageComponentBuilders
         )
     );
-    
+
     public ContainerComponentNode()
     {
         Properties =
@@ -47,21 +47,20 @@ public sealed class ContainerComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         foreach (var child in state.Children)
         {
             if (!IsValidChild(child.Inner))
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidContainerChild,
-                    child.State.Source,
-                    child.Inner.Name
+                diagnostics.Add(
+                    Diagnostics.InvalidContainerChild(child.Inner.Name),
+                    child.State.Source
                 );
             }
         }
 
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
     private static bool IsValidChild(ComponentNode node)
@@ -73,36 +72,39 @@ public sealed class ContainerComponentNode : ComponentNode
             or SeparatorComponentNode
             or FileComponentNode;
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-    {
-        var props = state.RenderProperties(this, context, asInitializers: true);
-        var children = state.RenderChildren(context, options: ChildRenderingOptions);
-
-        var init = new StringBuilder(props);
-
-        if (!string.IsNullOrWhiteSpace(children))
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context, asInitializers: true)
+        .Combine(state.RenderChildren(context, options: ChildRenderingOptions))
+        .Map(x =>
         {
-            if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
-            
-            init.Append(
-                $"""
-                 Components =
-                 [
-                     {children.WithNewlinePadding(4)}
-                 ]
-                 """
-            );
-        }
+            var (props, children) = x;
 
-        return
-            $$"""
-              new {{context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
-                  init
-                      .ToString()
-                      .WithNewlinePadding(4)
-                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
-                      .PostfixIfSome($"{Environment.NewLine}}}")
-              }}
-              """;
-    }
+            var init = new StringBuilder(props);
+
+            if (!string.IsNullOrWhiteSpace(children))
+            {
+                if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+
+                init.Append(
+                    $"""
+                     Components =
+                     [
+                         {children.WithNewlinePadding(4)}
+                     ]
+                     """
+                );
+            }
+
+            return
+                $"new {context.KnownTypes.ContainerBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(){
+                    init.ToString()
+                        .WithNewlinePadding(4)
+                        .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+                        .PostfixIfSome($"{Environment.NewLine}}}")
+                }";
+        });
 }

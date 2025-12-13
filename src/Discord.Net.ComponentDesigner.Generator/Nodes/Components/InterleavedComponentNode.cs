@@ -73,7 +73,8 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
     }
 
 
-    public override string Render(InterleavedState state, IComponentContext context, ComponentRenderingOptions options)
+    public override Result<string> Render(InterleavedState state, IComponentContext context,
+        ComponentRenderingOptions options)
     {
         var designerValue = context.GetDesignerValue(
             state.InterpolationId,
@@ -114,14 +115,13 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
              * conform to the current constraints
              */
 
-            context.AddDiagnostic(
-                Diagnostics.InvalidInterleavedComponentInCurrentContext,
-                state.Source,
-                Symbol.ToDisplayString(),
-                typingContext.Value.ConformingType
+            return Result<string>.FromDiagnostic(
+                Diagnostics.InvalidInterleavedComponentInCurrentContext(
+                    Symbol.ToDisplayString(),
+                    typingContext.Value.ConformingType.ToString()
+                ),
+                state.Source
             );
-            
-            return string.Empty;
         }
 
         return value;

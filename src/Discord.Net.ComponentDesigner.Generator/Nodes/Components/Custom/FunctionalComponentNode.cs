@@ -24,7 +24,7 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
     public IMethodSymbol Method { get; }
     public ComponentBuilderKind Kind { get; }
     public IParameterSymbol? ChildrenParameter { get; }
-    
+
     private readonly ComponentChildrenAdapter? _adapter;
 
     private FunctionalComponentNode(
@@ -50,7 +50,8 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
             : null;
     }
 
-    public static FunctionalComponentNode Create(IMethodSymbol method, ComponentBuilderKind kind, Compilation compilation)
+    public static FunctionalComponentNode Create(IMethodSymbol method, ComponentBuilderKind kind,
+        Compilation compilation)
     {
         var properties = new List<ComponentProperty>();
         IParameterSymbol? childrenParameter = null;
@@ -104,73 +105,74 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
     private string MethodReference =>
         $"{Method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{Method.Name}";
 
-    public override string Render(
+    public override Result<string> Render(
         FunctionalComponentNodeState state,
         IComponentContext context,
         ComponentRenderingOptions options
-    )
-    {
-        var source = $"{MethodReference}({
-            string
-                .Join(
-                    ", ",
-                    ((string[])
-                    [
-                        state.RenderProperties(this, context),
-                        (_adapter?.ChildrenRenderer(context, state, state.Children) ?? string.Empty)
-                        .PrefixIfSome($"{ChildrenParameter?.Name}: ")
-                    ])
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                )
-                .WithNewlinePadding(4)
-                .PrefixIfSome(4)
-                .WrapIfSome("\n")
-        })";
-        
-        var typingContext = options.TypingContext;
-
-        if (typingContext is null)
+    ) => state
+        .RenderProperties(this, context)
+        .Combine(
+            (
+                _adapter?.ChildrenRenderer(context, state, state.Children)
+                    .Map(x => $"{ChildrenParameter?.Name}: ")
+            )
+            .Or(string.Empty)
+        )
+        .Map(x =>
         {
-            if (state.IsRootNode)
+            var args = string.Join(
+                $",{Environment.NewLine}",
+                ((IEnumerable<string>)[x.Left, x.Right]).Where(x => !string.IsNullOrWhiteSpace(x))
+            );
+
+            var source = $"{MethodReference}({
+                args.WithNewlinePadding(4)
+                    .PrefixIfSome(4)
+            })";
+
+            var typingContext = options.TypingContext;
+
+            if (typingContext is null)
             {
-                typingContext = context.RootTypingContext;
+                if (state.IsRootNode)
+                {
+                    typingContext = context.RootTypingContext;
+                }
+                else
+                {
+                    /*
+                     * TODO: unknown typing context may imply a bug where a parent component isn't supplying their
+                     * required typing information
+                     */
+
+                    Debug.Fail("Unknown typing context in functional node");
+                    typingContext = context.RootTypingContext;
+                }
             }
-            else
+
+            var value = ComponentBuilderKindUtils.Convert(
+                source,
+                Kind,
+                typingContext.Value.ConformingType,
+                typingContext.Value.CanSplat
+            );
+
+            if (value is null)
             {
                 /*
-                 * TODO: unknown typing context may imply a bug where a parent component isn't supplying their
-                 * required typing information
+                 * we've failed to convert, this case implies that whatever the type of this interleaved node is, it doesn't
+                 * conform to the current constraints
                  */
 
-                Debug.Fail("Unknown typing context in functional node");
-                typingContext = context.RootTypingContext;
+                return Result<string>.FromDiagnostic(
+                    Diagnostics.InvalidInterleavedComponentInCurrentContext(
+                        Method.ReturnType.ToDisplayString(),
+                        typingContext.Value.ConformingType.ToString()
+                    ),
+                    state.Source
+                );
             }
-        }
 
-        var value = ComponentBuilderKindUtils.Convert(
-            source,
-            Kind,
-            typingContext.Value.ConformingType,
-            typingContext.Value.CanSplat
-        );
-
-        if (value is null)
-        {
-            /*
-             * we've failed to convert, this case implies that whatever the type of this interleaved node is, it doesn't
-             * conform to the current constraints
-             */
-
-            context.AddDiagnostic(
-                Diagnostics.InvalidInterleavedComponentInCurrentContext,
-                state.Source,
-                Method.ReturnType.ToDisplayString(),
-                typingContext.Value.ConformingType
-            );
-            
-            return string.Empty;
-        }
-
-        return value;
-    }
+            return value;
+        });
 }

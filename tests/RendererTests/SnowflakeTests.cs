@@ -31,7 +31,7 @@ public sealed class SnowflakeTests : BaseRendererTest
             "ulong.Parse(\"-1\")"
         );
         {
-            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing.Id);
+            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"));
             EOF();
         }
         
@@ -41,7 +41,7 @@ public sealed class SnowflakeTests : BaseRendererTest
             "ulong.Parse(\"18446744073709551616\")"
         );
         {
-            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing.Id);
+            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"));
             EOF();
         }
     }

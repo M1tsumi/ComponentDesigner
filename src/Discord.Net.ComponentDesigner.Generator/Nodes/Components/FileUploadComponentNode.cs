@@ -25,7 +25,8 @@ public sealed class FileUploadComponentNode : ComponentNode
                 isOptional: true,
                 aliases: ["minValues"],
                 renderer: Renderers.Integer,
-                validators: [
+                validators:
+                [
                     Validators.IntRange(Constants.FILE_UPLOAD_MIN_VALUES_LOWER, Constants.FILE_UPLOAD_MIN_VALUES_UPPER)
                 ]
             ),
@@ -34,7 +35,8 @@ public sealed class FileUploadComponentNode : ComponentNode
                 isOptional: true,
                 aliases: ["maxValues"],
                 renderer: Renderers.Integer,
-                validators: [
+                validators:
+                [
                     Validators.IntRange(Constants.FILE_UPLOAD_MAX_VALUES_LOWER, Constants.FILE_UPLOAD_MAX_VALUES_UPPER)
                 ]
             ),
@@ -46,34 +48,39 @@ public sealed class FileUploadComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         if (context.KnownTypes.FileUploadComponentBuilderType is null)
         {
-            context.AddDiagnostic(
-                Diagnostics.MissingTypeInAssembly,
-                state.Source,
-                nameof(context.KnownTypes.FileUploadComponentBuilderType)
+            diagnostics.Add(
+                Diagnostics.MissingTypeInAssembly(nameof(context.KnownTypes.FileUploadComponentBuilderType)),
+                state.Source
             );
         }
-        
+
         // file uploads must be placed in labels, but we allow them as the root element.
         if (state.OwningNode?.Parent is not null && state.OwningNode.Parent.Inner is not LabelComponentNode)
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.FileUploadNotInLabel,
                 state.Source
             );
         }
+        
+        base.Validate(state, context, diagnostics);
     }
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-        => $"""
-            new {context.KnownTypes.FileUploadComponentBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                state.RenderProperties(this, context)
-                    .WithNewlinePadding(4)
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context)
+        .Map(x =>
+            $"new {context.KnownTypes.FileUploadComponentBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                x.WithNewlinePadding(4)
                     .PrefixIfSome(4)
                     .WrapIfSome(Environment.NewLine)
-            })
-            """;
+            })"
+        );
 }

@@ -36,16 +36,16 @@ public class ActionRowComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         if (!state.HasChildren)
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.EmptyActionRow,
                 state.Source
             );
 
-            base.Validate(state, context);
+            base.Validate(state, context, diagnostics);
             return;
         }
 
@@ -56,7 +56,7 @@ public class ActionRowComponentNode : ComponentNode
                 {
                     if (rest.Inner is not ButtonComponentNode)
                     {
-                        context.AddDiagnostic(
+                        diagnostics.Add(
                             Diagnostics.ActionRowInvalidChild,
                             rest.State.Source
                         );
@@ -65,7 +65,7 @@ public class ActionRowComponentNode : ComponentNode
 
                 foreach (var extra in state.Children.Skip(5))
                 {
-                    context.AddDiagnostic(
+                    diagnostics.Add(
                         Diagnostics.ActionRowInvalidChild,
                         extra.State.Source
                     );
@@ -75,7 +75,7 @@ public class ActionRowComponentNode : ComponentNode
             case SelectMenuComponentNode:
                 foreach (var rest in state.Children.Skip(1))
                 {
-                    context.AddDiagnostic(
+                    diagnostics.Add(
                         Diagnostics.ActionRowInvalidChild,
                         rest.State.Source
                     );
@@ -83,7 +83,7 @@ public class ActionRowComponentNode : ComponentNode
 
                 break;
 
-            case InterleavedComponentNode: break;
+            case IDynamicComponentNode: break;
 
             default:
                 foreach (
@@ -91,7 +91,7 @@ public class ActionRowComponentNode : ComponentNode
                     in state.Children.Where(x => !IsValidChild(x.Inner))
                 )
                 {
-                    context.AddDiagnostic(
+                    diagnostics.Add(
                         Diagnostics.ActionRowInvalidChild,
                         rest.State.Source
                     );
@@ -100,7 +100,7 @@ public class ActionRowComponentNode : ComponentNode
                 break;
         }
 
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
     private static bool IsValidChild(ComponentNode node)
@@ -108,42 +108,40 @@ public class ActionRowComponentNode : ComponentNode
             or SelectMenuComponentNode
             or IDynamicComponentNode;
 
-    public override string Render(
+    public override Result<string> Render(
         ComponentState state,
         IComponentContext context,
         ComponentRenderingOptions options
-    )
-    {
-        var props = state.RenderProperties(this, context, asInitializers: true);
-        var children = state.RenderChildren(context, options: ChildRenderingOptions);
-
-        var init = new StringBuilder(props);
-
-        if (!string.IsNullOrWhiteSpace(children))
+    ) => state.RenderProperties(this, context, asInitializers: true)
+        .Combine(state.RenderChildren(context, options: ChildRenderingOptions))
+        .Map(x =>
         {
-            if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+            var (props, children) = x;
 
-            init.Append(
-                $"""
-                 Components =
-                 [
-                     {children.WithNewlinePadding(4)}
-                 ]
-                 """
-            );
-        }
+            var init = new StringBuilder(props);
 
-        return
-            $$"""
-              new {{context.KnownTypes.ActionRowBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
-                  init
-                      .ToString()
-                      .WithNewlinePadding(4)
-                      .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
-                      .PostfixIfSome($"{Environment.NewLine}}}")
-              }}
-              """;
-    }
+            if (!string.IsNullOrWhiteSpace(children))
+            {
+                if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+
+                init.Append(
+                    $"""
+                     Components =
+                     [
+                         {children.WithNewlinePadding(4)}
+                     ]
+                     """
+                );
+            }
+
+            return
+                $"new {context.KnownTypes.ActionRowBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(){
+                    init.ToString()
+                        .WithNewlinePadding(4)
+                        .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+                        .PostfixIfSome($"{Environment.NewLine}}}")
+                }";
+        });
 }
 
 public sealed class AutoActionRowComponentNode : ActionRowComponentNode
@@ -156,7 +154,7 @@ public sealed class AutoActionRowComponentNode : ActionRowComponentNode
         return new ComponentState() { Source = context.Node };
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         // no validation occurs for auto rows
     }

@@ -223,7 +223,7 @@ public sealed class ContainerTests : BaseComponentTest
 
             Validate();
 
-            Diagnostic(Diagnostics.UnknownProperty.Id, message: "'unknown' is not a known property of 'container'");
+            Diagnostic(Diagnostics.UnknownProperty("unknown", "container"));
 
             Renders(
                 """
@@ -369,12 +369,10 @@ public sealed class ContainerTests : BaseComponentTest
             Validate();
 
             Diagnostic(
-                Diagnostics.InvalidContainerChild.Id,
-                message: "'container' is not a valid child component of 'container'"
+                Diagnostics.InvalidContainerChild("container")
             );
             Diagnostic(
-                Diagnostics.InvalidContainerChild.Id,
-                message: "'button' is not a valid child component of 'container'"
+                Diagnostics.InvalidContainerChild("button")
             );
 
             EOF();

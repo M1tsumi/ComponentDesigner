@@ -21,17 +21,15 @@ public sealed class LabelTests : BaseComponentTest
             Validate(hasErrors: true);
             
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'label' requires the property 'component' to be specified"
+                Diagnostics.MissingRequiredProperty("label", "component")
             );
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'label' requires the property 'value' to be specified"
+                Diagnostics.MissingRequiredProperty("label", "value")
             );
             
             Diagnostic(
-                Diagnostics.MissingTypeInAssembly.Id
+                Diagnostics.MissingTypeInAssembly("LabelBuilderType")
             );
 
             EOF();

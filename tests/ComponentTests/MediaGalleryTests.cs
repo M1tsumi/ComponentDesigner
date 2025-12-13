@@ -20,8 +20,8 @@ public sealed class MediaGalleryTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MediaGalleryIsEmpty.Id,
-                location: CurrentGraph.GetLocation(galleryNode.State.Source)
+                Diagnostics.MediaGalleryIsEmpty,
+                galleryNode.State.Source
             );
 
             EOF();
@@ -77,8 +77,8 @@ public sealed class MediaGalleryTests : BaseComponentTest
             );
 
             Diagnostic(
-                Diagnostics.TooManyItemsInMediaGallery.Id,
-                location: CurrentGraph.GetLocation(errorSpan)
+                Diagnostics.TooManyItemsInMediaGallery,
+                errorSpan
             );
 
             EOF();
@@ -148,8 +148,8 @@ public sealed class MediaGalleryTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidMediaGalleryChild.Id,
-                location: CurrentGraph.GetLocation(containerNode.State.Source)
+                Diagnostics.InvalidMediaGalleryChild("container"),
+                containerNode.State.Source
             );
             
             Diagnostic(Diagnostics.MediaGalleryIsEmpty.Id);

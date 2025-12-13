@@ -80,18 +80,17 @@ public sealed class SelectMenuOptionComponentNode : ComponentNode
         return state;
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
-    {
-        base.Validate(state, context);
-    }
-
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-        => $"""
-            new {context.KnownTypes.SelectMenuOptionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                state.RenderProperties(this, context)
-                    .WithNewlinePadding(4)
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context)
+        .Map(x =>
+            $"new {context.KnownTypes.SelectMenuOptionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                x.WithNewlinePadding(4)
                     .PrefixIfSome(4)
                     .WrapIfSome(Environment.NewLine)
-            })
-            """;
+            })"
+        );
 }

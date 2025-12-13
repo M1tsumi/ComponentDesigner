@@ -117,8 +117,8 @@ public sealed class ActionRowTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.ActionRowInvalidChild.Id,
-                location: CurrentGraph.GetLocation(extraButtonNode.State.Source)
+                Diagnostics.ActionRowInvalidChild,
+                span: extraButtonNode.State.Source.Span
             );
 
             EOF();
@@ -154,8 +154,8 @@ public sealed class ActionRowTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.ActionRowInvalidChild.Id,
-                location: CurrentGraph.GetLocation(selectMenuNode.State.Source)
+                Diagnostics.ActionRowInvalidChild,
+                selectMenuNode.State.Source.Span
             );
 
             EOF();
@@ -194,7 +194,7 @@ public sealed class ActionRowTests : BaseComponentTest
                         new global::Discord.SelectMenuBuilder(
                             type: global::Discord.ComponentType.SelectMenu,
                             customId: "abc",
-                            options: 
+                            options:
                             [
                                 new global::Discord.SelectMenuOptionBuilder(
                                     label: "Foo",
@@ -286,12 +286,12 @@ public sealed class ActionRowTests : BaseComponentTest
             Validate();
 
             Diagnostic(
-                Diagnostics.UnknownProperty.Id,
-                location: CurrentGraph.GetLocation(abcAttr)
+                Diagnostics.UnknownProperty(property: "abc", owner: "action-row"),
+                span: abcAttr.Span
             );
             Diagnostic(
-                Diagnostics.UnknownProperty.Id,
-                location: CurrentGraph.GetLocation(somePropAttr)
+                Diagnostics.UnknownProperty(property: "someProp", owner: "action-row"),
+                span: somePropAttr.Span
             );
 
             EOF();
@@ -320,8 +320,8 @@ public sealed class ActionRowTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.ActionRowInvalidChild.Id,
-                location: CurrentGraph.GetLocation(containerNode.State.Source)
+                Diagnostics.ActionRowInvalidChild,
+                span: containerNode.State.Source.Span
             );
             
             EOF();

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Discord.CX.Parser;
-using Discord.Net.ComponentDesignerGenerator.Utils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -14,13 +13,19 @@ public abstract class SelectMenuDefaultValue
     public abstract ICXNode Owner { get; }
     public abstract SelectMenuDefaultValueKind Kind { get; }
 
-    public void Validate(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
-    {
-        this.ValidateInternal(context, selectState);
-    }
+    public void Validate(
+        IComponentContext context,
+        SelectMenuComponentNode.SelectState selectState,
+        IList<DiagnosticInfo> diagnostics
+    ) => ValidateInternal(context, selectState, diagnostics);
 
-    protected abstract void ValidateInternal(IComponentContext context, SelectMenuComponentNode.SelectState selectState);
-    public abstract string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState);
+    protected abstract void ValidateInternal(
+        IComponentContext context,
+        SelectMenuComponentNode.SelectState selectState,
+        IList<DiagnosticInfo> diagnostics
+    );
+
+    public abstract Result<string> Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState);
 
     private static string FromIdAndKind(IComponentContext context, string id, SelectMenuDefaultValueKind kind)
     {
@@ -57,18 +62,25 @@ public abstract class SelectMenuDefaultValue
         public override ICXNode Owner => node;
         public override SelectMenuDefaultValueKind Kind => SelectMenuDefaultValueKind.Unknown;
 
-        protected override void ValidateInternal(IComponentContext context,
-            SelectMenuComponentNode.SelectState selectState)
+        protected override void ValidateInternal(
+            IComponentContext context,
+            SelectMenuComponentNode.SelectState selectState,
+            IList<DiagnosticInfo> diagnostics
+        )
         {
-            context.AddDiagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKind,
-                node,
-                node.GetType().Name
+            diagnostics.Add(
+                Diagnostics.InvalidSelectMenuDefaultKind(node.GetType().Name),
+                node
             );
         }
 
-        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
-            => string.Empty;
+        public override Result<string> Render(
+            IComponentContext context,
+            SelectMenuComponentNode.SelectState selectState
+        ) => Result<string>.FromDiagnostic(
+            Diagnostics.InvalidSelectMenuDefaultKind(node.GetType().Name),
+            node
+        );
     }
 
     public sealed class Interpolation(CXToken interpolation) : SelectMenuDefaultValue
@@ -196,16 +208,18 @@ public abstract class SelectMenuDefaultValue
 
         protected override void ValidateInternal(
             IComponentContext context,
-            SelectMenuComponentNode.SelectState selectState
+            SelectMenuComponentNode.SelectState selectState,
+            IList<DiagnosticInfo> diagnostics
         )
         {
             if (!TryGetKind(context, out var kind))
             {
-                context.AddDiagnostic(
-                    Diagnostics.TypeMismatch,
-                    interpolation,
-                    context.GetInterpolationInfo(interpolation).Symbol,
-                    "select menu default"
+                diagnostics.Add(
+                    Diagnostics.TypeMismatch(
+                        "select menu default",
+                        context.GetInterpolationInfo(interpolation).Symbol!.ToDisplayString()
+                    ),
+                    interpolation
                 );
 
                 return;
@@ -218,11 +232,12 @@ public abstract class SelectMenuDefaultValue
                     case SelectKind.Channel when !kind.HasFlag(InterpolationKind.Channel):
                     case SelectKind.User when !kind.HasFlag(InterpolationKind.User):
                     case SelectKind.Role when !kind.HasFlag(InterpolationKind.Role):
-                        context.AddDiagnostic(
-                            Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu,
-                            interpolation,
-                            kind,
-                            selectState.Kind
+                        diagnostics.Add(
+                            Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu(
+                                kind.ToString(),
+                                selectState.Kind.ToString()
+                            ),
+                            interpolation
                         );
                         break;
                 }
@@ -232,9 +247,12 @@ public abstract class SelectMenuDefaultValue
             _kind = kind;
         }
 
-        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override Result<string> Render(
+            IComponentContext context,
+            SelectMenuComponentNode.SelectState selectState
+        )
         {
-            if (_kind is null or InterpolationKind.Unknown) return string.Empty;
+            if (_kind is null or InterpolationKind.Unknown) return default;
 
             return RenderKind(context, _kind.Value);
         }
@@ -248,8 +266,11 @@ public abstract class SelectMenuDefaultValue
         private SelectMenuDefaultValueKind? _kind;
         private CXValue? _value;
 
-        protected override void ValidateInternal(IComponentContext context,
-            SelectMenuComponentNode.SelectState selectState)
+        protected override void ValidateInternal(
+            IComponentContext context,
+            SelectMenuComponentNode.SelectState selectState,
+            IList<DiagnosticInfo> diagnostics
+        )
         {
             _kind = element.Identifier.ToLowerInvariant() switch
             {
@@ -261,10 +282,9 @@ public abstract class SelectMenuDefaultValue
 
             if (_kind is null)
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidSelectMenuDefaultKind,
-                    element,
-                    element.Identifier
+                diagnostics.Add(
+                    Diagnostics.InvalidSelectMenuDefaultKind(element.Identifier),
+                    element
                 );
 
                 return;
@@ -272,7 +292,7 @@ public abstract class SelectMenuDefaultValue
 
             if (element.Children.Count is 0)
             {
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.MissingSelectMenuDefaultValue,
                     element
                 );
@@ -282,7 +302,7 @@ public abstract class SelectMenuDefaultValue
 
             if (element.Children.Count > 1)
             {
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.TooManyValuesInSelectMenuDefault,
                     TextSpan.FromBounds(
                         element.Children[1].Span.Start,
@@ -295,10 +315,9 @@ public abstract class SelectMenuDefaultValue
 
             if (element.Children[0] is not CXValue value)
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidSelectMenuDefaultChild,
-                    element.Children[0],
-                    element.Children[0].GetType().Name
+                diagnostics.Add(
+                    Diagnostics.InvalidSelectMenuDefaultChild(element.Children[0].GetType().Name),
+                    element.Children[0]
                 );
 
                 return;
@@ -307,23 +326,19 @@ public abstract class SelectMenuDefaultValue
             _value = value;
         }
 
-        public override string Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
+        public override Result<string> Render(IComponentContext context, SelectMenuComponentNode.SelectState selectState)
         {
-            if (_value is null || !_kind.HasValue) return string.Empty;
+            if (_value is null || !_kind.HasValue) return default;
 
             switch (_value)
             {
                 case CXValue.Scalar scalar:
                     if (!ulong.TryParse(scalar.Value, out var id))
                     {
-                        context.AddDiagnostic(
-                            Diagnostics.TypeMismatch,
-                            scalar,
-                            "text",
-                            "ulong"
+                        return Result<string>.FromDiagnostic(
+                            Diagnostics.TypeMismatch("ulong", "text"),
+                            scalar
                         );
-
-                        return string.Empty;
                     }
 
                     return FromId(id.ToString());
@@ -373,23 +388,15 @@ public abstract class SelectMenuDefaultValue
                             );
                     }
 
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        interpolation,
-                        info.Symbol!.ToDisplayString(),
-                        _kind.Value.ToString()
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.TypeMismatch(_kind.Value.ToString(), info.Symbol!.ToDisplayString()),
+                        interpolation
                     );
-
-                    return string.Empty;
                 default:
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        _value?.Span ?? element.Span,
-                        _value?.GetType().Name,
-                        _kind.Value.ToString()
+                    return Result<string>.FromDiagnostic(
+                        Diagnostics.TypeMismatch(_kind.Value.ToString(), _value?.GetType().Name ?? "null"),
+                        _value?.Span ?? element.Span
                     );
-
-                    return string.Empty;
             }
 
             string FromId(string id)

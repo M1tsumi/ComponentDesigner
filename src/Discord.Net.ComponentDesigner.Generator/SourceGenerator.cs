@@ -14,29 +14,6 @@ using System.Threading;
 
 namespace Discord.CX;
 
-public sealed record Target(
-    InterceptableLocation InterceptLocation,
-    InvocationExpressionSyntax InvocationSyntax,
-    ExpressionSyntax ArgumentExpressionSyntax,
-    IInvocationOperation Operation,
-    Compilation Compilation,
-    string? ParentKey,
-    string CXDesigner,
-    TextSpan CXDesignerSpan,
-    DesignerInterpolationInfo[] Interpolations,
-    int CXQuoteCount
-)
-{
-    public SyntaxTree SyntaxTree => InvocationSyntax.SyntaxTree;
-}
-
-public sealed record DesignerInterpolationInfo(
-    int Id,
-    TextSpan Span,
-    ITypeSymbol? Symbol,
-    Optional<object?> Constant
-);
-
 [Generator]
 public sealed class SourceGenerator : IIncrementalGenerator
 {
@@ -57,7 +34,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 .Combine(provider.Select(GetKeysAndUpdateCachedEntries))
                 .Combine(GeneratorOptions.CreateProvider(context))
                 .SelectMany(MapManagers)
-                .Select((x, _) => x.Render())
+                .Select((manager, token) => manager.Render(token))
                 .Collect(),
             Generate
         );
@@ -74,7 +51,12 @@ public sealed class SourceGenerator : IIncrementalGenerator
             var interceptor = interceptors[i];
             foreach (var diagnostic in interceptor.Diagnostics)
             {
-                context.ReportDiagnostic(diagnostic);
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        diagnostic.Descriptor,
+                        interceptor.SyntaxTree.GetLocation(diagnostic.Span)
+                    )
+                );
             }
 
             if (i > 0)
@@ -83,12 +65,12 @@ public sealed class SourceGenerator : IIncrementalGenerator
             var parameter = interceptor.UsesDesigner
                 ? $"global::{Constants.COMPONENT_DESIGNER_QUALIFIED_NAME} designer"
                 : "global::System.String cx";
-            
+
             sb.AppendLine(
                 $$"""
                   /*
                   {{interceptor.Location}}
-                  
+
                   {{interceptor.CX.NormalizeIndentation()}}
                   */
                   [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.InterceptLocation.Version}}, data: "{{interceptor.InterceptLocation.Data}}")]
@@ -124,7 +106,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
     }
 
     private IEnumerable<CXGraphManager> MapManagers(
-        ((ImmutableArray<Target?>, ImmutableArray<string?>), GeneratorOptions) tuple,
+        ((ImmutableArray<ComponentDesignerTarget?>, ImmutableArray<string?>), GeneratorOptions) tuple,
         CancellationToken token
     )
     {
@@ -159,7 +141,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
     }
 
     private ImmutableArray<string?> GetKeysAndUpdateCachedEntries(
-        ImmutableArray<Target?> target,
+        ImmutableArray<ComponentDesignerTarget?> target,
         CancellationToken token
     )
     {
@@ -198,10 +180,11 @@ public sealed class SourceGenerator : IIncrementalGenerator
         return [..result];
     }
 
-    private static Target? MapPossibleComponentDesignerCall(GeneratorSyntaxContext context, CancellationToken token)
+    private static ComponentDesignerTarget? MapPossibleComponentDesignerCall(GeneratorSyntaxContext context,
+        CancellationToken token)
         => MapPossibleComponentDesignerCall(context.SemanticModel, context.Node, token);
 
-    public static Target? MapPossibleComponentDesignerCall(
+    public static ComponentDesignerTarget? MapPossibleComponentDesignerCall(
         SemanticModel semanticModel,
         SyntaxNode node,
         CancellationToken token
@@ -221,7 +204,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 argumentSyntax,
                 semanticModel,
                 out var cxDesigner,
-                out var span,
+                out var locationInfo,
                 out var interpolationInfos,
                 out var quoteCount,
                 token
@@ -229,18 +212,16 @@ public sealed class SourceGenerator : IIncrementalGenerator
         ) return null;
 
 
-        return new Target(
-            interceptLocation,
-            invocationSyntax,
-            argumentSyntax,
-            operation,
+        return new ComponentDesignerTarget(
             semanticModel.Compilation,
-            semanticModel
-                .GetEnclosingSymbol(invocationSyntax.SpanStart, token)
+            invocationSyntax.SyntaxTree,
+            interceptLocation,
+            semanticModel.GetEnclosingSymbol(invocationSyntax.SpanStart, token)
                 ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             cxDesigner,
-            span,
-            interpolationInfos,
+            locationInfo,
+            [..interpolationInfos],
+            operation.TargetMethod.Parameters[0].Type.SpecialType is not SpecialType.System_String,
             quoteCount
         );
 
@@ -248,7 +229,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             out string content,
-            out TextSpan span,
+            out LocationInfo locationInfo,
             out DesignerInterpolationInfo[] interpolations,
             out int quoteCount,
             CancellationToken token
@@ -256,7 +237,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         {
             switch (expression)
             {
-                case LiteralExpressionSyntax {Token.Text: { } literalContent} literal:
+                case LiteralExpressionSyntax { Token.Text: { } literalContent } literal:
                     content = PrepareRawLiteral(
                         literalContent,
                         out var startQuoteCount,
@@ -265,10 +246,14 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
                     quoteCount = startQuoteCount;
                     interpolations = [];
-                    span = TextSpan.FromBounds(
-                        literal.Token.Span.Start + startQuoteCount,
-                        literal.Token.Span.End - endQuoteCount
-                    );
+                    locationInfo = LocationInfo.CreateFrom(
+                        expression.SyntaxTree.GetLocation(
+                            TextSpan.FromBounds(
+                                literal.Token.Span.Start + startQuoteCount,
+                                literal.Token.Span.End - endQuoteCount
+                            )
+                        )
+                    )!;
                     return true;
 
                 case InterpolatedStringExpressionSyntax interpolated:
@@ -287,12 +272,14 @@ public sealed class SourceGenerator : IIncrementalGenerator
                             );
                         })
                         .ToArray();
-                    span = interpolated.Contents.Span;
+                    locationInfo = LocationInfo.CreateFrom(
+                        expression.SyntaxTree.GetLocation(interpolated.Contents.Span)
+                    )!;
                     quoteCount = interpolated.StringEndToken.Span.Length;
                     return true;
                 default:
                     content = string.Empty;
-                    span = default;
+                    locationInfo = null!;
                     interpolations = [];
                     quoteCount = 0;
                     return false;
@@ -317,7 +304,8 @@ public sealed class SourceGenerator : IIncrementalGenerator
             }
 
             for (var i = literal.Length - 1; i >= startQuoteCount; i--, endQuoteCount++)
-                if (literal[i] is not '"') break;
+                if (literal[i] is not '"')
+                    break;
 
             return literal.Substring(
                 startQuoteCount, literal.Length - startQuoteCount - endQuoteCount
@@ -354,6 +342,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
                         operation = invocation;
                         break;
                     }
+
                     goto default;
 
                 default:
@@ -385,7 +374,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         {
             Expression: MemberAccessExpressionSyntax
             {
-                Name: {Identifier.Value: "Create" or "cx"}
+                Name: { Identifier.Value: "Create" or "cx" }
             } or IdentifierNameSyntax
             {
                 Identifier.ValueText: "cx"

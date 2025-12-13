@@ -12,9 +12,9 @@ public sealed class TextDisplayComponentNode : ComponentNode
     public override IReadOnlyList<string> Aliases { get; } = ["text"];
 
     public ComponentProperty Content { get; }
-    
+
     public override IReadOnlyList<ComponentProperty> Properties { get; }
-    
+
     protected override bool AllowChildrenInCX => true;
 
     public TextDisplayComponentNode()
@@ -39,13 +39,19 @@ public sealed class TextDisplayComponentNode : ComponentNode
         return state;
     }
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-        => $"""
-            new {context.KnownTypes.TextDisplayBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                state.RenderProperties(this, context)
-                    .WithNewlinePadding(4)
-                    .PrefixIfSome(4)
-                    .WrapIfSome(Environment.NewLine)
-            })
-            """;
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context)
+        .Map(x =>
+            $"""
+             new {context.KnownTypes.TextDisplayBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                 x.PrefixIfSome(4)
+                     .WithNewlinePadding(4)
+                     .WrapIfSome(Environment.NewLine)
+             })
+             """
+        );
 }

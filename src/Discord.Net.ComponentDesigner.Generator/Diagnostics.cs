@@ -5,38 +5,35 @@ namespace Discord.CX;
 
 public static partial class Diagnostics
 {
-    public static Diagnostic CreateParsingDiagnostic(CXDiagnostic diagnostic, Location location)
-        => Diagnostic.Create(
-            new DiagnosticDescriptor(
-                $"DCP{((int)diagnostic.Code).ToString().PadLeft(3, '0')}",
-                diagnostic.Message,
-                diagnostic.Message,
-                "CX Parser",
-                diagnostic.Severity,
-                true
-            ),
-            location
+    public static DiagnosticDescriptor CreateParsingDiagnostic(CXDiagnostic diagnostic)
+        => new DiagnosticDescriptor(
+            $"DCP{((int)diagnostic.Code).ToString().PadLeft(3, '0')}",
+            diagnostic.Message,
+            diagnostic.Message,
+            "CX Parser",
+            diagnostic.Severity,
+            true
         );
 
-    public static readonly DiagnosticDescriptor InvalidEnumVariant = new(
+    public static DiagnosticDescriptor InvalidEnumVariant(string variant, string target) => new(
         "DC0001",
         "Invalid enum variant",
-        "'{0}' is not a valid variant of '{1}'; valid values are '{2}'",
+        $"'{variant}' is not a valid variant of '{target}'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
 
-    public static readonly DiagnosticDescriptor TypeMismatch = new(
+    public static DiagnosticDescriptor TypeMismatch(string expected, string actual) => new(
         "DC0002",
         "Type mismatch",
-        "'{0}' is not of expected type '{1}'",
+        $"'{actual}' is not of expected type '{expected}'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
 
-    public static readonly DiagnosticDescriptor OutOfRange = new(
+    public static DiagnosticDescriptor OutOfRange(string a, string b) => new(
         "DC0003",
         "Type mismatch",
         "'{0}' must be {1}",
@@ -45,10 +42,10 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor UnknownComponent = new(
+    public static DiagnosticDescriptor UnknownComponent(string identifier) => new(
         "DC0004",
         "Unknown component",
-        "'{0}' is not a known component",
+        $"'{identifier}' is not a known component",
         "Components",
         DiagnosticSeverity.Error,
         true
@@ -117,19 +114,19 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor MissingRequiredProperty = new(
+    public static DiagnosticDescriptor MissingRequiredProperty(string? owner, string property) => new(
         "DC0012",
         "Missing Property",
-        "'{0}' requires the property '{1}' to be specified",
+        $"'{owner ?? "Unknown"}' requires the property '{property}' to be specified",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
 
-    public static readonly DiagnosticDescriptor UnknownProperty = new(
+    public static DiagnosticDescriptor UnknownProperty(string property, string? owner) => new(
         "DC0013",
         "Unknown Property",
-        "'{0}' is not a known property of '{1}'",
+        $"'{property}' is not a known property of '{owner ?? "Unknown"}'",
         "Components",
         DiagnosticSeverity.Warning,
         true
@@ -162,10 +159,10 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor InvalidAccessoryChild = new(
+    public static DiagnosticDescriptor InvalidAccessoryChild(string accessory) => new(
         "DC0017",
         "Invalid accessory child",
-        "'{0}' is not a valid accessory, only buttons and thumbnails are allowed",
+        $"'{accessory}' is not a valid accessory, only buttons and thumbnails are allowed",
         "Components",
         DiagnosticSeverity.Error,
         true
@@ -207,10 +204,10 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor InvalidSectionChildComponentType = new(
+    public static  DiagnosticDescriptor InvalidSectionChildComponentType(string child) => new(
         "DC0022",
         "Invalid section child component type",
-        "'{0}' is not a valid child component of a section; only text displays are allowed",
+        $"'{child}' is not a valid child component of a section; only text displays are allowed",
         "Components",
         DiagnosticSeverity.Error,
         true
@@ -234,10 +231,10 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor SpecifiedInvalidSelectMenuType = new(
+    public static DiagnosticDescriptor SpecifiedInvalidSelectMenuType(string type) => new(
         "DC0025",
         "Invalid select menu type",
-        "'{0}' is not a valid elect menu type; must be either 'string', 'user', 'role', 'channel', or 'mentionable'",
+        $"'{type}' is not a valid elect menu type; must be either 'string', 'user', 'role', 'channel', or 'mentionable'",
         "Components",
         DiagnosticSeverity.Error,
         true
@@ -252,15 +249,15 @@ public static partial class Diagnostics
         true
     );
 
-    public static readonly DiagnosticDescriptor InvalidPropertyValueSyntax = new(
+    public static DiagnosticDescriptor InvalidPropertyValueSyntax(string expected) => new(
         "DC0027",
         "Invalid syntax",
-        "Expected '{}' as the property value",
+        $"Expected '{expected}' as the property value",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor ButtonMustHaveALabelOrEmoji = new(
         "DC0028",
         "A button must have a label or emoji",
@@ -269,25 +266,25 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor PossibleInvalidEmote = new(
+
+    public static DiagnosticDescriptor PossibleInvalidEmote(string emote) => new(
         "DC0029",
         "Possible invalid emote",
-        "'{0}' doesn't look like a unicode emoji or a custom emote",
+        $"'{emote}' doesn't look like a unicode emoji or a custom emote",
         "Components",
         DiagnosticSeverity.Warning,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidChildComponentCardinality = new(
+
+    public static DiagnosticDescriptor InvalidChildComponentCardinality(string owner) => new(
         "DC0030",
         "Too many children",
-        "'{0}' only accepts one child",
+        $"'{owner}' only accepts one child",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor FileUploadNotInLabel = new(
         "DC0031",
         "A file upload component must be placed in a label",
@@ -296,16 +293,16 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor MissingTypeInAssembly = new(
+
+    public static DiagnosticDescriptor MissingTypeInAssembly(string type) => new(
         "DC0032",
         "Missing type in assembly",
-        "Could not find '{0}' in your assembly",
+        $"Could not find '{type}' in your assembly",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor MissingLabelComponent = new(
         "DC0033",
         "Label is missing a child component",
@@ -314,7 +311,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor TooManyChildrenInLabel = new(
         "DC0034",
         "Too many children in Label",
@@ -323,7 +320,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor InvalidLabelChild = new(
         "DC0035",
         "Invalid label child component",
@@ -332,43 +329,43 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidContainerChild = new(
+
+    public static DiagnosticDescriptor InvalidContainerChild(string child) => new(
         "DC0036",
         "Invalid container child component",
-        "'{0}' is not a valid child component of 'container'",
+        $"'{child}' is not a valid child component of 'container'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidMediaGalleryChild = new(
+
+    public static DiagnosticDescriptor InvalidMediaGalleryChild(string child) => new(
         "DC0037",
         "Invalid media gallery child component",
-        "'{0}' is not a valid child component of 'media gallery'",
+        $"'{child}' is not a valid child component of 'media gallery'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor PropertyNotAllowed = new(
+
+    public static DiagnosticDescriptor PropertyNotAllowed(string owner, string property) => new(
         "DC0038",
         "Property not allowed",
-        "'{0}' doesn't allow the property '{1}' to be specified in the current configuration",
+        $"'{owner}' doesn't allow the property '{property}' to be specified in the current configuration",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor CardinalityForcedToRuntime = new(
+
+    public static DiagnosticDescriptor CardinalityForcedToRuntime(string target) => new(
         "DC0040",
         "Cardinality forced to runtime check",
-        "'{0}' can be more than 1 component, a runtime check will occur to enforce a single component",
+        $"'{target}' can be more than 1 component, a runtime check will occur to enforce a single component",
         "Components",
         DiagnosticSeverity.Warning,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor LabelComponentDuplicate = new(
         "DC0041",
         "Duplicate component definition",
@@ -377,8 +374,8 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor ComponentDoesntAllowChildren = new(
+
+    public static DiagnosticDescriptor ComponentDoesntAllowChildren(string owner) => new(
         "DC0042",
         "Component doesn't allow children",
         "'{0}' doesn't allow children",
@@ -386,7 +383,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor MediaGalleryIsEmpty = new(
         "DC0043",
         "Empty media gallery",
@@ -395,7 +392,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor TooManyItemsInMediaGallery = new(
         "DC0044",
         "Too many items in media gallery",
@@ -404,25 +401,25 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidRange = new(
+
+    public static DiagnosticDescriptor InvalidRange(string lower, string upper) => new(
         "DC0045",
         "Invalid range",
-        "'{0}' must be less than or equal to '{1}'",
+        $"'{lower}' must be less than or equal to '{upper}'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultKind = new(
+
+    public static DiagnosticDescriptor InvalidSelectMenuDefaultKind(string kind) => new(
         "DC0046",
         "Invalid select menu default kind",
-        "'{0}' is not a valid default kind, valid kinds are: 'user', 'role', and 'channel'",
+        $"'{kind}' is not a valid default kind, valid kinds are: 'user', 'role', and 'channel'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor MissingSelectMenuDefaultValue = new(
         "DC0047",
         "Missing value for default option",
@@ -431,7 +428,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor TooManyValuesInSelectMenuDefault = new(
         "DC0048",
         "Too many values in default option",
@@ -440,25 +437,25 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultChild = new(
+
+    public static DiagnosticDescriptor InvalidSelectMenuDefaultChild(string child) => new(
         "DC0049",
         "Invalid child of select menu default option",
-        "'{0}' is not a valid value, expected a scalar or interpolation",
+        $"'{child}' is not a valid value, expected a scalar or interpolation",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidSelectMenuDefaultKindInCurrentMenu = new(
+
+    public static DiagnosticDescriptor InvalidSelectMenuDefaultKindInCurrentMenu(string kind, string menu) => new(
         "DC0050",
         "Invalid default value kind",
-        "'{0}' is not a valid default kind for the menu '{1}'",
+        $"'{kind}' is not a valid default kind for the menu '{menu}'",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor EmptyStringSelectMenu = new(
         "DC0051",
         "A string select menu requires at least one option",
@@ -467,16 +464,16 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor InvalidStringSelectChild = new(
+
+    public static DiagnosticDescriptor InvalidStringSelectChild(string child) => new(
         "DC0052",
         "Invalid child of string select menu",
-        "'{0}' is not a valid child of a string select menu; valid children are: 'select-menu-option' or <interpolation>",
+        $"'{child}' is not a valid child of a string select menu; valid children are: 'select-menu-option' or <interpolation>",
         "Components",
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor TooManyStringSelectMenuChildren = new(
         "DC0053",
         "Too many string select children",
@@ -485,20 +482,20 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
-    public static readonly DiagnosticDescriptor FallbackToRuntimeValueParsing = new(
+
+    public static DiagnosticDescriptor FallbackToRuntimeValueParsing(string method) => new(
         "DC0054",
         "Using a runtime parse method",
-        "The value may be invalid or out of range, falling back to the runtime parsing method '{0}'",
+        $"The value may be invalid or out of range, falling back to the runtime parsing method '{method}'",
         "Components",
         DiagnosticSeverity.Warning,
         true
     );
 
-    public static readonly DiagnosticDescriptor InvalidInterleavedComponentInCurrentContext = new(
+    public static DiagnosticDescriptor InvalidInterleavedComponentInCurrentContext(string interleaved, string context) => new(
         "DC0055",
         "Invalid interpolated component",
-        "'{0}' cannot be used in an expected context of '{1}'",
+        $"'{interleaved}' cannot be used in an expected context of '{context}'",
         "Components",
         DiagnosticSeverity.Error,
         true

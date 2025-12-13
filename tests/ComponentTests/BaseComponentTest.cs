@@ -111,14 +111,16 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
         Assert.NotNull(_graph);
         Assert.NotNull(_context);
 
-        _graph.Value.Validate(_context);
+        var diagnostics = new List<DiagnosticInfo>();
+        
+        _graph.Value.Validate(_context, diagnostics);
 
         if (hasErrors.HasValue)
-            Assert.Equal(hasErrors.Value, _graph.Value.HasErrors);
+            Assert.Equal(hasErrors.Value, diagnostics.Any(x => x.Descriptor.DefaultSeverity is DiagnosticSeverity.Error));
 
         AssertEmptyDiagnostics();
 
-        PushDiagnostics([.._context.GlobalDiagnostics, .._graph.Value.Diagnostics]);
+        PushDiagnostics(diagnostics);
     }
 
     protected void Renders(string? expected = null)
@@ -130,9 +132,13 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
 
         var result = _graph.Value.Render(_context);
 
-        PushDiagnostics([.._context.GlobalDiagnostics, .._graph.Value.Diagnostics]);
+        PushDiagnostics(result.Diagnostics);
 
-        if (expected is not null) Assert.Equal(expected, result);
+        if (expected is not null)
+        {
+            Assert.True(result.HasResult);
+            Assert.Equal(expected, result.Value);
+        }
     }
 
 

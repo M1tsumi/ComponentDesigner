@@ -57,8 +57,7 @@ public sealed class TextDisplayTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'text-display' requires the property 'content' to be specified"
+                Diagnostics.MissingRequiredProperty("text-display", "content")
             );
 
             EOF();

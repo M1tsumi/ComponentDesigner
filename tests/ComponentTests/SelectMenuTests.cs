@@ -21,12 +21,11 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'select-menu' requires the property 'customId' to be specified"
+                Diagnostics.MissingRequiredProperty("select-menu", "customId")
             );
 
             Diagnostic(
-                Diagnostics.MissingSelectMenuType.Id
+                Diagnostics.MissingSelectMenuType
             );
 
             EOF();
@@ -50,8 +49,7 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'select-menu' requires the property 'customId' to be specified"
+                Diagnostics.MissingRequiredProperty("select-menu", "customId")
             );
 
             Diagnostic(Diagnostics.EmptyStringSelectMenu.Id);
@@ -110,7 +108,7 @@ public sealed class SelectMenuTests : BaseComponentTest
                 new global::Discord.SelectMenuBuilder(
                     type: global::Discord.ComponentType.SelectMenu,
                     customId: "abc",
-                    options: 
+                    options:
                     [
                         new global::Discord.SelectMenuOptionBuilder(
                             label: "label1",
@@ -197,7 +195,7 @@ public sealed class SelectMenuTests : BaseComponentTest
                 new global::Discord.SelectMenuBuilder(
                     type: global::Discord.ComponentType.SelectMenu,
                     customId: "abc",
-                    options: 
+                    options:
                     [
                         new global::Discord.SelectMenuOptionBuilder(
                             label: "1",
@@ -429,12 +427,10 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'Channel' is not a valid default kind for the menu 'User'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("Channel", "User")
             );
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'Role' is not a valid default kind for the menu 'User'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("Role", "User")
             );
 
             EOF();
@@ -503,12 +499,10 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'User' is not a valid default kind for the menu 'Channel'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("User", "Channel")
             );
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'Role' is not a valid default kind for the menu 'Channel'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("Role", "Channel")
             );
 
             EOF();
@@ -577,12 +571,10 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'User' is not a valid default kind for the menu 'Role'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("User", "Role")
             );
             Diagnostic(
-                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu.Id,
-                message: "'Channel' is not a valid default kind for the menu 'Role'"
+                Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu("Channel", "Role")
             );
 
             EOF();
@@ -690,13 +682,11 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'minValues' must be between 0 and 25"
+                Diagnostics.OutOfRange("minValues", "between 0 and 25")
             );
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'maxValues' must be between 1 and 25"
+                Diagnostics.OutOfRange("maxValues", "between 1 and 25")
             );
 
             EOF();
@@ -719,8 +709,7 @@ public sealed class SelectMenuTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidRange.Id,
-                message: "'minValues' must be less than or equal to 'maxValues'"
+                Diagnostics.InvalidRange("minValues", "maxValues")
             );
             
             EOF();

@@ -20,13 +20,11 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'button' requires the property 'customId' to be specified"
+                Diagnostics.MissingRequiredProperty(owner: "button", property: "customId")
             );
             
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'button' requires the property 'label' or 'emoji' to be specified"
+                Diagnostics.MissingRequiredProperty(owner: "button", property: "label' or 'emoji")
             );
             
             EOF();
@@ -105,15 +103,13 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'sku' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(sku.Attribute)
+                Diagnostics.PropertyNotAllowed(owner: "button", property: "sku"),
+                span: sku.Attribute.Span
             );
             
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'url' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(url.Attribute)
+                Diagnostics.PropertyNotAllowed(owner: "button", property: "url"),
+                url.Attribute
             );
             
             EOF();
@@ -149,15 +145,13 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'customId' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(customId.Attribute)
+                Diagnostics.PropertyNotAllowed(owner: "button", property: "customId"),
+                customId.Attribute
             );
             
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'sku' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(sku.Attribute)
+                Diagnostics.PropertyNotAllowed(owner: "button", "sku"),
+                sku.Attribute
             );
             
             EOF();
@@ -197,28 +191,24 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'customId' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(customId.Attribute)
+                Diagnostics.PropertyNotAllowed("button", "customId"),
+                customId.Attribute
             );
             
            
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'url' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(url.Attribute)
+                Diagnostics.PropertyNotAllowed("button", "url"),
+                url.Attribute
             );
             
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'label' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(label.Attribute)
+                Diagnostics.PropertyNotAllowed("button", "label"),
+                label.Attribute
             );
             
             Diagnostic(
-                Diagnostics.PropertyNotAllowed.Id,
-                message: "'button' doesn't allow the property 'emoji' to be specified in the current configuration",
-                location: CurrentGraph.GetLocation(emoji.Attribute)
+                Diagnostics.PropertyNotAllowed("button", "emoji"),
+                emoji.Attribute
             );
             
             EOF();
@@ -239,13 +229,11 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'button' requires the property 'url' to be specified"
+                Diagnostics.MissingRequiredProperty("button", "url")
             );
             
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'button' requires the property 'label' or 'emoji' to be specified"
+                Diagnostics.MissingRequiredProperty("button", "label' or 'emoji")
             );
             
             EOF();
@@ -266,8 +254,7 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'button' requires the property 'skuId' to be specified"
+                Diagnostics.MissingRequiredProperty("button", "skuId")
             );
             
             EOF();
@@ -328,9 +315,8 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'label' must be at most 80 characters in length",
-                location: CurrentGraph.GetLocation(label.Value)
+                Diagnostics.OutOfRange("label", "at most 80 characters in length"),
+                label.Value
             );
             
             EOF();
@@ -358,9 +344,8 @@ public sealed class ButtonTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'customId' must be at most 100 characters in length",
-                location: CurrentGraph.GetLocation(customId.Value)
+                Diagnostics.OutOfRange("customId", "at most 100 characters in length"),
+                customId.Value
             );
             
             EOF();
@@ -399,8 +384,8 @@ public sealed class ButtonTests : BaseComponentTest
             );
             
             Diagnostic(
-                Diagnostics.InvalidEnumVariant.Id,
-                location: CurrentGraph.GetLocation(style.Value)
+                Diagnostics.InvalidEnumVariant("invalid", "Discord.ButtonStyle"),
+                style.Value
             );
             
             EOF();

@@ -20,8 +20,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
             
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'text-input' requires the property 'customId' to be specified"
+                Diagnostics.MissingRequiredProperty("text-input", "customId")
             );
             
             EOF();
@@ -131,8 +130,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.InvalidRange.Id,
-                message: "'minLength' must be less than or equal to 'maxLength'"
+                Diagnostics.InvalidRange("minLength", "maxLength")
             );
             
             EOF();
@@ -156,8 +154,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'minLength' must be between 0 and 4000"
+                Diagnostics.OutOfRange("minLength", "between 0 and 4000")
             );
             
             EOF();
@@ -177,8 +174,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'minLength' must be between 0 and 4000"
+                Diagnostics.OutOfRange("minLength", "between 0 and 4000")
             );
             
             EOF();
@@ -202,8 +198,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'maxLength' must be between 1 and 4000"
+                Diagnostics.OutOfRange("maxLength", "between 1 and 4000")
             );
             
             EOF();
@@ -223,8 +218,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'maxLength' must be between 1 and 4000"
+                Diagnostics.OutOfRange("maxLength", "between 1 and 4000")
             );
             
             EOF();
@@ -248,8 +242,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'placeholder' must be at most 100 characters in length"
+                Diagnostics.OutOfRange("placeholder", "at most 100 characters in length")
             );
             
             EOF();
@@ -275,8 +268,7 @@ public sealed class TextInputTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'value' must be at most 4000 characters in length"
+                Diagnostics.OutOfRange("value", "at most 4000 characters in length")
             );
             
             EOF();

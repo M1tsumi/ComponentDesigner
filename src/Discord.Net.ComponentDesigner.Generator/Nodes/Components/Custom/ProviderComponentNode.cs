@@ -69,15 +69,18 @@ public sealed class ProviderComponentNode : ComponentNode
         Properties = properties;
     }
 
-    
 
-    public override string Render(ComponentState state,
-        IComponentContext context, ComponentRenderingOptions options) =>
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) =>
         $"{_providerSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.Render({CreateProviderState(state, context)})";
 
 
     private string CreateProviderState(
         ComponentState state,
         IComponentContext context
-    ) => $"new {_stateSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(){state.RenderInitializer(this, context)}";
+    ) =>
+        $"new {_stateSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(){state.RenderInitializer(this, context)}";
 }

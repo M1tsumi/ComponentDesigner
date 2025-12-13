@@ -31,7 +31,7 @@ public sealed class ColorTests : BaseRendererTest
             "global::Discord.Color.Parse(\"blah\")"
         );
         {
-            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing.Id);
+            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing("Discord.Color.Parse"));
             EOF();
         }
     }

@@ -25,7 +25,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
     public override bool HasChildren => true;
 
     public override IReadOnlyList<ComponentProperty> Properties { get; }
-    
+
     private static readonly ComponentRenderingOptions ChildRenderingOptions = new(
         TypingContext: new(
             CanSplat: false,
@@ -97,21 +97,25 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
         return state;
     }
 
-    public override void Validate(LabelComponentState state, IComponentContext context)
+    public override void Validate(
+        LabelComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
 
         var component = state.GetProperty(Component);
 
         if (component.Attribute is not null && state.ChildValue is not null)
         {
             // specified both in attribute and in the children
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.LabelComponentDuplicate,
                 component.Attribute
             );
 
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.LabelComponentDuplicate,
                 state.ChildValue
             );
@@ -119,10 +123,9 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 
         if (context.KnownTypes.LabelBuilderType is null)
         {
-            context.AddDiagnostic(
-                Diagnostics.MissingTypeInAssembly,
-                state.Source,
-                nameof(context.KnownTypes.LabelBuilderType)
+            diagnostics.Add(
+                Diagnostics.MissingTypeInAssembly(nameof(context.KnownTypes.LabelBuilderType)),
+                state.Source
             );
         }
 
@@ -130,7 +133,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
         {
             if (child != state.ChildValue && child != state.ChildElement)
             {
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.TooManyChildrenInLabel,
                     child
                 );
@@ -141,7 +144,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 
         if (labelChild is not null && !IsValidLabelChild(labelChild.Inner))
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.InvalidLabelChild,
                 labelChild.State.Source
             );
@@ -154,29 +157,20 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
             or TextInputComponentNode
             or FileUploadComponentNode;
 
-    public override string Render(
+    public override Result<string> Render(
         LabelComponentState state,
         IComponentContext context,
         ComponentRenderingOptions options
-    )
-    {
-        var props = string.Join(
-            $",{Environment.NewLine}",
-            [
-                state.RenderProperties(this, context),
-                state.Children.FirstOrDefault()
-                    ?.Render(context, options: ChildRenderingOptions)
-                    .PrefixIfSome("component: ")
-            ]
-        );
-
-        return
+    ) => state
+        .RenderProperties(this, context)
+        .Combine((state.Children.FirstOrDefault()?.Render(context, options: ChildRenderingOptions)).Or("null"))
+        .Map(x =>
             $"new {context.KnownTypes.LabelBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}{
-                props
+                string.Join($",{Environment.NewLine}", [x.Left, x.Right])
                     .Prefix(4)
                     .WithNewlinePadding(4)
                     .WrapIfSome(Environment.NewLine)
                     .Map(x => $"({x})")
-            }";
-    }
+            }"
+        );
 }

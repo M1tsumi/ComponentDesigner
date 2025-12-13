@@ -196,38 +196,37 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
 
         switch (state)
         {
             case MissingTypeState:
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.MissingSelectMenuType,
                     state.Source
                 );
                 return;
             case InvalidTypeState { Kind: var kind }:
-                context.AddDiagnostic(
+                diagnostics.Add(
                     kind is not null
-                        ? Diagnostics.SpecifiedInvalidSelectMenuType
+                        ? Diagnostics.SpecifiedInvalidSelectMenuType(kind)
                         : Diagnostics.InvalidSelectMenuType,
-                    state.Source,
-                    kind is not null ? [kind] : null
+                    state.Source
                 );
                 return;
             case SelectState selectState:
 
-                Validators.Range(context, state, MinValues, MaxValues);
+                Validators.Range(context, state, MinValues, MaxValues, diagnostics);
 
                 switch (selectState.Kind)
                 {
                     case SelectKind.String:
-                        ValidateStringSelectMenu(selectState, context);
+                        ValidateStringSelectMenu(selectState, context, diagnostics);
                         break;
                     default:
-                        ValidateDefaultValues(selectState, context);
+                        ValidateDefaultValues(selectState, context, diagnostics);
                         break;
                 }
 
@@ -235,11 +234,11 @@ public sealed class SelectMenuComponentNode : ComponentNode
         }
     }
 
-    private void ValidateDefaultValues(SelectState state, IComponentContext context)
+    private void ValidateDefaultValues(SelectState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         foreach (var defaultValue in state.Defaults)
         {
-            defaultValue.Validate(context, state);
+            defaultValue.Validate(context, state, diagnostics);
 
             switch (state.Kind, defaultValue.Kind)
             {
@@ -249,18 +248,23 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 case (SelectKind.Channel, not SelectMenuDefaultValueKind.Channel)
                     or (SelectKind.User, not SelectMenuDefaultValueKind.User)
                     or (SelectKind.Role, not SelectMenuDefaultValueKind.Role):
-                    context.AddDiagnostic(
-                        Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu,
-                        defaultValue.Owner,
-                        defaultValue.Kind,
-                        state.Kind
+                    diagnostics.Add(
+                        Diagnostics.InvalidSelectMenuDefaultKindInCurrentMenu(
+                            defaultValue.Kind.ToString(),
+                            state.Kind.ToString()
+                        ),
+                        defaultValue.Owner
                     );
                     continue;
             }
         }
     }
 
-    private void ValidateStringSelectMenu(SelectState state, IComponentContext context)
+    private void ValidateStringSelectMenu(
+        SelectState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         var validChildrenCount = 0;
 
@@ -268,10 +272,9 @@ public sealed class SelectMenuComponentNode : ComponentNode
         {
             if (!IsValidStringSelectChild(child.Inner))
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidStringSelectChild,
-                    child.State.Source,
-                    child.Inner.Name
+                diagnostics.Add(
+                    Diagnostics.InvalidStringSelectChild(child.Inner.Name),
+                    child.State.Source
                 );
             }
             else validChildrenCount++;
@@ -280,13 +283,13 @@ public sealed class SelectMenuComponentNode : ComponentNode
         switch (validChildrenCount)
         {
             case 0:
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.EmptyStringSelectMenu,
                     state.Source
                 );
                 break;
             case > Constants.STRING_SELECT_MAX_VALUES:
-                context.AddDiagnostic(
+                diagnostics.Add(
                     Diagnostics.TooManyStringSelectMenuChildren,
                     TextSpan.FromBounds(
                         state.Children.Skip(Constants.STRING_SELECT_MAX_VALUES).First()
@@ -307,7 +310,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
         foreach (var candidate in candidates)
         {
-            if (SelectMenuInterpolatedOption.TryCreate(context, candidate, out var option))
+            if (SelectMenuInterpolatedOption.TryCreate(context, candidate, diagnostics, out var option))
                 state.InterpolatedOptions.Add(option);
         }
 
@@ -335,70 +338,67 @@ public sealed class SelectMenuComponentNode : ComponentNode
     private static bool IsValidStringSelectChild(ComponentNode node)
         => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
+    public override Result<string> Render(ComponentState state, IComponentContext context,
+        ComponentRenderingOptions options)
     {
-        if (state is not SelectState selectState) return string.Empty;
+        if (state is not SelectState selectState) return default;
 
-        var props = new StringBuilder();
-
-        props.Append("type: ").Append(ToDiscordComponentType(context, selectState.Kind));
-
-        var componentProps = state.RenderProperties(this, context);
-
-        if (!string.IsNullOrWhiteSpace(componentProps))
-            props.AppendLine(",").Append(componentProps);
-
-        if (selectState.Defaults.Count > 0)
-        {
-            props.AppendLine(",").AppendLine("defaultValues:").AppendLine("[");
-
-            for (var i = 0; i < selectState.Defaults.Count; i++)
+        return state
+            .RenderProperties(this, context)
+            .Combine(
+                selectState.Kind is SelectKind.String
+                    ? GetStringSelectOrderedChildrenRenderers(selectState, context)
+                        .Select(x => x(selectState, context, options))
+                        .FlattenAll()
+                        .Map(x => x.Count > 0
+                            ? $"""
+                               options:
+                               [
+                                   {string.Join($",{Environment.NewLine}", x).WithNewlinePadding(4)}
+                               ]
+                               """
+                            : string.Empty
+                        )
+                    : string.Empty
+            )
+            .Combine(
+                selectState.Defaults
+                    .Select(x => x.Render(context, selectState))
+                    .FlattenAll()
+                    .Map(x => x.Count > 0
+                        ? $"""
+                           defaultValues:
+                           [
+                               {string.Join($",{Environment.NewLine}", x).WithNewlinePadding(4)}
+                           ]
+                           """
+                        : string.Empty
+                    )
+            )
+            .Map(x =>
             {
-                if (i > 0) props.AppendLine(",");
-                var defaultValue = selectState.Defaults[i];
-                props.Append("    ");
+                var ((props, children), defaults) = x;
 
-                var render = defaultValue.Render(context, selectState);
-
-                if (render == string.Empty) return string.Empty;
-
-                props.Append(render.WithNewlinePadding(4));
-            }
-
-            props.AppendLine().Append("]");
-        }
-
-        if (selectState.Kind is SelectKind.String)
-        {
-            var childRenderers = GetStringSelectOrderedChildrenRenderers(selectState, context)
-                .ToArray();
-
-            // something is wrong if this doesn't add up
-            if (childRenderers.Length != selectState.Children.Count + selectState.InterpolatedOptions.Count)
-                return string.Empty;
-
-            var children = string.Join(
-                $",{Environment.NewLine}",
-                childRenderers.Select(x => x(selectState, context))
-            );
-
-            if (!string.IsNullOrWhiteSpace(children))
-            {
-                props
-                    .AppendLine(",")
-                    .AppendLine("options: ")
-                    .AppendLine("[")
-                    .AppendLine(children.Prefix(4).WithNewlinePadding(4))
-                    .Append("]");
-            }
-        }
-
-        return
-            $"""
-             new {context.KnownTypes.SelectMenuBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
-                 {props.ToString().WithNewlinePadding(4)}
-             )
-             """;
+                return
+                    $"""
+                     new {context.KnownTypes.SelectMenuBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                         string
+                             .Join(
+                                 $",{Environment.NewLine}",
+                                 ((IEnumerable<string>)[
+                                     $"type: {ToDiscordComponentType(context, selectState.Kind)}",
+                                     props,
+                                     children,
+                                     defaults
+                                 ])
+                                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                             )
+                             .PrefixIfSome(4)
+                             .WithNewlinePadding(4)
+                             .WrapIfSome(Environment.NewLine)
+                     })
+                     """;
+            });
 
         static IEnumerable<ComponentNodeRenderer<SelectState>> GetStringSelectOrderedChildrenRenderers(
             SelectState state,

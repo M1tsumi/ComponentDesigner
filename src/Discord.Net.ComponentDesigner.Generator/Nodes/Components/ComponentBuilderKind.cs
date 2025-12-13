@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using Discord.Net.ComponentDesignerGenerator.Utils;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes.Components;

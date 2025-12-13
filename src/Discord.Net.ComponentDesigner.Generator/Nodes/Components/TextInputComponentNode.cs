@@ -91,20 +91,25 @@ public sealed class TextInputComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
-        base.Validate(state, context);
-
-        Validators.Range(context, state, MinLength, MaxLength);
+        base.Validate(state, context, diagnostics);
+        Validators.Range(context, state, MinLength, MaxLength, diagnostics);
     }
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-        => $"""
-            new {context.KnownTypes.TextInputBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
-                state.RenderProperties(this, context)
-                    .PrefixIfSome(4)
-                    .WithNewlinePadding(4)
-                    .WrapIfSome(Environment.NewLine)
-            })
-            """;
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context)
+        .Map(x =>
+            $"""
+             new {context.KnownTypes.TextInputBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({
+                     x.PrefixIfSome(4)
+                         .WithNewlinePadding(4)
+                         .WrapIfSome(Environment.NewLine)
+                 })
+             """
+        );
 }

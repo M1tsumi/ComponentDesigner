@@ -20,13 +20,11 @@ public sealed class SelectMenuOptionTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'select-menu-option' requires the property 'label' to be specified"
+                Diagnostics.MissingRequiredProperty("select-menu-option", "label")
             );
             
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'select-menu-option' requires the property 'value' to be specified"
+                Diagnostics.MissingRequiredProperty("select-menu-option", "value")
             );
             
             EOF();
@@ -115,18 +113,15 @@ public sealed class SelectMenuOptionTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'label' must be at most 100 characters in length"
+                Diagnostics.OutOfRange("label", "at most 100 characters in length")
             );
             
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'value' must be at most 100 characters in length"
+                Diagnostics.OutOfRange("value", "at most 100 characters in length")
             );
             
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'description' must be at most 100 characters in length"
+                Diagnostics.OutOfRange("description", "at most 100 characters in length")
             );
             
             EOF();

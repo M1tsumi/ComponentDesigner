@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using Microsoft.CodeAnalysis;
 
-namespace Discord.Net.ComponentDesignerGenerator.Utils;
+namespace Discord.CX;
 
 public static class TypeUtils
 {

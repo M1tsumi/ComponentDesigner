@@ -1,5 +1,5 @@
-﻿using Discord.CX.Parser;
-using Discord.Net.ComponentDesignerGenerator.Utils;
+﻿using System.Collections.Generic;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes.Components.SelectMenus;
@@ -24,7 +24,7 @@ public sealed class SelectMenuInterpolatedOption
         IsBuilder = isBuilder;
     }
 
-    public string Render(
+    public Result<string> Render(
         SelectMenuComponentNode.SelectState state,
         IComponentContext context,
         ComponentRenderingOptions options
@@ -65,6 +65,7 @@ public sealed class SelectMenuInterpolatedOption
     public static bool TryCreate(
         IComponentContext context,
         ICXNode interpolation,
+        IList<DiagnosticInfo> diagnostics, 
         out SelectMenuInterpolatedOption option
     )
     {
@@ -106,10 +107,9 @@ public sealed class SelectMenuInterpolatedOption
 
         if (!isBuilderType && !isComponentType)
         {
-            context.AddDiagnostic(
-                Diagnostics.InvalidStringSelectChild,
-                interpolation,
-                info.Symbol!.ToDisplayString()
+            diagnostics.Add(
+                Diagnostics.InvalidStringSelectChild(info.Symbol!.ToDisplayString()),
+                interpolation
             );
             option = null!;
             return false;

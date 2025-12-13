@@ -31,9 +31,7 @@ public sealed class IntegerTests : BaseRendererTest
             $"int.Parse(\"{uint.MaxValue}\")"
         );
         {
-            Diagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing.Id
-            );
+            Diagnostic(Diagnostics.FallbackToRuntimeValueParsing("int.Parse"));
 
             EOF();
         }

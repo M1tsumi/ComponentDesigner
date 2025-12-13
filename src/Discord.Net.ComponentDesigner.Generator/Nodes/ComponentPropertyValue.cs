@@ -21,7 +21,7 @@ public sealed record ComponentPropertyValue(
     public bool IsSpecified => Attribute is not null || HasValue;
 
     public bool HasValue => Value is not null;
-    
+
     public bool IsAttributeValue => Attribute is not null;
 
     public bool RequiresValue => Property.RequiresValue;
@@ -29,7 +29,7 @@ public sealed record ComponentPropertyValue(
     public bool IsOptional => Property.IsOptional;
     public string PropertyName => Property.Name;
 
-    public bool CanOmitFromSource => Property.Synthetic || ( Property.IsOptional && !IsSpecified);
+    public bool CanOmitFromSource => Property.Synthetic || (Property.IsOptional && !IsSpecified);
 
     public bool TryGetLiteralValue(out string value)
     {
@@ -38,7 +38,7 @@ public sealed record ComponentPropertyValue(
             case CXValue.Scalar scalar:
                 value = scalar.Value;
                 return true;
-            case CXValue.StringLiteral {HasInterpolations: false} literal:
+            case CXValue.StringLiteral { HasInterpolations: false } literal:
                 value = literal.Tokens.ToString();
                 return true;
 
@@ -51,6 +51,7 @@ public sealed record ComponentPropertyValue(
     public void ReportPropertyConfigurationDiagnostics(
         IComponentContext context,
         ComponentState state,
+        IList<DiagnosticInfo> diagnostics,
         bool? optional = null,
         bool? requiresValue = null
     )
@@ -59,21 +60,20 @@ public sealed record ComponentPropertyValue(
 
         if (!isOptional && !IsSpecified)
         {
-            context.AddDiagnostic(
-                Diagnostics.MissingRequiredProperty,
-                state.Source,
-                state.OwningNode?.Inner.Name,
-                Property.Name
+            diagnostics.Add(
+                Diagnostics.MissingRequiredProperty(state.OwningNode?.Inner.Name, Property.Name),
+                state.Source
             );
         }
 
         if (requiresValue.HasValue && Attribute is not null && Value is null)
         {
-            context.AddDiagnostic(
-                Diagnostics.MissingRequiredProperty,
-                Attribute ?? state.Source,
-                state.OwningNode?.Inner.Name,
-                Property.Name
+            diagnostics.Add(
+                Diagnostics.MissingRequiredProperty(
+                    state.OwningNode?.Inner.Name,
+                    Property.Name
+                ),
+                Attribute ?? state.Source
             );
         }
     }

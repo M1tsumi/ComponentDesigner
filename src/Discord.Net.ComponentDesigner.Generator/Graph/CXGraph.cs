@@ -12,21 +12,16 @@ namespace Discord.CX;
 
 public readonly struct CXGraph
 {
-    public bool HasErrors => Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
-
-    public IReadOnlyList<Diagnostic> Diagnostics
-        => [.._diagnostics, ..RootNodes.SelectMany(x => x.Diagnostics)];
-
     public readonly CXGraphManager Manager;
     public readonly ImmutableArray<Node> RootNodes;
     public readonly IReadOnlyDictionary<ICXNode, Node> NodeMap;
 
-    private readonly ImmutableArray<Diagnostic> _diagnostics;
+    private readonly ImmutableArray<DiagnosticInfo> _diagnostics;
 
     public CXGraph(
         CXGraphManager manager,
         ImmutableArray<Node> rootNodes,
-        ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArray<DiagnosticInfo> diagnostics,
         IReadOnlyDictionary<ICXNode, Node> nodeMap
     )
     {
@@ -35,15 +30,6 @@ public readonly struct CXGraph
         _diagnostics = diagnostics;
         NodeMap = nodeMap;
     }
-
-    public Location GetLocation(ICXNode node) => GetLocation(Manager, node);
-    public Location GetLocation(TextSpan span) => GetLocation(Manager, span);
-
-    public static Location GetLocation(CXGraphManager manager, ICXNode node)
-        => GetLocation(manager, node.Span);
-
-    public static Location GetLocation(CXGraphManager manager, TextSpan span)
-        => manager.SyntaxTree.GetLocation(span);
 
     public CXGraph Update(
         CXGraphManager manager,
@@ -61,7 +47,7 @@ public readonly struct CXGraph
         if (manager == Manager) return this;
 
         var map = new Dictionary<ICXNode, Node>();
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
         var rootNodes = ImmutableArray.CreateBuilder<Node>();
 
@@ -93,7 +79,7 @@ public readonly struct CXGraph
     )
     {
         var map = new Dictionary<ICXNode, Node>();
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
         var context = new GraphInitializationContext(
             manager,
@@ -123,7 +109,7 @@ public readonly struct CXGraph
         IReadOnlyList<ICXNode> ReusedNodes,
         CXGraph? OldGraph,
         Dictionary<ICXNode, Node> Map,
-        ImmutableArray<Diagnostic>.Builder Diagnostics,
+        ImmutableArray<DiagnosticInfo>.Builder Diagnostics,
         IncrementalParseResult? IncrementalParseResult
     )
     {
@@ -139,8 +125,7 @@ public readonly struct CXGraph
             if (
                 IsIncremental &&
                 ReusedNodes.Contains(node) &&
-                OldGraph!.Value.NodeMap.TryGetValue(node, out graphNode) &&
-                graphNode.Diagnostics.Count is 0
+                OldGraph!.Value.NodeMap.TryGetValue(node, out graphNode)
             )
             {
                 graphNode = AddToMap(node, graphNode.Reuse(parent, IncrementalParseResult!.Value, Manager));
@@ -186,10 +171,9 @@ public readonly struct CXGraph
                     else
                     {
                         context.Diagnostics.Add(
-                            Diagnostic.Create(
-                                CX.Diagnostics.UnknownComponent,
-                                GetLocation(context.Manager, cxNode),
-                                token.Kind
+                            new DiagnosticInfo(
+                                CX.Diagnostics.UnknownComponent(token.Kind.ToString()),
+                                cxNode.Span
                             )
                         );
                     }
@@ -209,24 +193,28 @@ public readonly struct CXGraph
                     );
                 }
 
+                /*
+                 * TODO: A 2 staged approach for any late-bound compilation/semantic introspection is needed here
+                 * since we need to lookup provider and custom components. A first stage pass would build the graph, and
+                 * the second stage would map them to a custom node
+                 */
                 if (
                     !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
                     !ComponentNode.TryGetProviderNode(
                         context.Compilation.GetSemanticModel(context.Manager.SyntaxTree),
-                        context.Manager.ArgumentExpressionSyntax.SpanStart,
+                        context.Manager.CXDesignerLocation.TextSpan.Start,
                         element.Identifier,
                         out componentNode
                     )
                 )
                 {
                     context.Diagnostics.Add(
-                        Diagnostic.Create(
-                            CX.Diagnostics.UnknownComponent,
-                            GetLocation(context.Manager, element),
-                            element.Identifier
+                        new(
+                            CX.Diagnostics.UnknownComponent(element.Identifier),
+                            element.Span
                         )
                     );
-
+                
                     return [];
                 }
 
@@ -235,9 +223,9 @@ public readonly struct CXGraph
                     parent,
                     context
                 );
-
+                
                 componentNode.AddGraphNode(initContext);
-
+                
                 return initContext
                     .Initializations
                     .Select(x =>
@@ -250,10 +238,9 @@ public readonly struct CXGraph
             }
             default:
                 context.Diagnostics.Add(
-                    Diagnostic.Create(
-                        CX.Diagnostics.UnknownComponent,
-                        GetLocation(context.Manager, cxNode),
-                        cxNode.GetType()
+                    new(
+                        CX.Diagnostics.UnknownComponent(cxNode.GetType().ToString()),
+                        cxNode.Span
                     )
                 );
                 return [];
@@ -346,13 +333,16 @@ public readonly struct CXGraph
         return node;
     }
 
-    public void Validate(ComponentContext context)
+    public void Validate(ComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
-        foreach (var node in RootNodes) node.Validate(context);
+        foreach (var node in RootNodes) node.Validate(context, diagnostics);
     }
 
-    public string Render(ComponentContext context)
-        => string.Join(",\n", RootNodes.Select(x => x.Render(context)));
+    public Result<string> Render(ComponentContext context)
+        => RootNodes
+            .Select(x => x.Render(context))
+            .FlattenAll()
+            .Map(x => string.Join(",\n", x));
 
     public sealed class Node
     {
@@ -362,18 +352,9 @@ public readonly struct CXGraph
         public List<Node> AttributeNodes { get; }
         public Node? Parent { get; }
 
-        public IReadOnlyList<Diagnostic> Diagnostics
-            =>
-            [
-                .._diagnostics,
-                ..AttributeNodes.SelectMany(x => x.Diagnostics),
-                ..Children.SelectMany(x => x.Diagnostics)
-            ];
-
         public bool Incremental { get; }
 
-        private readonly List<Diagnostic> _diagnostics;
-        private string? _render;
+        private Result<string>? _render;
 
         private ComponentState _state;
 
@@ -383,9 +364,8 @@ public readonly struct CXGraph
             List<Node> children,
             List<Node> attributeNodes,
             Node? parent = null,
-            IReadOnlyList<Diagnostic>? diagnostics = null,
             bool incremental = false,
-            string? render = null
+            Result<string>? render = null
         )
         {
             Inner = inner;
@@ -393,7 +373,6 @@ public readonly struct CXGraph
             Children = children;
             AttributeNodes = attributeNodes;
             Parent = parent;
-            _diagnostics = [..diagnostics ?? []];
             _render = render;
             Incremental = incremental;
         }
@@ -409,86 +388,72 @@ public readonly struct CXGraph
             Inner.UpdateState(ref _state, context);
         }
 
-        public string Render(IComponentContext context, ComponentRenderingOptions options = default)
-        {
-            if (_render is not null) return _render;
+        public Result<string> Render(IComponentContext context, ComponentRenderingOptions options = default)
+            => (_render ??= Inner.Render(State, context, options));
 
-            using (context.CreateDiagnosticScope(_diagnostics))
-            {
-                return _render = Inner.Render(State, context, options);
-            }
-        }
-
-        public void Validate(IComponentContext context)
+        public void Validate(IComponentContext context, IList<DiagnosticInfo> diagnostics)
         {
-            using (context.CreateDiagnosticScope(_diagnostics))
-            {
-                Inner.Validate(State, context);
-                foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context);
-                foreach (var child in Children) child.Validate(context);
-            }
+            Inner.Validate(State, context, diagnostics);
+            foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context, diagnostics);
+            foreach (var child in Children) child.Validate(context, diagnostics);
         }
 
         public Node Reuse(Node? parent, IncrementalParseResult parseResult, CXGraphManager manager)
         {
-            var diagnostics = new List<Diagnostic>(Diagnostics);
-
-            if (diagnostics.Count > 0)
-            {
-                var offset = 0;
-                var changeQueue = new Queue<TextChange>(parseResult.Changes);
-                for (var i = 0; i < diagnostics.Count; i++)
-                {
-                    var diagnostic = diagnostics[i];
-                    var diagnosticSpan = diagnostic.Location.SourceSpan;
-
-                    while (changeQueue.Count > 0)
-                    {
-                        TextChangeRange change = changeQueue.Peek();
-
-                        if (change.Span.Start < diagnosticSpan.Start)
-                        {
-                            offset += (change.NewLength - change.Span.Length);
-                            changeQueue.Dequeue();
-                        }
-                    }
-
-                    if (offset is not 0)
-                    {
-                        // we love roslyn making 'WithLocation' internal *smile*
-                        diagnostics[i] = Diagnostic.Create(
-                            diagnostic.Descriptor.Id,
-                            diagnostic.Descriptor.Category,
-                            diagnostic.GetMessage(),
-                            diagnostic.Severity,
-                            diagnostic.Descriptor.DefaultSeverity,
-                            diagnostic.Descriptor.IsEnabledByDefault,
-                            diagnostic.WarningLevel,
-                            diagnostic.Descriptor.Title,
-                            diagnostic.Descriptor.Description,
-                            diagnostic.Descriptor.HelpLinkUri,
-                            GetLocation(
-                                manager,
-                                new TextSpan(diagnosticSpan.Start + offset, diagnosticSpan.Length)
-                            ),
-                            null,
-                            diagnostic.Descriptor.CustomTags,
-                            diagnostic.Properties
-                        );
-                    }
-                }
-            }
-
+            // TODO: rewrite this
+            
             return new(
                 Inner,
                 State,
                 Children,
                 AttributeNodes,
                 parent,
-                diagnostics,
                 true,
                 _render
             );
+            
+            // var diagnostics = new List<DiagnosticInfo>(Diagnostics);
+            //
+            // if (diagnostics.Count > 0)
+            // {
+            //     var offset = 0;
+            //     var changeQueue = new Queue<TextChange>(parseResult.Changes);
+            //     for (var i = 0; i < diagnostics.Count; i++)
+            //     {
+            //         var diagnostic = diagnostics[i];
+            //         var diagnosticSpan = diagnostic.Span;
+            //
+            //         while (changeQueue.Count > 0)
+            //         {
+            //             TextChangeRange change = changeQueue.Peek();
+            //
+            //             if (change.Span.Start < diagnosticSpan.Start)
+            //             {
+            //                 offset += (change.NewLength - change.Span.Length);
+            //                 changeQueue.Dequeue();
+            //             }
+            //         }
+            //
+            //         if (offset is not 0)
+            //         {
+            //             diagnostics[i] = new(
+            //                 diagnostic.Descriptor,
+            //                 new(diagnosticSpan.Start + offset, diagnosticSpan.Length)
+            //             );
+            //         }
+            //     }
+            // }
+            //
+            // return new(
+            //     Inner,
+            //     State,
+            //     Children,
+            //     AttributeNodes,
+            //     parent,
+            //     diagnostics,
+            //     true,
+            //     _render
+            // );
         }
     }
 }

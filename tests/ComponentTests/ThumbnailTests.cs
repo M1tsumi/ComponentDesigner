@@ -19,8 +19,7 @@ public sealed class ThumbnailTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.MissingRequiredProperty.Id,
-                message: "'thumbnail' requires the property 'media' to be specified"
+                Diagnostics.MissingRequiredProperty("thumbnail", "media")
             );
 
             EOF();
@@ -116,8 +115,7 @@ public sealed class ThumbnailTests : BaseComponentTest
             Validate(hasErrors: true);
 
             Diagnostic(
-                Diagnostics.OutOfRange.Id,
-                message: "'description' must be at most 1024 characters in length"
+                Diagnostics.OutOfRange("description", "at most 1024 characters in length")
             );
             
             EOF();

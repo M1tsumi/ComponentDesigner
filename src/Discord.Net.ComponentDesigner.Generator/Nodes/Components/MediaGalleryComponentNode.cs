@@ -25,7 +25,7 @@ public sealed class MediaGalleryComponentNode : ComponentNode
         ];
     }
 
-    public override void Validate(ComponentState state, IComponentContext context)
+    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         var validItemCount = 0;
 
@@ -33,10 +33,9 @@ public sealed class MediaGalleryComponentNode : ComponentNode
         {
             if (!IsValidChild(child.Inner))
             {
-                context.AddDiagnostic(
-                    Diagnostics.InvalidMediaGalleryChild,
-                    child.State.Source,
-                    child.Inner.Name
+                diagnostics.Add(
+                    Diagnostics.InvalidMediaGalleryChild(child.Inner.Name),
+                    child.State.Source
                 );
             }
             else validItemCount++;
@@ -44,7 +43,7 @@ public sealed class MediaGalleryComponentNode : ComponentNode
 
         if (validItemCount is 0)
         {
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.MediaGalleryIsEmpty,
                 state.Source
             );
@@ -62,51 +61,53 @@ public sealed class MediaGalleryComponentNode : ComponentNode
                 extra[extra.Length - 1].State.Source.Span.End
             );
 
-            context.AddDiagnostic(
+            diagnostics.Add(
                 Diagnostics.TooManyItemsInMediaGallery,
                 span
             );
         }
 
-        base.Validate(state, context);
+        base.Validate(state, context, diagnostics);
     }
 
     private static bool IsValidChild(ComponentNode node)
         => node is IDynamicComponentNode
             or MediaGalleryItemComponentNode;
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-    {
-        var props = state.RenderProperties(this, context, asInitializers: true);
-        var children = state.RenderChildren(context);
-
-        var init = new StringBuilder(props);
-
-        if (!string.IsNullOrWhiteSpace(children))
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context, asInitializers: true)
+        .Combine(state.RenderChildren(context))
+        .Map(x =>
         {
-            if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+            var (props, children) = x;
 
-            init.Append(
-                $"""
-                 Items =
-                 [
-                     {children.WithNewlinePadding(4)}
-                 ]
-                 """
-            );
-        }
+            var init = new StringBuilder(props);
 
-        return
-            $$"""
-              new {{context.KnownTypes.MediaGalleryBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}(){{
-                     init
-                         .ToString()
-                         .WithNewlinePadding(4)
-                         .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
-                         .PostfixIfSome($"{Environment.NewLine}}}")
-                 }}
-              """;
-    }
+            if (!string.IsNullOrWhiteSpace(children))
+            {
+                if (!string.IsNullOrWhiteSpace(props)) init.Append(',').AppendLine();
+
+                init.Append(
+                    $"""
+                     Items =
+                     [
+                         {children.WithNewlinePadding(4)}
+                     ]
+                     """
+                );
+            }
+
+            return
+                $"new {context.KnownTypes.MediaGalleryBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(){
+                    init.ToString()
+                        .WithNewlinePadding(4)
+                        .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
+                        .PostfixIfSome($"{Environment.NewLine}}}")}";
+        });
 }
 
 public sealed class MediaGalleryItemComponentNode : ComponentNode
@@ -145,10 +146,17 @@ public sealed class MediaGalleryItemComponentNode : ComponentNode
         ];
     }
 
-    public override string Render(ComponentState state, IComponentContext context, ComponentRenderingOptions options)
-        => $"""
-            new {context.KnownTypes.MediaGalleryItemPropertiesType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
-                {state.RenderProperties(this, context).WithNewlinePadding(4)}
-            )
-            """;
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    ) => state
+        .RenderProperties(this, context)
+        .Map(x =>
+            $"""
+             new {context.KnownTypes.MediaGalleryItemPropertiesType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
+                 {x.WithNewlinePadding(4)}
+             )
+             """
+        );
 }

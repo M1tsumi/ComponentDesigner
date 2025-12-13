@@ -12,16 +12,6 @@ public interface IComponentContext
     KnownTypes KnownTypes { get; }
     Compilation Compilation { get; }
 
-    bool HasErrors { get; }
-
-    IReadOnlyList<Diagnostic> GlobalDiagnostics { get; }
-
-    void AddDiagnostic(Diagnostic diagnostic);
-
-    Location GetLocation(TextSpan span);
-
-    IDisposable CreateDiagnosticScope(List<Diagnostic> bag);
-
     string GetDesignerValue(int index, string? type = null);
 
     DesignerInterpolationInfo GetInterpolationInfo(int index);
@@ -50,33 +40,4 @@ public static class ComponentContextExtensions
         DesignerInterpolationInfo interpolation,
         string? type = null
     ) => context.GetDesignerValue(interpolation.Id, type);
-
-    public static Location GetLocation(this IComponentContext context, ICXNode node)
-        => context.GetLocation(node.Span);
-
-    public static void AddDiagnostic(
-        this IComponentContext context,
-        DiagnosticDescriptor descriptor,
-        ICXNode node,
-        params object?[]? args
-    ) => context.AddDiagnostic(
-        Diagnostic.Create(
-            descriptor,
-            GetLocation(context, node),
-            args
-        )
-    );
-
-    public static void AddDiagnostic(
-        this IComponentContext context,
-        DiagnosticDescriptor descriptor,
-        TextSpan span,
-        params object?[]? args
-    ) => context.AddDiagnostic(
-        Diagnostic.Create(
-            descriptor,
-            context.GetLocation(span),
-            args
-        )
-    );
 }

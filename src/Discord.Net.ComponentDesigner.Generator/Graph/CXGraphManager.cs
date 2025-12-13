@@ -17,7 +17,7 @@ namespace Discord.CX;
 public sealed record CXGraphManager(
     SourceGenerator Generator,
     string Key,
-    Target Target,
+    ComponentDesignerTarget Target,
     GeneratorOptions Options,
     CXDoc Document
 )
@@ -25,15 +25,13 @@ public sealed record CXGraphManager(
     public const bool FORCE_NO_INCREMENTAL = true;
     public const bool ALWAYS_REPARSE = true;
 
-    public SyntaxTree SyntaxTree => InvocationSyntax.SyntaxTree;
     public InterceptableLocation InterceptLocation => Target.InterceptLocation;
-    public InvocationExpressionSyntax InvocationSyntax => Target.InvocationSyntax;
-    public ExpressionSyntax ArgumentExpressionSyntax => Target.ArgumentExpressionSyntax;
-    public IInvocationOperation Operation => Target.Operation;
+    public LocationInfo CXDesignerLocation => Target.CXDesignerLocation;
     public Compilation Compilation => Target.Compilation;
+    public SyntaxTree SyntaxTree => Target.SyntaxTree;
 
     public string CXDesigner => Target.CXDesigner;
-    public DesignerInterpolationInfo[] InterpolationInfos => Target.Interpolations;
+    public EquatableArray<DesignerInterpolationInfo> InterpolationInfos => Target.Interpolations;
 
     public TextSpan CXDesignerSpan => Target.CXDesignerSpan;
 
@@ -54,7 +52,7 @@ public sealed record CXGraphManager(
     );
 
     public bool UsesDesigner
-        => Operation.TargetMethod.Parameters[0].Type.SpecialType is not SpecialType.System_String;
+        => Target.UsesDesigner;
 
     private string? _simpleSource;
 
@@ -72,7 +70,7 @@ public sealed record CXGraphManager(
     public static CXGraphManager Create(
         SourceGenerator generator,
         string key,
-        Target target,
+        ComponentDesignerTarget target,
         GeneratorOptions options,
         CancellationToken token
     )
@@ -97,7 +95,7 @@ public sealed record CXGraphManager(
 
     public CXGraphManager OnUpdate(
         string key,
-        Target target,
+        ComponentDesignerTarget target,
         GeneratorOptions options,
         CancellationToken token
     )
@@ -114,7 +112,8 @@ public sealed record CXGraphManager(
         return result;
     }
 
-    private void DoReparse(Target target, CXGraphManager old, ref CXGraphManager result, CancellationToken token)
+    private void DoReparse(ComponentDesignerTarget target, CXGraphManager old, ref CXGraphManager result,
+        CancellationToken token)
     {
         var reader = new CXSourceReader(
             new CXSourceText.StringSource(target.CXDesigner),
@@ -127,16 +126,17 @@ public sealed record CXGraphManager(
 
         var document = FORCE_NO_INCREMENTAL
             ? CXParser.Parse(reader, token)
-            : Document.IncrementalParse(
-                reader,
-                target
-                    .SyntaxTree
-                    .GetChanges(old.SyntaxTree)
-                    .Where(x => CXDesignerSpan.IntersectsWith(x.Span))
-                    .ToArray(),
-                out parseResult,
-                token
-            );
+            : throw new NotImplementedException();
+        // : Document.IncrementalParse(
+        //     reader,
+        //     target
+        //         .SyntaxTree
+        //         .GetChanges(old.SyntaxTree)
+        //         .Where(x => CXDesignerSpan.IntersectsWith(x.Span))
+        //         .ToArray(),
+        //     out parseResult,
+        //     token
+        // );
 
         result = result with
         {
@@ -148,40 +148,29 @@ public sealed record CXGraphManager(
     private RenderedInterceptor? _render;
 
     public RenderedInterceptor Render(CancellationToken token = default)
-    {
-        _render ??= CreateRender(token);
-        return _render.Value;
-    }
+        => _render ??= CreateRender(token);
 
     private RenderedInterceptor CreateRender(CancellationToken token = default)
     {
-        var parserDiagnostics = Document
+        var diagnostics = Document
             .Diagnostics
             .Select(x =>
-                Diagnostics.CreateParsingDiagnostic(x, Graph.GetLocation(x.Span))
+                new DiagnosticInfo(
+                    Diagnostics.CreateParsingDiagnostic(x),
+                    x.Span
+                )
             )
-            .ToArray();
+            .ToList();
 
-        if (parserDiagnostics.Length > 0)
+        if (diagnostics.Count > 0)
         {
             return new RenderedInterceptor(
+                Target.SyntaxTree,
                 InterceptLocation,
-                InvocationSyntax.GetLocation(),
+                CXDesignerLocation,
                 CXDesigner,
                 "// omitted, contains parser errors.",
-                [..parserDiagnostics],
-                UsesDesigner
-            );
-        }
-
-        if (Graph.HasErrors)
-        {
-            return new RenderedInterceptor(
-                InterceptLocation,
-                InvocationSyntax.GetLocation(),
-                CXDesigner,
-                "// omitted, contains graph structural errors.",
-                [..parserDiagnostics, ..Graph.Diagnostics],
+                [..diagnostics],
                 UsesDesigner
             );
         }
@@ -193,32 +182,31 @@ public sealed record CXGraphManager(
             node.UpdateState(context);
         }
 
-        Graph.Validate(context);
+        Graph.Validate(context, diagnostics);
 
-        if (context.HasErrors || Graph.HasErrors)
-        {
-            return new(
-                this.InterceptLocation,
-                InvocationSyntax.GetLocation(),
-                CXDesigner,
-                "// omitted, contains validation errors.",
-                [..parserDiagnostics, ..Graph.Diagnostics, ..context.GlobalDiagnostics],
-                UsesDesigner
-            );
-        }
+        // if (context.HasErrors || Graph.HasErrors)
+        // {
+        //     return new(
+        //         this.InterceptLocation,
+        //         CXDesignerLocation,
+        //         CXDesigner,
+        //         "// omitted, contains validation errors.",
+        //         [..diagnostics, ..Graph.Diagnostics, ..context.GlobalDiagnostics],
+        //         UsesDesigner
+        //     );
+        // }
 
         var source = Graph.Render(context);
 
+        diagnostics.AddRange(source.Diagnostics);
+
         return new(
-            this.InterceptLocation,
-            InvocationSyntax.GetLocation(),
+            Target.SyntaxTree,
+            InterceptLocation,
+            CXDesignerLocation,
             CXDesigner,
-            source,
-            [
-                ..parserDiagnostics,
-                ..Graph.Diagnostics,
-                ..context.GlobalDiagnostics
-            ],
+            source.GetValueOrDefault("// omitted, contains errors")!,
+            [..diagnostics],
             UsesDesigner
         );
     }
@@ -226,15 +214,16 @@ public sealed record CXGraphManager(
     private static string GetCXWithoutInterpolations(
         int offset,
         string cx,
-        DesignerInterpolationInfo[] interpolations
+        EquatableArray<DesignerInterpolationInfo> interpolations
     )
     {
-        if (interpolations.Length is 0) return cx;
+        if (interpolations.IsEmpty) return cx;
 
         var builder = new StringBuilder(cx);
 
         var rmDelta = 0;
-        for (var i = 0; i < interpolations.Length; i++)
+
+        for (var i = 0; i < interpolations.Count; i++)
         {
             var interpolation = interpolations[i];
             builder.Remove(interpolation.Span.Start - offset - rmDelta, interpolation.Span.Length);

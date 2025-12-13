@@ -11,6 +11,10 @@ using Discord.CX.Nodes.Components;
 
 namespace Discord.CX.Nodes;
 
+using RenderResult = Result<string>;
+using static Result<string>;
+using static DiagnosticInfo;
+
 public static class Renderers
 {
     public static PropertyRenderer CreateDefault(ComponentProperty property)
@@ -30,7 +34,10 @@ public static class Renderers
             switch (propValue.Value)
             {
                 case CXValue.Interpolation interpolation:
+                    var builder = new Builder();
+                    
                     var info = context.GetInterpolationInfo(interpolation);
+                    
                     if (
                         !context.Compilation.HasImplicitConversion(
                             info.Symbol,
@@ -38,17 +45,17 @@ public static class Renderers
                         )
                     )
                     {
-                        context.AddDiagnostic(
-                            Diagnostics.TypeMismatch,
-                            interpolation,
-                            info.Symbol,
-                            type
+                        builder.AddDiagnostic(
+                            Diagnostics.TypeMismatch(type.ToDisplayString(), info.Symbol!.ToDisplayString()),
+                            interpolation
                         );
                     }
 
-                    return context.GetDesignerValue(
-                        interpolation,
-                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    return builder.WithValue(
+                        context.GetDesignerValue(
+                            interpolation,
+                            type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        )
                     );
                 default: return "default";
             }
@@ -76,10 +83,10 @@ public static class Renderers
     public static PropertyRenderer ComponentAsProperty(ComponentRenderingOptions options)
         => (context, propertyValue) => ComponentAsProperty(context, propertyValue, options);
 
-    public static string ComponentAsProperty(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static Result<string> ComponentAsProperty(IComponentContext context, IComponentPropertyValue propertyValue)
         => ComponentAsProperty(context, propertyValue, ComponentRenderingOptions.Default);
 
-    private static string ComponentAsProperty(
+    private static Result<string> ComponentAsProperty(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         ComponentRenderingOptions options
@@ -90,6 +97,7 @@ public static class Renderers
             case CXValue.Element when propertyValue.Node is not null:
                 return propertyValue.Node.Render(context, options);
             case CXValue.Interpolation interpolation:
+            {
                 // ensure its a component builder
                 var info = context.GetInterpolationInfo(interpolation);
 
@@ -101,14 +109,13 @@ public static class Renderers
                     )
                 )
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.TypeMismatch,
-                        interpolation,
-                        info.Symbol,
-                        $"{context.KnownTypes.IMessageComponentBuilderType} | {context.KnownTypes.MessageComponentType}"
+                    return FromDiagnostic(
+                        Diagnostics.TypeMismatch(
+                            $"{context.KnownTypes.IMessageComponentBuilderType} | {context.KnownTypes.MessageComponentType}",
+                            info.Symbol!.ToString()
+                        ),
+                        interpolation
                     );
-
-                    return string.Empty;
                 }
 
                 var source = context.GetDesignerValue(
@@ -119,6 +126,7 @@ public static class Renderers
                 // ensure we can convert it to a builder
                 var target = options.TypingContext?.ConformingType ?? ComponentBuilderKind.IMessageComponentBuilder;
 
+                var result = new Builder();
                 if (
                     !ComponentBuilderKindUtils.TryConvert(
                         source,
@@ -143,45 +151,50 @@ public static class Renderers
 
                     if (source != string.Empty)
                     {
-                        context.AddDiagnostic(
-                            Diagnostics.CardinalityForcedToRuntime,
-                            interpolation,
-                            info.Symbol.ToDisplayString()
+                        result.AddDiagnostic(
+                            Diagnostics.CardinalityForcedToRuntime(info.Symbol.ToDisplayString()),
+                            interpolation
                         );
                     }
                     else
                     {
-                        context.AddDiagnostic(
-                            Diagnostics.InvalidChildComponentCardinality,
-                            interpolation,
-                            propertyValue.PropertyName
+                        result.AddDiagnostic(
+                            Diagnostics.InvalidChildComponentCardinality(propertyValue.PropertyName),
+                            interpolation
                         );
                     }
                 }
 
-                return source;
+                return result.WithValue(source);
+            }
             default:
+            {
+                var result = new Builder();
+
                 if (propertyValue.Value is not null)
                 {
-                    context.AddDiagnostic(
-                        Diagnostics.InvalidPropertyValueSyntax,
-                        propertyValue.Value,
-                        "interpolation"
+                    result.AddDiagnostic(
+                        Diagnostics.InvalidPropertyValueSyntax("interpolation"),
+                        propertyValue.Value
                     );
                 }
 
-                return string.Empty;
+                return result;
+            }
         }
     }
 
-    public static string UnfurledMediaItem(IComponentContext context, IComponentPropertyValue propertyValue)
-        => $"new {
-            context.KnownTypes
-                .UnfurledMediaItemPropertiesType
-                !.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}({String(context, propertyValue)
-            })";
+    public static RenderResult UnfurledMediaItem(IComponentContext context, IComponentPropertyValue propertyValue)
+        => String(context, propertyValue)
+            .Map(x =>
+                $"new {
+                    context.KnownTypes
+                        .UnfurledMediaItemPropertiesType
+                        !.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                }({x})"
+            );
 
-    public static string Integer(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Integer(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -198,30 +211,28 @@ public static class Renderers
                 if (IsLoneInterpolatedLiteral(context, literal, out var info))
                     return FromInterpolation(literal, info);
 
-                context.AddDiagnostic(
-                    Diagnostics.FallbackToRuntimeValueParsing,
-                    literal,
-                    "int.Parse"
+                return FromValue(
+                    $"int.Parse({RenderStringLiteral(literal)})",
+                    Diagnostics.FallbackToRuntimeValueParsing("int.Parse"),
+                    literal
                 );
-
-                return $"int.Parse({RenderStringLiteral(literal)})";
             default: return "default";
         }
 
-        string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             if (info.Constant.Value is int || int.TryParse(info.Constant.Value?.ToString(), out _))
                 return info.Constant.Value!.ToString();
 
-            if (info.Constant.HasValue)
-            {
-                context.AddDiagnostic(
-                    Diagnostics.TypeMismatch,
-                    owner,
-                    info.Constant.Value!.GetType().Name,
-                    "int"
-                );
-            }
+            // if (info.Constant.HasValue)
+            // {
+            //     context.AddDiagnostic(
+            //         Diagnostics.TypeMismatch,
+            //         owner,
+            //         info.Constant.Value!.GetType().Name,
+            //         "int"
+            //     );
+            // }
 
             if (
                 context.Compilation.HasImplicitConversion(
@@ -233,30 +244,26 @@ public static class Renderers
                 return context.GetDesignerValue(info, "int");
             }
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "int.Parse"
+            return FromValue(
+                $"int.Parse({context.GetDesignerValue(info)})",
+                Diagnostics.FallbackToRuntimeValueParsing("int.Parse"),
+                owner
             );
-
-            return $"int.Parse({context.GetDesignerValue(info)})";
         }
 
-        string FromText(ICXNode owner, string text)
+        RenderResult FromText(ICXNode owner, string text)
         {
             if (int.TryParse(text, out _)) return text;
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "int.Parse"
+            return FromValue(
+                $"int.Parse({ToCSharpString(text)})",
+                Diagnostics.FallbackToRuntimeValueParsing("int.Parse"),
+                owner
             );
-
-            return $"int.Parse({ToCSharpString(text)})";
         }
     }
 
-    public static string Boolean(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Boolean(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -273,13 +280,11 @@ public static class Renderers
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
 
-                context.AddDiagnostic(
-                    Diagnostics.FallbackToRuntimeValueParsing,
-                    stringLiteral,
-                    "bool.Parse"
+                return FromValue(
+                    $"bool.Parse({context.GetDesignerValue(info)})",
+                    Diagnostics.FallbackToRuntimeValueParsing("bool.Parse"),
+                    stringLiteral
                 );
-
-                return $"bool.Parse({context.GetDesignerValue(info)})";
 
             case null when !propertyValue.RequiresValue:
                 return "true";
@@ -287,10 +292,9 @@ public static class Renderers
             default: return "default";
         }
 
-        string FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
+        RenderResult FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
         {
             if (info.Constant.Value is bool b) return b ? "true" : "false";
-
 
             if (
                 context.Compilation.HasImplicitConversion(
@@ -305,24 +309,20 @@ public static class Renderers
             if (info.Constant.Value?.ToString().Trim().ToLowerInvariant() is { } str and ("true" or "false"))
                 return str;
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                node,
-                "bool.Parse"
+            return FromValue(
+                $"bool.Parse({context.GetDesignerValue(info)})",
+                Diagnostics.FallbackToRuntimeValueParsing("bool.Parse"),
+                node
             );
-
-            return $"bool.Parse({context.GetDesignerValue(info)})";
         }
 
-        string FromText(ICXNode owner, string value)
+        RenderResult FromText(ICXNode owner, string value)
         {
             if (value is not "true" and not "false")
             {
-                context.AddDiagnostic(
-                    Diagnostics.TypeMismatch,
-                    owner,
-                    "string",
-                    "bool"
+                return Create(
+                    Diagnostics.TypeMismatch("bool", "string"),
+                    owner
                 );
             }
 
@@ -364,7 +364,7 @@ public static class Renderers
         return _colorPresets.TryGetValue(value.ToLowerInvariant(), out fieldName);
     }
 
-    public static string Color(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Color(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         var colorSymbol = context.KnownTypes.ColorType;
         var qualifiedColor = colorSymbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -385,17 +385,15 @@ public static class Renderers
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
 
-                context.AddDiagnostic(
-                    Diagnostics.FallbackToRuntimeValueParsing,
-                    stringLiteral,
-                    "Discord.Color.Parse"
+                return FromValue(
+                    UseLibraryParser(RenderStringLiteral(stringLiteral)),
+                    Diagnostics.FallbackToRuntimeValueParsing("Discord.Color.Parse"),
+                    stringLiteral
                 );
-
-                return UseLibraryParser(RenderStringLiteral(stringLiteral));
             default: return "default";
         }
 
-        string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             if (
                 info.Symbol is not null &&
@@ -436,16 +434,14 @@ public static class Renderers
                 return $"new {qualifiedColor}({context.GetDesignerValue(info, "uint")})";
             }
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "Discord.Color.Parse"
+            return FromValue(
+                UseLibraryParser(context.GetDesignerValue(info)),
+                Diagnostics.FallbackToRuntimeValueParsing("Discord.Color.Parse"),
+                owner
             );
-
-            return $"{qualifiedColor}.Parse({context.GetDesignerValue(info)})";
         }
 
-        string FromText(ICXNode owner, string rawValue)
+        RenderResult FromText(ICXNode owner, string rawValue)
         {
             if (TryGetColorPreset(context, rawValue, out var presetName))
             {
@@ -465,16 +461,13 @@ public static class Renderers
                     null,
                     out var hexCode
                 )
-            )
-                return $"new {qualifiedColor}({hexCode})";
+            ) return $"new {qualifiedColor}({hexCode})";
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "Discord.Color.Parse"
+            return FromValue(
+                UseLibraryParser(ToCSharpString(rawValue)),
+                Diagnostics.FallbackToRuntimeValueParsing("Discord.Color.Parse"),
+                owner
             );
-
-            return UseLibraryParser(ToCSharpString(rawValue));
         }
 
         string UseLibraryParser(string source)
@@ -497,10 +490,10 @@ public static class Renderers
         }
     }
 
-    public static string Snowflake(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Snowflake(IComponentContext context, IComponentPropertyValue propertyValue)
         => Snowflake(context, propertyValue.Value);
 
-    public static string Snowflake(IComponentContext context, CXValue? value)
+    public static RenderResult Snowflake(IComponentContext context, CXValue? value)
     {
         switch (value)
         {
@@ -517,18 +510,16 @@ public static class Renderers
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
 
-                context.AddDiagnostic(
-                    Diagnostics.FallbackToRuntimeValueParsing,
-                    stringLiteral,
-                    "ulong.Parse"
+                return FromValue(
+                    UseParseMethod(RenderStringLiteral(stringLiteral)),
+                    Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"),
+                    stringLiteral
                 );
-
-                return UseParseMethod(RenderStringLiteral(stringLiteral));
 
             default: return "default";
         }
 
-        string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             var targetType = context.Compilation.GetSpecialType(SpecialType.System_UInt64);
 
@@ -543,33 +534,29 @@ public static class Renderers
                 return context.GetDesignerValue(info, "ulong");
             }
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "ulong.Parse"
+            return FromValue(
+                UseParseMethod(context.GetDesignerValue(info)),
+                Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"),
+                owner
             );
-
-            return UseParseMethod(context.GetDesignerValue(info));
         }
 
-        string FromText(ICXNode owner, string text)
+        RenderResult FromText(ICXNode owner, string text)
         {
             if (ulong.TryParse(text, out _)) return text;
 
-            context.AddDiagnostic(
-                Diagnostics.FallbackToRuntimeValueParsing,
-                owner,
-                "ulong.Parse"
+            return FromValue(
+                UseParseMethod(ToCSharpString(text)),
+                Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"),
+                owner
             );
-
-            return UseParseMethod(ToCSharpString(text));
         }
 
         static string UseParseMethod(string input)
             => $"ulong.Parse({input})";
     }
 
-    public static string String(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult String(IComponentContext context, IComponentPropertyValue propertyValue)
     {
         switch (propertyValue.Value)
         {
@@ -833,7 +820,7 @@ public static class Renderers
                 default: return "default";
             }
 
-            string FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+            RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
             {
                 if (
                     context.Compilation.HasImplicitConversion(
@@ -857,28 +844,25 @@ public static class Renderers
                     $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
             }
 
-            string FromText(string text, ICXNode owner)
+            RenderResult FromText(string text, ICXNode owner)
             {
                 if (variants.TryGetValue(text, out var name))
                     return $"{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{name}";
 
-                context.AddDiagnostic(
-                    Diagnostics.InvalidEnumVariant,
-                    owner,
-                    text,
-                    symbol.ToDisplayString()
+                return FromValue(
+                    $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})",
+                    Diagnostics.InvalidEnumVariant(text, symbol.ToDisplayString()),
+                    owner
                 );
-
-                return
-                    $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({ToCSharpString(text)})";
             }
         };
     }
 
-    public static string Emoji(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Emoji(IComponentContext context, IComponentPropertyValue propertyValue)
     {
-        bool isDiscordEmote = false;
-        bool isEmoji = false;
+        var isDiscordEmote = false;
+        var isEmoji = false;
+
         switch (propertyValue.Value)
         {
             case CXValue.Interpolation interpolation:
@@ -904,34 +888,50 @@ public static class Renderers
                 );
 
             case CXValue.Scalar scalar:
-                LightlyValidateEmote(scalar.Value, scalar, out isDiscordEmote, out isEmoji);
-                return UseLibraryParser(context, ToCSharpString(scalar.Value), isEmoji, isDiscordEmote);
+            {
+                var builder = new Builder();
+                LightlyValidateEmote(ref builder, scalar.Value, scalar, out isDiscordEmote, out isEmoji);
+                return builder.WithValue(
+                    UseLibraryParser(context, ToCSharpString(scalar.Value), isEmoji, isDiscordEmote)
+                );
+            }
 
             case CXValue.Multipart stringLiteral:
+            {
+                var builder = new Builder();
                 if (!stringLiteral.HasInterpolations)
                     LightlyValidateEmote(
+                        ref builder,
                         stringLiteral.Tokens.ToString(),
                         stringLiteral.Tokens,
                         out isDiscordEmote,
                         out isEmoji
                     );
 
-                return UseLibraryParser(context, RenderStringLiteral(stringLiteral), isEmoji, isDiscordEmote);
+                return builder.WithValue(
+                    UseLibraryParser(context, RenderStringLiteral(stringLiteral), isEmoji, isDiscordEmote)
+                );
+            }
 
             default: return "null";
         }
 
-        void LightlyValidateEmote(string emote, ICXNode node, out bool isDiscordEmote, out bool isEmoji)
+        void LightlyValidateEmote(
+            ref Builder builder,
+            string emote,
+            ICXNode node,
+            out bool isDiscordEmote,
+            out bool isEmoji
+        )
         {
             isDiscordEmote = IsDiscordEmote.IsMatch(emote);
             isEmoji = IsEmoji.IsMatch(emote);
 
             if (!isDiscordEmote && !isEmoji)
             {
-                context.AddDiagnostic(
-                    Diagnostics.PossibleInvalidEmote,
-                    node,
-                    emote
+                builder.AddDiagnostic(
+                    Diagnostics.PossibleInvalidEmote(emote),
+                    node
                 );
             }
         }

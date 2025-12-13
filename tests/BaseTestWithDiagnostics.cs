@@ -1,11 +1,14 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Discord.CX.Parser;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
+using DiagnosticInfo = Discord.CX.DiagnosticInfo;
 
 namespace UnitTests;
 
 public abstract class BaseTestWithDiagnostics
 {
-    private readonly Queue<Diagnostic> _diagnostics = [];
-    private readonly HashSet<Diagnostic> _expectedDiagnostics = [];
+    private readonly Queue<DiagnosticInfo> _diagnostics = [];
+    private readonly HashSet<DiagnosticInfo> _expectedDiagnostics = [];
 
     protected void ClearDiagnostics()
     {
@@ -17,38 +20,54 @@ public abstract class BaseTestWithDiagnostics
     {
         Assert.Empty(_diagnostics);
     }
-    
-    protected void PushDiagnostics(IEnumerable<Diagnostic> diagnostics)
+
+    protected void PushDiagnostics(IEnumerable<DiagnosticInfo> diagnostics)
     {
         foreach (var diagnostic in diagnostics)
-            if(!_expectedDiagnostics.Contains(diagnostic))
+            if (!_expectedDiagnostics.Contains(diagnostic))
                 _diagnostics.Enqueue(diagnostic);
     }
+
+    protected DiagnosticInfo Diagnostic(
+        DiagnosticDescriptor descriptor,
+        ICXNode node
+    ) => Diagnostic(descriptor, node.Span);
     
-    protected Diagnostic Diagnostic(
+    protected DiagnosticInfo Diagnostic(
+        DiagnosticDescriptor descriptor,
+        TextSpan? span = null
+    ) => Diagnostic(
+        descriptor.Id,
+        descriptor.Title.ToString(),
+        descriptor.MessageFormat.ToString(),
+        descriptor.DefaultSeverity,
+        span
+    );
+
+    protected DiagnosticInfo Diagnostic(
         string id,
         string? title = null,
         string? message = null,
         DiagnosticSeverity? severity = null,
-        Location? location = null
+        TextSpan? span = null
     )
     {
         Assert.NotEmpty(_diagnostics);
-        
+
         var diagnostic = _diagnostics.Dequeue();
 
-        Assert.Equal(id, diagnostic.Id);
+        Assert.Equal(id, diagnostic.Descriptor.Id);
 
         if (title is not null) Assert.Equal(title, diagnostic.Descriptor.Title);
-        if (message is not null) Assert.Equal(message, diagnostic.GetMessage());
-        if (severity is not null) Assert.Equal(severity, diagnostic.Severity);
-        if (location is not null) Assert.Equal(location, diagnostic.Location);
+        if (message is not null) Assert.Equal(message, diagnostic.Descriptor.MessageFormat);
+        if (severity is not null) Assert.Equal(severity, diagnostic.Descriptor.DefaultSeverity);
+        if (span is not null) Assert.Equal(span, diagnostic.Span);
 
         _expectedDiagnostics.Add(diagnostic);
-        
+
         return diagnostic;
     }
-    
+
     protected virtual void EOF()
     {
         Assert.Empty(_diagnostics);
