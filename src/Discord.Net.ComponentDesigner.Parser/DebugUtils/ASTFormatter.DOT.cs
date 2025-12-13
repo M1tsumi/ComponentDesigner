@@ -14,8 +14,8 @@ partial class ASTFormatter
 
         var parts = new List<string>()
         {
-            "rankdir=BT",
-            "graph [splines=ortho, overlap=false, splines=true]"
+            "rankdir=TB",
+            "graph [splines=ortho, ordering=out]"
         };
 
         parts.Add(
@@ -29,10 +29,15 @@ partial class ASTFormatter
                         $"{Array.IndexOf(flat, x)} [label=<<b>{x.Kind}</b><br/>{HtmlClean(x.Value)}>]"
                     )
                 )}}
+                
+                {{string.Join("--", tokens.Select(x => Array.IndexOf(flat, x)))}} [style=invis]
               }
               """
         );
 
+        var nodes = new List<string>();
+        var edges = new List<string>();
+        
         for (var i = 0; i < flat.Length; i++)
         {
             var node = flat[i];
@@ -42,72 +47,69 @@ partial class ASTFormatter
             if (node is CXNode)
             {
                 // add the node
-                parts.Add($"{i} [label=\"{node.GetType().Name}\"]");
+                nodes.Add($"{i} [label=\"{node.GetType().Name}\"]");
             }
 
             switch (node)
             {
-                case CXDoc cxDoc:
+                case CXDoc { RootNodes.Count: not 0 } cxDoc:
                 {
-                    for (var j = 0; j < cxDoc.RootNodes.Count; j++)
-                    {
-                        var rootNode = cxDoc.RootNodes[j];
-                        var index = Array.IndexOf(flat, rootNode);
-
-                        parts.Add($"{index} -- {i} [label=\"RootNodes[{j}]\"]");
-                    }
+                    edges.Add($"{i} -- {{{string.Join(" ", cxDoc.RootNodes.Select(x => Array.IndexOf(flat, x)))}}}");
 
                     break;
                 }
                 case CXElement cxElement:
                 {
-                    AddEdge(i, cxElement.ElementStartOpenToken);
-                    AddEdge(i, cxElement.ElementStartNameToken);
-                    AddEdge(i, cxElement.Attributes);
-                    AddEdge(i, cxElement.ElementStartCloseToken);
-
-                    AddEdge(i, cxElement.Children);
-                    AddEdge(i, cxElement.ElementEndOpenToken);
-                    AddEdge(i, cxElement.ElementEndNameToken);
-                    AddEdge(i, cxElement.ElementEndCloseToken);
+                    AddEdges(
+                        i,
+                        cxElement.ElementStartOpenToken,
+                        cxElement.ElementStartNameToken,
+                        cxElement.Attributes,
+                        cxElement.ElementStartCloseToken,
+                        cxElement.Children,
+                        cxElement.ElementEndOpenToken,
+                        cxElement.ElementEndNameToken,
+                        cxElement.ElementEndCloseToken
+                    );
 
                     break;
                 }
                 case CXAttribute cxAttribute:
-                    AddEdge(i, cxAttribute.Identifier);
-                    AddEdge(i, cxAttribute.EqualsToken);
-                    AddEdge(i, cxAttribute.Value);
+                    AddEdges(
+                        i,
+                        cxAttribute.Identifier,
+                        cxAttribute.EqualsToken,
+                        cxAttribute.Value
+                    );
                     break;
                 case CXValue.Element element:
-                    AddEdge(i, element.OpenParenthesis);
-                    AddEdge(i, element.Value);
-                    AddEdge(i, element.CloseParenthesis);
+                    AddEdges(
+                        i,
+                        element.OpenParenthesis,
+                        element.Value,
+                        element.CloseParenthesis
+                    );
                     break;
                 case CXValue.Interpolation interpolation:
-                    AddEdge(i, interpolation.Token);
+                    AddEdges(i, interpolation.Token);
                     break;
                 case CXValue.StringLiteral stringLiteral:
-                    AddEdge(i, stringLiteral.StartToken);
-                    AddEdge(i, stringLiteral.Tokens);
-                    AddEdge(i, stringLiteral.EndToken);
+                    AddEdges(i, stringLiteral.StartToken, stringLiteral.Tokens, stringLiteral.EndToken);
                     break;
                 case CXValue.Multipart multipart:
-                    AddEdge(i, multipart.Tokens);
+                    AddEdges(i, multipart.Tokens);
                     break;
                 case CXValue.Scalar scalar:
-                    AddEdge(i, scalar.Token);
+                    AddEdges(i, scalar.Token);
                     break;
-                case ICXCollection cxCollection:
-                    var list = cxCollection.ToList();
-                    for (var j = 0; j < list.Count; j++)
-                    {
-                        var item = list[j];
-                        AddEdge(i, item, $"[{j}]");
-                    }
-
+                case ICXCollection{Count:not 0} cxCollection:
+                    edges.Add($"{i} -- {{{string.Join(" ", cxCollection.ToList().Select(x => Array.IndexOf(flat, x)))}}}");
                     break;
             }
         }
+        
+        parts.AddRange(nodes);
+        parts.AddRange(edges);
 
         return
             $$"""
@@ -116,19 +118,29 @@ partial class ASTFormatter
               }
               """;
 
-        void AddEdge(int index, ICXNode? node, string? name = null)
+        void AddEdges(int index, params IEnumerable<ICXNode?> nodes)
         {
-            if (node is null or ICXCollection { Count: 0 }) return;
+            var targets = nodes
+                .Where(x => x is not null and not ICXCollection { Count: 0 })
+                .Select(x => Array.IndexOf(flat, x))
+                .Where(x => x is not -1)
+                .ToArray();
 
-            var targetIndex = Array.IndexOf(flat, node);
+            if (targets.Length is 0) return;
 
-            if (targetIndex is -1) return;
+            edges.Add($"{index} -- {{{string.Join(" ", targets)}}}");
 
-            var part = $"{targetIndex} -- {index}";
-
-            if (name is not null) part += $" [label=\"{name}\"]";
-
-            parts.Add(part);
+            // if (nodes.Length is 0) return;
+            //
+            // var targetIndex = Array.IndexOf(flat, node);
+            //
+            // if (targetIndex is -1) return;
+            //
+            // var part = $"{targetIndex} -- {index}";
+            //
+            // if (name is not null) part += $" [label=\"{name}\"]";
+            //
+            // parts.Add(part);
         }
 
         static string HtmlClean(string str)
