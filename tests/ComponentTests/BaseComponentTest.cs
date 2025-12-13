@@ -1,11 +1,13 @@
 ﻿using System.Text;
 using Discord.CX;
 using Discord.CX.Nodes;
+using Discord.CX.Parser.DebugUtils;
 using Microsoft.CodeAnalysis;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public abstract class BaseComponentTest : BaseTestWithDiagnostics
+public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWithDiagnostics
 {
     protected CXGraph CurrentGraph => _graph!.Value;
 
@@ -75,6 +77,8 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
                   {{additionalMethods?.WithNewlinePadding(4)}}
               }
               """";
+        
+        output.WriteLine($"CX:\n{cxString}");
 
         var target = Targets.FromSource(source);
 
@@ -85,6 +89,9 @@ public abstract class BaseComponentTest : BaseTestWithDiagnostics
             options ?? GeneratorOptions.Default,
             CancellationToken.None
         );
+        
+        output.WriteLine($"AST:\n{manager.Document.ToStructuralFormat()}");
+        output.WriteLine($"DOT:\n{manager.Document.ToDOTFormat()}");
 
         Assert.Equal(allowParsingErrors, manager.Document.HasErrors);
 

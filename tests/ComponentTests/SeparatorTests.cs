@@ -1,10 +1,11 @@
 ﻿using Discord;
 using Discord.CX;
 using Discord.CX.Nodes.Components;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class SeparatorTests : BaseComponentTest
+public sealed class SeparatorTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void SingleQuoteSpacing()

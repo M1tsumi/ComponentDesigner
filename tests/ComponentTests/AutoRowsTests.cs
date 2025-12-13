@@ -1,9 +1,10 @@
 ﻿using Discord.CX.Nodes.Components;
 using Discord.CX.Nodes.Components.SelectMenus;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class AutoRowsTests : BaseComponentTest
+public sealed class AutoRowsTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void MixOfButtonsAndSelects()

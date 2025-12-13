@@ -1,9 +1,10 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes.Components;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class LabelTests : BaseComponentTest
+public sealed class LabelTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     // waiting for label builder in dnet before testing.
     

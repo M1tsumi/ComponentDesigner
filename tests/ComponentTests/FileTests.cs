@@ -1,10 +1,11 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes.Components;
 using Discord.CX.Parser;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class FileTests : BaseComponentTest
+public sealed class FileTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyFile()

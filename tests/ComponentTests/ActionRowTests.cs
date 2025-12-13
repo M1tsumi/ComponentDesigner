@@ -2,10 +2,11 @@
 using Discord.CX.Nodes.Components;
 using Discord.CX.Nodes.Components.SelectMenus;
 using Discord.CX.Parser;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class ActionRowTests : BaseComponentTest
+public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyRow()

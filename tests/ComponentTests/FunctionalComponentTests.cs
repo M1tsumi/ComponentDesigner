@@ -1,9 +1,10 @@
 ﻿using Discord.CX.Nodes.Components;
 using Discord.CX.Nodes.Components.Custom;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class FunctionalComponentTests : BaseComponentTest
+public sealed class FunctionalComponentTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void ChildOfContainer()

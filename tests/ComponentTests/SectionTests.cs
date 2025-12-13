@@ -1,9 +1,10 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes.Components;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class SectionTests : BaseComponentTest
+public sealed class SectionTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptySection()

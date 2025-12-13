@@ -1,11 +1,13 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Discord.CX.Parser;
+using Discord.CX.Parser.DebugUtils;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.ParseTests;
 
-public abstract class BaseParsingTest
+public abstract class BaseParsingTest(ITestOutputHelper output)
 {
     protected CXDoc? Document { get; private set; }
     private IEnumerator<ICXNode>? _enumerator;
@@ -43,10 +45,15 @@ public abstract class BaseParsingTest
     {
         parseFunc ??= (parser) => parser.ParseRootNodes();
         
+        output.WriteLine($"Parsing:\n{cx}");
+        
         var parser = new CXParser(CXSourceText.From(cx).CreateReader(interpolations: interpolations));
         var nodes = parseFunc(parser).ToList();
 
         Document = new CXDoc(parser, nodes);
+        
+        output.WriteLine($"AST:\n{Document.ToStructuralFormat()}");
+        output.WriteLine($"DOT:\n{Document.ToDOTFormat()}");
         
         if(!allowErrors) Assert.False(Document.HasErrors);
 

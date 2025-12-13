@@ -1,9 +1,10 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes.Components;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class ThumbnailTests : BaseComponentTest
+public sealed class ThumbnailTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyThumbnail()

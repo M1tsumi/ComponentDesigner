@@ -1,10 +1,11 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes.Components;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class MediaGalleryTests : BaseComponentTest
+public sealed class MediaGalleryTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyGallery()

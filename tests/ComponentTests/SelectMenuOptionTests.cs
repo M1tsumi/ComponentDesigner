@@ -1,10 +1,11 @@
 ﻿using Discord;
 using Discord.CX;
 using Discord.CX.Nodes.Components.SelectMenus;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class SelectMenuOptionTests : BaseComponentTest
+public sealed class SelectMenuOptionTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyOption()

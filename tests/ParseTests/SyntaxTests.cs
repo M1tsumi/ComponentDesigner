@@ -1,9 +1,10 @@
 ﻿using Discord.CX.Parser;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.ParseTests;
 
-public class SyntaxTests : BaseParsingTest
+public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
 {
     [Fact]
     public void SingleElements()

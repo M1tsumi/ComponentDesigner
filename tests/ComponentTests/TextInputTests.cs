@@ -1,10 +1,11 @@
 ﻿using Discord;
 using Discord.CX;
 using Discord.CX.Nodes.Components;
+using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public sealed class TextInputTests : BaseComponentTest
+public sealed class TextInputTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
     public void EmptyInput()

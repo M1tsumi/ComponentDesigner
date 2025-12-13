@@ -1,9 +1,10 @@
 ﻿using Discord.CX.Parser;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.ParseTests;
 
-public sealed class TriviaTests : BaseParsingTest
+public sealed class TriviaTests(ITestOutputHelper output) : BaseParsingTest(output)
 {
     [Fact]
     public void BasicWhitespace()
