@@ -27,17 +27,21 @@ public abstract class ComponentNode<TState> : ComponentNode
 {
     public abstract Result<string> Render(TState state, IComponentContext context, ComponentRenderingOptions options);
 
-    public virtual void UpdateState(ref TState state, IComponentContext context)
-    {
-    }
+    public virtual TState UpdateState(TState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
+        => state;
 
-    public sealed override void UpdateState(ref ComponentState state, IComponentContext context)
-        => UpdateState(ref Unsafe.As<ComponentState, TState>(ref state), context);
+    public sealed override ComponentState UpdateState(
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    ) => UpdateState((TState)state, context, diagnostics);
 
-    public abstract TState? CreateState(ComponentStateInitializationContext context);
+    public abstract TState? CreateState(ComponentStateInitializationContext context, IList<DiagnosticInfo> diagnostics);
 
-    public sealed override ComponentState? Create(ComponentStateInitializationContext context)
-        => CreateState(context);
+    public sealed override ComponentState? Create(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    ) => CreateState(context, diagnostics);
 
     public sealed override Result<string> Render(
         ComponentState state,
@@ -50,7 +54,8 @@ public abstract class ComponentNode<TState> : ComponentNode
         base.Validate(state, context, diagnostics);
     }
 
-    public sealed override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
+    public sealed override void Validate(ComponentState state, IComponentContext context,
+        IList<DiagnosticInfo> diagnostics)
         => Validate((TState)state, context, diagnostics);
 }
 
@@ -135,23 +140,32 @@ public abstract class ComponentNode
         ComponentRenderingOptions options
     );
 
-    public virtual void UpdateState(ref ComponentState state, IComponentContext context)
-    {
-    }
+    public virtual ComponentState UpdateState(
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    ) => state;
 
-    public virtual ComponentState? Create(ComponentStateInitializationContext context)
+    public virtual ComponentState? Create(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        if (HasChildren && context.Node is CXElement element)
-        {
-            context.AddChildren(element.Children);
-        }
-
-        return new ComponentState() { Source = context.Node };
+        return new ComponentState(
+            context.GraphNode,
+            context.CXNode
+        );
     }
 
     public virtual void AddGraphNode(ComponentGraphInitializationContext context)
     {
-        context.Push(this, cxNode: context.CXNode);
+        context.Push(
+            this,
+            cxNode: context.CXNode,
+            children: HasChildren && context.CXNode is CXElement element
+                ? element.Children
+                : null
+        );
     }
 
 

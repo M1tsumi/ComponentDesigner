@@ -8,11 +8,12 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
 
-public sealed class LabelComponentState : ComponentState
-{
-    public CXValue? ChildValue { get; set; }
-    public CXElement? ChildElement { get; set; }
-}
+public sealed record LabelComponentState(
+    GraphNode OwningGraphNode,
+    ICXNode Source,
+    CXValue? ChildValue,
+    CXElement? ChildElement
+) : ComponentState(OwningGraphNode, Source);
 
 public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 {
@@ -54,23 +55,22 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
         ];
     }
 
-    public override LabelComponentState? CreateState(ComponentStateInitializationContext context)
+    public override LabelComponentState? CreateState(ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics)
     {
-        if (context.Node is not CXElement element) return null;
+        if (context.CXNode is not CXElement element) return null;
 
-        var state = new LabelComponentState()
-        {
-            Source = element
-        };
 
+        CXValue? childValue = null;
         CXElement? component = null;
 
         switch (element.Children.FirstOrDefault())
         {
             case CXValue value:
             {
-                state.SubstitutePropertyValue(Value, value);
-                state.ChildValue = value;
+                // state.SubstitutePropertyValue(Value, value);
+                // state.ChildValue = value;
+                childValue = value;
 
                 if (element.Children.Count > 1 && element.Children[1] is CXElement labelComponent)
                     component = labelComponent;
@@ -81,18 +81,22 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
                 break;
         }
 
-        if (component is not null)
-        {
-            state.ChildElement = component;
-            state.SubstitutePropertyValue(
-                Component,
+        var state = new LabelComponentState(
+            context.GraphNode,
+            element,
+            childValue,
+            component
+        );
+
+        if (state.ChildValue is not null) state.SubstitutePropertyValue(Value, state.ChildValue);
+        if (state.ChildElement is not null)
+            state.SubstitutePropertyValue(Component,
                 new CXValue.Element(
                     CXToken.CreateSynthetic(CXTokenKind.OpenParenthesis),
-                    component,
+                    state.ChildElement,
                     CXToken.CreateSynthetic(CXTokenKind.CloseParenthesis)
                 )
             );
-        }
 
         return state;
     }

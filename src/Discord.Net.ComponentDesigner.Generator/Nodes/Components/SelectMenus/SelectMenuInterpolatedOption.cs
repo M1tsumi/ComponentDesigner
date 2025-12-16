@@ -4,26 +4,13 @@ using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes.Components.SelectMenus;
 
-public sealed class SelectMenuInterpolatedOption
+public sealed record SelectMenuInterpolatedOption(
+    CXToken Interpolation,
+    int InterpolationId,
+    bool IsCollection,
+    bool IsBuilder
+)
 {
-    public CXToken Interpolation { get; }
-    public int InterpolationId { get; }
-    public bool IsCollection { get; }
-    public bool IsBuilder { get; }
-
-    private SelectMenuInterpolatedOption(
-        CXToken interpolation,
-        int interpolationId,
-        bool isCollection,
-        bool isBuilder
-    )
-    {
-        Interpolation = interpolation;
-        InterpolationId = interpolationId;
-        IsCollection = isCollection;
-        IsBuilder = isBuilder;
-    }
-
     public Result<string> Render(
         SelectMenuComponentNode.SelectState state,
         IComponentContext context,
@@ -65,7 +52,7 @@ public sealed class SelectMenuInterpolatedOption
     public static bool TryCreate(
         IComponentContext context,
         ICXNode interpolation,
-        IList<DiagnosticInfo> diagnostics, 
+        IList<DiagnosticInfo> diagnostics,
         out SelectMenuInterpolatedOption option
     )
     {

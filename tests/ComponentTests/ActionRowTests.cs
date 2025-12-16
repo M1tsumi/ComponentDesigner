@@ -103,7 +103,7 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
             """
         );
         {
-            CXGraph.Node extraButtonNode;
+            GraphNode extraButtonGraphNode;
 
             Node<ActionRowComponentNode>();
             {
@@ -112,14 +112,14 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
                 Node<ButtonComponentNode>();
                 Node<ButtonComponentNode>();
                 Node<ButtonComponentNode>();
-                Node<ButtonComponentNode>(out extraButtonNode);
+                Node<ButtonComponentNode>(out extraButtonGraphNode);
             }
 
             Validate(hasErrors: true);
 
             Diagnostic(
                 Diagnostics.ActionRowInvalidChild,
-                span: extraButtonNode.State.Source.Span
+                span: extraButtonGraphNode.State.Source.Span
             );
 
             EOF();
@@ -141,11 +141,11 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
             """
         );
         {
-            CXGraph.Node selectMenuNode;
+            GraphNode selectMenuGraphNode;
             Node<ActionRowComponentNode>();
             {
                 Node<ButtonComponentNode>();
-                Node<SelectMenuComponentNode>(out selectMenuNode);
+                Node<SelectMenuComponentNode>(out selectMenuGraphNode);
                 {
                     Node<SelectMenuOptionComponentNode>();
                 }
@@ -156,7 +156,7 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
 
             Diagnostic(
                 Diagnostics.ActionRowInvalidChild,
-                selectMenuNode.State.Source.Span
+                selectMenuGraphNode.State.Source.Span
             );
 
             EOF();
@@ -311,18 +311,18 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
             """
         );
         {
-            CXGraph.Node containerNode;
+            GraphNode containerGraphNode;
             Node<ActionRowComponentNode>();
             {
                 Node<ButtonComponentNode>();
-                Node<ContainerComponentNode>(out containerNode);
+                Node<ContainerComponentNode>(out containerGraphNode);
             }
 
             Validate(hasErrors: true);
 
             Diagnostic(
                 Diagnostics.ActionRowInvalidChild,
-                span: containerNode.State.Source.Span
+                span: containerGraphNode.State.Source.Span
             );
             
             EOF();

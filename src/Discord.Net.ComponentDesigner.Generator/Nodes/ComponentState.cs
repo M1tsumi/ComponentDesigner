@@ -7,19 +7,19 @@ using System.Text;
 
 namespace Discord.CX.Nodes;
 
-public class ComponentState
+public record ComponentState(
+    GraphNode OwningGraphNode,
+    ICXNode Source
+)
 {
-    public CXGraph.Node? OwningNode { get; set; }
-    public required ICXNode Source { get; init; }
+    public bool HasChildren => OwningGraphNode?.Children.Count > 0;
 
-    public bool HasChildren => OwningNode?.Children.Count > 0;
-
-    public IReadOnlyList<CXGraph.Node> Children
-        => OwningNode?.Children ?? [];
+    public IReadOnlyList<GraphNode> Children
+        => OwningGraphNode?.Children ?? [];
 
     public bool IsElement => Source is CXElement;
 
-    public bool IsRootNode => OwningNode?.Parent is null;
+    public bool IsRootNode => OwningGraphNode?.Parent is null;
 
     private readonly Dictionary<ComponentProperty, ComponentPropertyValue> _properties = [];
 
@@ -35,11 +35,11 @@ public class ComponentState
                 property.Name == x.Identifier.Value || property.Aliases.Contains(x.Identifier.Value)
             );
 
-        CXGraph.Node? node = null;
+        GraphNode? node = null;
 
         if (attribute?.Value is CXValue.Element element)
         {
-            node = OwningNode?.AttributeNodes
+            node = OwningGraphNode?.AttributeNodes
                 .FirstOrDefault(x => ReferenceEquals(x.State.Source, element.Value));
         }
 
@@ -57,7 +57,7 @@ public class ComponentState
         {
             diagnostics.Add(
                 Diagnostics.PropertyNotAllowed(
-                    OwningNode?.Inner.Name ?? "Unknown",
+                    OwningGraphNode?.Inner.Name ?? "Unknown",
                     propertyValue.Attribute!.Identifier.Value
                 ),
                 propertyValue.Attribute
@@ -103,23 +103,23 @@ public class ComponentState
         }
 
         diagnostics.Add(
-            Diagnostics.MissingRequiredProperty(OwningNode?.Inner.Name, sb.ToString()),
+            Diagnostics.MissingRequiredProperty(OwningGraphNode?.Inner.Name, sb.ToString()),
             Source
         );
     }
 
-    public bool TryGetChildGraphNode(ICXNode node, out CXGraph.Node childNode)
+    public bool TryGetChildGraphNode(ICXNode node, out GraphNode childGraphNode)
     {
         foreach (var child in Children)
         {
             if (ReferenceEquals(child.State.Source, node))
             {
-                childNode = child;
+                childGraphNode = child;
                 return true;
             }
         }
 
-        childNode = null!;
+        childGraphNode = null!;
         return false;
     }
 
@@ -188,13 +188,13 @@ public class ComponentState
 
     public Result<string> RenderChildren(
         IComponentContext context,
-        Func<CXGraph.Node, bool>? predicate = null,
+        Func<GraphNode, bool>? predicate = null,
         ComponentRenderingOptions options = default
     )
     {
-        if (OwningNode is null || !HasChildren) return string.Empty;
+        if (OwningGraphNode is null || !HasChildren) return string.Empty;
 
-        IEnumerable<CXGraph.Node> children = OwningNode.Children;
+        IEnumerable<GraphNode> children = OwningGraphNode.Children;
 
         if (predicate is not null) children = children.Where(predicate);
 
@@ -202,5 +202,10 @@ public class ComponentState
             .Select(x => x.Render(context, options))
             .FlattenAll()
             .Map(x => string.Join($",{Environment.NewLine}", x));
+    }
+
+    public virtual bool Equals(ComponentState? other)
+    {
+        return ReferenceEquals(this, other);
     }
 }

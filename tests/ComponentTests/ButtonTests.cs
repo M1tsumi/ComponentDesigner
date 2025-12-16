@@ -275,7 +275,7 @@ public sealed class ButtonTests(ITestOutputHelper output) : BaseComponentTest(ou
         {
             var button = Node<ButtonComponentNode>(out var buttonNode);
 
-            var label = buttonNode.State.GetProperty(button.Label);
+            var label = buttonNode.State!.GetProperty(button.Label);
 
             Assert.NotNull(label.Value);
             
@@ -368,7 +368,7 @@ public sealed class ButtonTests(ITestOutputHelper output) : BaseComponentTest(ou
         {
             var button = Node<ButtonComponentNode>(out var buttonNode);
             
-            var style = buttonNode.State.GetProperty(button.Style);
+            var style = buttonNode.State!.GetProperty(button.Style);
 
             Assert.NotNull(style.Value);
             

@@ -52,8 +52,8 @@ public sealed class MediaGalleryTests(ITestOutputHelper output) : BaseComponentT
             """
         );
         {
-            CXGraph.Node eleventh;
-            CXGraph.Node twelfth;
+            GraphNode eleventh;
+            GraphNode twelfth;
 
             Node<MediaGalleryComponentNode>();
             {
@@ -140,18 +140,18 @@ public sealed class MediaGalleryTests(ITestOutputHelper output) : BaseComponentT
             """
         );
         {
-            CXGraph.Node containerNode;
+            GraphNode containerGraphNode;
 
             Node<MediaGalleryComponentNode>();
             {
-                Node<ContainerComponentNode>(out containerNode);
+                Node<ContainerComponentNode>(out containerGraphNode);
             }
 
             Validate(hasErrors: true);
 
             Diagnostic(
                 Diagnostics.InvalidMediaGalleryChild("container"),
-                containerNode.State.Source
+                containerGraphNode.State.Source
             );
 
             Diagnostic(Diagnostics.MediaGalleryIsEmpty.Id);

@@ -6,7 +6,7 @@ public interface IComponentPropertyValue
 {
     CXValue? Value { get; }
     
-    CXGraph.Node? Node { get; }
+    GraphNode? Node { get; }
     
     bool IsSpecified { get; }
     

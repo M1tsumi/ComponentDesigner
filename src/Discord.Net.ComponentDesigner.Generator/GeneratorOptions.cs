@@ -20,7 +20,8 @@ public sealed record GeneratorOptions(
     {
         return context.CompilationProvider
             .Combine(context.AnalyzerConfigOptionsProvider)
-            .Select(CreateOptions);
+            .Select(CreateOptions)
+            .WithTrackingName(TrackingNames.GENERATOR_OPTIONS);
 
         static GeneratorOptions CreateOptions(
             (Compilation Compilation, AnalyzerConfigOptionsProvider Options) tuple,

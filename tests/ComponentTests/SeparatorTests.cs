@@ -105,7 +105,7 @@ public sealed class SeparatorTests(ITestOutputHelper output) : BaseComponentTest
         {
             var separator = Node<SeparatorComponentNode>(out var separatorNode);
 
-            var spacing = separatorNode.State.GetProperty(separator.Spacing);
+            var spacing = separatorNode.State!.GetProperty(separator.Spacing);
 
             Assert.NotNull(spacing.Value);
 

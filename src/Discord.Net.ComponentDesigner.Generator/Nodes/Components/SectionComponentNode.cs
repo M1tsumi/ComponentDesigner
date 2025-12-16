@@ -188,8 +188,8 @@ public sealed class AccessoryComponentNode : ComponentNode
 
         if (state.Children.Count is not 1)
         {
-            var start = state.OwningNode!.Children[0].State.Source.Span.Start;
-            var end = state.OwningNode!.Children[state.Children.Count - 1].State.Source.Span.End;
+            var start = state.OwningGraphNode!.Children[0].State.Source.Span.Start;
+            var end = state.OwningGraphNode!.Children[state.Children.Count - 1].State.Source.Span.End;
 
             diagnostics.Add(
                 Diagnostics.TooManyAccessoryChildren,

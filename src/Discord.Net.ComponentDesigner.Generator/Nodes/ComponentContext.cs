@@ -11,7 +11,7 @@ namespace Discord.CX.Nodes;
 public sealed class ComponentContext : IComponentContext
 {
     public KnownTypes KnownTypes => Compilation.GetKnownTypes();
-    public Compilation Compilation => _graph.Manager.Compilation;
+    public Compilation Compilation => _graph.Compilation;
 
     public ComponentTypingContext RootTypingContext { get; }
 
@@ -42,6 +42,6 @@ public sealed class ComponentContext : IComponentContext
         => type is not null ? $"designer.GetValue<{type}>({index})" : $"designer.GetValueAsString({index})";
     
     public DesignerInterpolationInfo GetInterpolationInfo(CXToken token)
-        => GetInterpolationInfo(_graph.Manager.Document.GetInterpolationIndex(token));
-    public DesignerInterpolationInfo GetInterpolationInfo(int index) => _graph.Manager.InterpolationInfos[index];
+        => GetInterpolationInfo(_graph.Document.GetInterpolationIndex(token));
+    public DesignerInterpolationInfo GetInterpolationInfo(int index) => _graph.InterpolationInfos[index];
 }

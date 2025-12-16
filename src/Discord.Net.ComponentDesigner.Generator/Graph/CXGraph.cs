@@ -1,173 +1,206 @@
-﻿using Discord.CX.Nodes;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using Discord.CX.Nodes;
 using Discord.CX.Nodes.Components;
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 
 namespace Discord.CX;
 
-public readonly struct CXGraph
+public sealed class CXGraph : IEquatable<CXGraph>
 {
-    public readonly CXGraphManager Manager;
-    public readonly ImmutableArray<Node> RootNodes;
-    public readonly IReadOnlyDictionary<ICXNode, Node> NodeMap;
+    public string Key { get; }
+    public EquatableArray<GraphNode> RootNodes { get; }
+    public EquatableArray<DiagnosticInfo> Diagnostics { get; }
+    public IReadOnlyDictionary<ICXNode, GraphNode> NodeMap { get; }
+    public CXDoc Document { get; }
 
-    private readonly ImmutableArray<DiagnosticInfo> _diagnostics;
+    public EquatableArray<DesignerInterpolationInfo> InterpolationInfos => _state.CX.InterpolationInfos;
 
-    public CXGraph(
-        CXGraphManager manager,
-        ImmutableArray<Node> rootNodes,
-        ImmutableArray<DiagnosticInfo> diagnostics,
-        IReadOnlyDictionary<ICXNode, Node> nodeMap
-    )
-    {
-        Manager = manager;
-        RootNodes = rootNodes;
-        _diagnostics = diagnostics;
-        NodeMap = nodeMap;
-    }
+    public Compilation Compilation => _state.Compilation;
 
-    public CXGraph Update(
-        CXGraphManager manager,
-        IncrementalParseResult parseResult,
+    private readonly GraphGeneratorState _state;
+
+    private CXGraph(
+        string key,
+        EquatableArray<GraphNode> rootNodes,
+        EquatableArray<DiagnosticInfo> diagnostics,
+        IReadOnlyDictionary<ICXNode, GraphNode> nodeMap,
+        GraphGeneratorState state,
         CXDoc document
     )
     {
-        /*
-         * Update semantics:
-         *
-         * We try to reuse any ComponentNodes who's source is a reused node within the 'parseResult' AND contain no
-         * diagnostics. Any nodes with errors are not reused.
-         */
-
-        if (manager == Manager) return this;
-
-        var map = new Dictionary<ICXNode, Node>();
-        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-
-        var rootNodes = ImmutableArray.CreateBuilder<Node>();
-
-        var context = new GraphInitializationContext(
-            manager,
-            parseResult.ReusedNodes,
-            this,
-            map,
-            diagnostics,
-            parseResult
-        );
-
-        foreach (var cxNode in document.RootNodes)
-        {
-            rootNodes.AddRange(
-                CreateNodes(
-                    cxNode,
-                    null,
-                    context
-                )
-            );
-        }
-
-        return new(manager, rootNodes.ToImmutable(), diagnostics.ToImmutable(), map);
+        _state = state;
+        Document = document;
+        Diagnostics = diagnostics;
+        NodeMap = nodeMap;
+        Key = key;
+        RootNodes = rootNodes;
     }
 
     public static CXGraph Create(
-        CXGraphManager manager
+        GraphGeneratorState state,
+        CXGraph? old,
+        CancellationToken token
     )
     {
-        var map = new Dictionary<ICXNode, Node>();
+        // TODO: support inc. parsing
+        var reader = new CXSourceReader(
+            new CXSourceText.StringSource(state.CX.Designer),
+            state.CX.Location.TextSpan,
+            state.CX.InterpolationInfos.Select(x => x.Span).ToArray(),
+            state.CX.QuoteCount
+        );
+
+        var doc = CXParser.Parse(reader, token);
+
+        var parserDiagnostics = doc.Diagnostics.Select(x => new DiagnosticInfo(
+            CX.Diagnostics.CreateParsingDiagnostic(x),
+            x.Span
+        ));
+
+        if (doc.HasErrors)
+        {
+            return new CXGraph(
+                state.Key,
+                [],
+                [..parserDiagnostics],
+                ImmutableDictionary<ICXNode, GraphNode>.Empty,
+                state,
+                doc
+            );
+        }
+
+        var map = new Dictionary<ICXNode, GraphNode>();
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
+        diagnostics.AddRange(parserDiagnostics);
+
         var context = new GraphInitializationContext(
-            manager,
+            state,
+            doc,
             [],
-            null,
+            old,
             map,
             diagnostics,
             null
         );
 
-        var rootNodes = manager.Document
-            .RootNodes
-            .SelectMany(x =>
-                CreateNodes(
-                    x,
-                    null,
-                    context
-                )
-            )
-            .ToImmutableArray();
-
-        return new(manager, rootNodes!, diagnostics.ToImmutable(), map);
+        return new CXGraph(
+            state.Key,
+            [
+                ..doc.RootNodes
+                    .SelectMany(x =>
+                        CreateNodes(
+                            x,
+                            parent: null,
+                            context
+                        )
+                    )
+            ],
+            diagnostics.ToImmutable(),
+            map,
+            state,
+            doc
+        );
     }
 
-    public readonly record struct GraphInitializationContext(
-        CXGraphManager Manager,
-        IReadOnlyList<ICXNode> ReusedNodes,
-        CXGraph? OldGraph,
-        Dictionary<ICXNode, Node> Map,
-        ImmutableArray<DiagnosticInfo>.Builder Diagnostics,
-        IncrementalParseResult? IncrementalParseResult
-    )
+    public CXGraph UpdateFromCompilation(Compilation compilation, CancellationToken token)
     {
-        public GeneratorOptions Options => Manager.Options;
-        public Compilation Compilation => Manager.Compilation;
-        public bool IsIncremental => HasOldGraph && HasIncrementalParseResult;
+        var context = new ComponentContext(
+            this
+        );
 
-        public bool HasIncrementalParseResult => IncrementalParseResult is not null;
-        public bool HasOldGraph => OldGraph is not null;
+        var diagnostics = new List<DiagnosticInfo>();
 
-        public bool TryReuse(ICXNode node, Node? parent, out Node graphNode)
+
+        var hasUpdatedState = false;
+
+        foreach (var rootNode in RootNodes)
         {
-            if (
-                IsIncremental &&
-                ReusedNodes.Contains(node) &&
-                OldGraph!.Value.NodeMap.TryGetValue(node, out graphNode)
-            )
-            {
-                graphNode = AddToMap(node, graphNode.Reuse(parent, IncrementalParseResult!.Value, Manager));
-                return true;
-            }
-
-            graphNode = null!;
-            return false;
+            hasUpdatedState |= rootNode.UpdateState(context, diagnostics);
         }
 
-        public Node AddToMap(ICXNode? node, Node graphNode)
-        {
-            if (node is null) return graphNode;
+        if (hasUpdatedState || diagnostics.Count is not 0)
+            return new CXGraph(
+                Key,
+                RootNodes,
+                [..Diagnostics, ..diagnostics],
+                NodeMap,
+                _state,
+                Document
+            );
 
-            return Map[node] = graphNode;
-        }
+        return this;
     }
 
-    private static IEnumerable<Node> CreateNodes(
+    public void Validate(IComponentContext context, IList<DiagnosticInfo> diagnostics)
+    {
+        foreach (var node in RootNodes)
+            node.Validate(context, diagnostics);
+    }
+
+    public RenderedGraph Render(IComponentContext? context = null, CancellationToken token = default)
+    {
+        context ??= new ComponentContext(this);
+
+        var diagnostics = new List<DiagnosticInfo>(Diagnostics);
+
+        Validate(context, diagnostics);
+
+        var result = RootNodes
+            .Select(x => x.Render(context))
+            .FlattenAll()
+            .Map(x => string.Join($",{Environment.NewLine}", x));
+
+        diagnostics.AddRange(result.Diagnostics);
+
+        return new RenderedGraph(
+            Key,
+            _state.CX.Designer,
+            result.GetValueOrDefault(),
+            [..diagnostics]
+        );
+    }
+
+
+    private static IEnumerable<GraphNode> CreateNodes(
         CXNode cxNode,
-        Node? parent,
+        GraphNode? parent,
         GraphInitializationContext context
     )
     {
-        if (context.TryReuse(cxNode, parent, out var existing))
-        {
-            return [existing];
-        }
+        if (context.TryReuse(cxNode, parent, out var reused))
+            return [reused];
 
         switch (cxNode)
         {
             case CXValue.Interpolation interpolation:
-            {
-                var info = context.Manager.InterpolationInfos[interpolation.InterpolationIndex];
-                return FromInterpolation(cxNode, info);
-            }
+                return CreateInterpolationNodes(
+                    interpolation,
+                    context.Interpolations[interpolation.InterpolationIndex],
+                    parent,
+                    context
+                );
             case CXValue.Multipart multipart:
-                var parts = new List<Node>();
+            {
+                var parts = new List<GraphNode>();
+
                 foreach (var token in multipart.Tokens)
                 {
                     if (token.InterpolationIndex is { } index)
-                        parts.AddRange(FromInterpolation(token, context.Manager.InterpolationInfos[index]));
+                    {
+                        parts.AddRange(CreateInterpolationNodes(
+                            token,
+                            context.Interpolations[index],
+                            parent,
+                            context
+                        ));
+                    }
                     else
                     {
                         context.Diagnostics.Add(
@@ -180,62 +213,9 @@ public readonly struct CXGraph
                 }
 
                 return parts;
-            case CXElement element:
-            {
-                if (element.IsFragment)
-                {
-                    return element.Children.SelectMany(x =>
-                        CreateNodes(
-                            x,
-                            parent,
-                            context
-                        )
-                    );
-                }
-
-                /*
-                 * TODO: A 2 staged approach for any late-bound compilation/semantic introspection is needed here
-                 * since we need to lookup provider and custom components. A first stage pass would build the graph, and
-                 * the second stage would map them to a custom node
-                 */
-                if (
-                    !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
-                    !ComponentNode.TryGetProviderNode(
-                        context.Compilation.GetSemanticModel(context.Manager.SyntaxTree),
-                        context.Manager.CXDesignerLocation.TextSpan.Start,
-                        element.Identifier,
-                        out componentNode
-                    )
-                )
-                {
-                    context.Diagnostics.Add(
-                        new(
-                            CX.Diagnostics.UnknownComponent(element.Identifier),
-                            element.Span
-                        )
-                    );
-                
-                    return [];
-                }
-
-                var initContext = new ComponentGraphInitializationContext(
-                    element,
-                    parent,
-                    context
-                );
-                
-                componentNode.AddGraphNode(initContext);
-                
-                return initContext
-                    .Initializations
-                    .Select(x =>
-                        CreateNodeFromInitialization(
-                            x,
-                            context,
-                            parent
-                        )
-                    );
             }
+            case CXElement element:
+                return CreateElementNodes(element, parent, context);
             default:
                 context.Diagnostics.Add(
                     new(
@@ -246,63 +226,146 @@ public readonly struct CXGraph
                 return [];
         }
 
-        IEnumerable<Node> FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
+        static IEnumerable<GraphNode> CreateElementNodes(CXElement element, GraphNode? parent,
+            GraphInitializationContext context)
         {
+            if (element.IsFragment)
+            {
+                return element.Children.SelectMany(x =>
+                    CreateNodes(x, parent, context)
+                );
+            }
+
             if (
-                InterleavedComponentNode.TryCreate(
-                    info.Symbol,
-                    context.Compilation,
-                    out var inner
+                !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
+                !ComponentNode.TryGetProviderNode(
+                    context.State.CX.SemanticModel,
+                    context.State.CX.Location.TextSpan.Start,
+                    element.Identifier,
+                    out componentNode
                 )
             )
             {
-                var state = inner.Create(new(node, context.Options, []));
+                context.Diagnostics.Add(
+                    new(
+                        CX.Diagnostics.UnknownComponent(element.Identifier),
+                        element.Span
+                    )
+                );
+
+                return [];
+            }
+
+            var initContext = new ComponentGraphInitializationContext(
+                element,
+                parent,
+                context
+            );
+
+            componentNode.AddGraphNode(initContext);
+
+            return initContext
+                .Initializations
+                .Select(x =>
+                    CreateFromInitialization(x, context, parent)
+                )
+                .Where(x => x is not null)!;
+        }
+
+        static IEnumerable<GraphNode> CreateInterpolationNodes(
+            ICXNode cxNode,
+            DesignerInterpolationInfo info,
+            GraphNode? parent,
+            GraphInitializationContext context
+        )
+        {
+            if (InterleavedComponentNode.TryCreate(info.Symbol, context.Compilation, out var inner))
+            {
+                var node = new GraphNode(
+                    inner,
+                    null,
+                    [],
+                    [],
+                    parent
+                );
+
+                var state = inner.Create(
+                    new ComponentStateInitializationContext(
+                        cxNode,
+                        node,
+                        [],
+                        context
+                    ),
+                    context.Diagnostics
+                );
 
                 if (state is null) return [];
+
+                node.State = state;
 
                 return
                 [
                     context.AddToMap(
-                        node,
-                        new(
-                            inner,
-                            state,
-                            [],
-                            [],
-                            parent
-                        )
+                        cxNode,
+                        node
                     )
                 ];
             }
+
+            context.Diagnostics.Add(
+                new(
+                    CX.Diagnostics.UnknownComponent(
+                        info.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        ?? "<interleaved>"
+                    ),
+                    cxNode.Span
+                )
+            );
 
             return [];
         }
     }
 
-    public static CXGraph.Node CreateNodeFromInitialization(
-        ComponentInitializationGraphNode initialization,
+    public static GraphNode? CreateFromInitialization(
+        ComponentInitializationGraphNode init,
         GraphInitializationContext context,
-        Node? parent
+        GraphNode? parent
     )
     {
-        var state = initialization.State;
+        // var state = init.State;
 
-        var nodeChildren = new List<Node>();
-        var attributeNodes = new List<Node>();
+        var nodeChildren = new List<GraphNode>();
+        var attributeNodes = new List<GraphNode>();
 
-        var node = state.OwningNode = context.AddToMap(
-            state.Source,
-            new(
-                initialization.Node,
-                state,
-                nodeChildren,
-                attributeNodes,
-                parent
-            )
+        var node = new GraphNode(
+            init.Node,
+            null,
+            nodeChildren,
+            attributeNodes,
+            parent
         );
 
+        List<CXNode> children = [..init.Children];
 
-        if (state.Source is CXElement { Attributes: { Count: > 0 } attributes })
+        var stateContext = new ComponentStateInitializationContext(
+            init.CXNode,
+            node,
+            children,
+            context
+        );
+
+        var state = init.Node.Create(stateContext, context.Diagnostics);
+
+        if (state is null) return null;
+
+        node.State = state;
+
+        context.AddToMap(
+            state.Source,
+            node
+        );
+
+        if (state?.Source is CXElement { Attributes: { Count: > 0 } attributes })
         {
             foreach (var attribute in attributes)
             {
@@ -320,8 +383,7 @@ public readonly struct CXGraph
         }
 
         nodeChildren.AddRange(
-            initialization
-                .Children
+            children
                 .SelectMany(x => CreateNodes(
                         x,
                         node,
@@ -333,127 +395,8 @@ public readonly struct CXGraph
         return node;
     }
 
-    public void Validate(ComponentContext context, IList<DiagnosticInfo> diagnostics)
-    {
-        foreach (var node in RootNodes) node.Validate(context, diagnostics);
-    }
-
-    public Result<string> Render(ComponentContext context)
-        => RootNodes
-            .Select(x => x.Render(context))
-            .FlattenAll()
-            .Map(x => string.Join(",\n", x));
-
-    public sealed class Node
-    {
-        public ComponentNode Inner { get; }
-        public ComponentState State => _state;
-        public List<Node> Children { get; }
-        public List<Node> AttributeNodes { get; }
-        public Node? Parent { get; }
-
-        public bool Incremental { get; }
-
-        private Result<string>? _render;
-
-        private ComponentState _state;
-
-        public Node(
-            ComponentNode inner,
-            ComponentState state,
-            List<Node> children,
-            List<Node> attributeNodes,
-            Node? parent = null,
-            bool incremental = false,
-            Result<string>? render = null
-        )
-        {
-            Inner = inner;
-            _state = state;
-            Children = children;
-            AttributeNodes = attributeNodes;
-            Parent = parent;
-            _render = render;
-            Incremental = incremental;
-        }
-
-        public void UpdateState(ComponentContext context)
-        {
-            foreach (var attributeNode in AttributeNodes)
-                attributeNode.UpdateState(context);
-
-            foreach (var node in Children)
-                node.UpdateState(context);
-
-            Inner.UpdateState(ref _state, context);
-        }
-
-        public Result<string> Render(IComponentContext context, ComponentRenderingOptions options = default)
-            => (_render ??= Inner.Render(State, context, options));
-
-        public void Validate(IComponentContext context, IList<DiagnosticInfo> diagnostics)
-        {
-            Inner.Validate(State, context, diagnostics);
-            foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context, diagnostics);
-            foreach (var child in Children) child.Validate(context, diagnostics);
-        }
-
-        public Node Reuse(Node? parent, IncrementalParseResult parseResult, CXGraphManager manager)
-        {
-            // TODO: rewrite this
-            
-            return new(
-                Inner,
-                State,
-                Children,
-                AttributeNodes,
-                parent,
-                true,
-                _render
-            );
-            
-            // var diagnostics = new List<DiagnosticInfo>(Diagnostics);
-            //
-            // if (diagnostics.Count > 0)
-            // {
-            //     var offset = 0;
-            //     var changeQueue = new Queue<TextChange>(parseResult.Changes);
-            //     for (var i = 0; i < diagnostics.Count; i++)
-            //     {
-            //         var diagnostic = diagnostics[i];
-            //         var diagnosticSpan = diagnostic.Span;
-            //
-            //         while (changeQueue.Count > 0)
-            //         {
-            //             TextChangeRange change = changeQueue.Peek();
-            //
-            //             if (change.Span.Start < diagnosticSpan.Start)
-            //             {
-            //                 offset += (change.NewLength - change.Span.Length);
-            //                 changeQueue.Dequeue();
-            //             }
-            //         }
-            //
-            //         if (offset is not 0)
-            //         {
-            //             diagnostics[i] = new(
-            //                 diagnostic.Descriptor,
-            //                 new(diagnosticSpan.Start + offset, diagnosticSpan.Length)
-            //             );
-            //         }
-            //     }
-            // }
-            //
-            // return new(
-            //     Inner,
-            //     State,
-            //     Children,
-            //     AttributeNodes,
-            //     parent,
-            //     diagnostics,
-            //     true,
-            //     _render
-            // );
-        }
-    }
+    public bool Equals(CXGraph other)
+        => Key == other.Key &&
+           RootNodes.Equals(other.RootNodes) &&
+           Diagnostics.Equals(other.Diagnostics);
 }

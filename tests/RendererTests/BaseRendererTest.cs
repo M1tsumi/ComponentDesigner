@@ -104,7 +104,7 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
 
     private sealed record MockPropertyValue(
         CXValue? Value,
-        CXGraph.Node? Node,
+        GraphNode? Node,
         bool IsSpecified,
         bool HasValue,
         bool IsAttributeValue,

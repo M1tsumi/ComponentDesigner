@@ -8,76 +8,213 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Discord.CX.Util;
+using Discord.CX.Utils;
 
 namespace Discord.CX;
 
 [Generator]
 public sealed class SourceGenerator : IIncrementalGenerator
 {
-    private readonly Dictionary<string, CXGraphManager> _cache = [];
+    internal sealed class Glue(
+        string key,
+        InterceptableLocation interceptLocation,
+        LocationInfo location,
+        bool usesDesigner,
+        SyntaxTree syntaxTree
+    ) : IEquatable<Glue>
+    {
+        public string Key { get; init; } = key;
+        public InterceptableLocation InterceptLocation { get; init; } = interceptLocation;
+        public LocationInfo Location { get; init; } = location;
+        public bool UsesDesigner { get; init; } = usesDesigner;
+        public SyntaxTree SyntaxTree { get; init; } = syntaxTree;
+
+        public bool Equals(Glue other)
+            => Key == other.Key &&
+               InterceptLocation.Equals(other.InterceptLocation) &&
+               Location.Equals(other.Location) &&
+               UsesDesigner == other.UsesDesigner;
+
+        public override bool Equals(object? obj)
+            => obj is Glue other && Equals(other);
+
+        public override int GetHashCode()
+            => Hash.Combine(Key, InterceptLocation, Location, UsesDesigner);
+    }
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var provider = context
+        var targetProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
                 IsComponentDesignerCall,
                 MapPossibleComponentDesignerCall
             )
+            .WithTrackingName(TrackingNames.INITIAL_TARGET)
             .Collect();
 
+        var keyMapperProvider = targetProvider
+            .Select(GetKeys)
+            .WithTrackingName(TrackingNames.MAP_KEYS);
+
+        var combinedKeys = targetProvider
+            .Combine(keyMapperProvider);
+
+        var glueProvider =
+            combinedKeys
+                .SelectMany(CreateClue)
+                .WithTrackingName(TrackingNames.CREATE_GLUE);
+
+        var graphProvider = combinedKeys
+            .Combine(GeneratorOptions.CreateProvider(context))
+            .SelectMany(CreateGraphState)
+            .WithTrackingName(TrackingNames.CREATE_GRAPH_STATE)
+            .Select(CreateGraph)
+            .WithTrackingName(TrackingNames.CREATE_GRAPH);
+
+        // inject compilation
+        graphProvider = graphProvider
+            .Combine(context.CompilationProvider)
+            .Select(UpdateFromCompilation)
+            .WithTrackingName(TrackingNames.UPDATE_GRAPH_STATE);
+
+        var finalProvider = graphProvider
+            .Select(RenderGraph)
+            .WithTrackingName(TrackingNames.RENDER_GRAPH)
+            .Collect()
+            .Combine(glueProvider.Collect())
+            .WithTrackingName(TrackingNames.RENDER_AND_GLUE_EMIT);
+
+        var graph = finalProvider.ToDOTTree();
+
         context.RegisterSourceOutput(
-            provider
-                .Combine(provider.Select(GetKeysAndUpdateCachedEntries))
-                .Combine(GeneratorOptions.CreateProvider(context))
-                .SelectMany(MapManagers)
-                .Select((manager, token) => manager.Render(token))
-                .Collect(),
+            finalProvider,
             Generate
         );
     }
 
-    private void Generate(SourceProductionContext context, ImmutableArray<RenderedInterceptor> interceptors)
+    internal static IEnumerable<Glue> CreateClue(
+        (ImmutableArray<ComponentDesignerTarget?> Targets, ImmutableArray<string?> Keys) tuple,
+        CancellationToken token
+    )
     {
-        if (interceptors.Length is 0) return;
+        var (targets, keys) = tuple;
+
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var target = targets[i];
+            var key = keys[i];
+
+            if (target is null || key is null) continue;
+
+            yield return new Glue(
+                key,
+                target.InterceptLocation,
+                target.CX.Location,
+                target.CX.UsesDesignerParameter,
+                target.SyntaxTree
+            );
+        }
+    }
+
+    internal static RenderedGraph RenderGraph(CXGraph graph, CancellationToken token)
+        => graph.Render(token: token);
+
+    internal static CXGraph UpdateFromCompilation(
+        (CXGraph Graph, Compilation compilation) tuple,
+        CancellationToken token
+    ) => tuple.Graph.UpdateFromCompilation(tuple.compilation, token);
+
+    internal static CXGraph CreateGraph(GraphGeneratorState state, CancellationToken token)
+    {
+        // TODO: incremental parsing
+        return CXGraph.Create(state, old: null, token);
+    }
+
+    internal static IEnumerable<GraphGeneratorState> CreateGraphState(
+        ((ImmutableArray<ComponentDesignerTarget?> Left, ImmutableArray<string?> Right) Left, GeneratorOptions Right)
+            tuple,
+        CancellationToken token)
+    {
+        var ((targets, keys), options) = tuple;
+
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var target = targets[i];
+            var key = keys[i];
+
+            if (target is null || key is null) continue;
+
+            yield return CreateGraphState(key, target, options);
+        }
+    }
+
+    internal static GraphGeneratorState CreateGraphState(
+        string key,
+        ComponentDesignerTarget target,
+        GeneratorOptions options
+    ) => new(
+        key,
+        options,
+        target.CX
+    );
+
+    internal void Generate(
+        SourceProductionContext context,
+        (ImmutableArray<RenderedGraph> Renders, ImmutableArray<Glue> Glues) tuple
+    )
+    {
+        var (renders, glues) = tuple;
+
+        if (renders.IsEmpty) return;
+
+        Debug.Assert(renders.Length == glues.Length);
 
         var sb = new StringBuilder();
 
-        for (var i = 0; i < interceptors.Length; i++)
+        for (var i = 0; i < renders.Length; i++)
         {
-            var interceptor = interceptors[i];
-            foreach (var diagnostic in interceptor.Diagnostics)
+            var render = renders[i];
+            var glue = glues[i];
+
+            Debug.Assert(render.Key == glue.Key);
+
+            foreach (var diagnostic in render.Diagnostics)
             {
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         diagnostic.Descriptor,
-                        interceptor.SyntaxTree.GetLocation(diagnostic.Span)
+                        glue.SyntaxTree.GetLocation(diagnostic.Span)
                     )
                 );
             }
 
+            if (string.IsNullOrWhiteSpace(render.EmittedSource)) continue;
+
             if (i > 0)
                 sb.AppendLine();
 
-            var parameter = interceptor.UsesDesigner
+            var parameter = glue.UsesDesigner
                 ? $"global::{Constants.COMPONENT_DESIGNER_QUALIFIED_NAME} designer"
                 : "global::System.String cx";
 
             sb.AppendLine(
                 $$"""
                   /*
-                  {{interceptor.Location}}
+                  {{glue.Location}}
 
-                  {{interceptor.CX.NormalizeIndentation()}}
+                  {{render.CX.NormalizeIndentation()}}
                   */
-                  [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{interceptor.InterceptLocation.Version}}, data: "{{interceptor.InterceptLocation.Data}}")]
-                  public static global::Discord.CXMessageComponent _{{Math.Abs(interceptor.GetHashCode())}}(
+                  [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{glue.InterceptLocation.Version}}, data: "{{glue.InterceptLocation.Data}}")]
+                  public static global::Discord.CXMessageComponent _{{Math.Abs(glue.InterceptLocation.GetHashCode())}}(
                       {{parameter}}
                   ) => new global::Discord.CXMessageComponent([
-                      {{interceptor.Source.WithNewlinePadding(4)}}
+                      {{render.EmittedSource!.WithNewlinePadding(4)}}
                   ]);
                   """
             );
@@ -105,42 +242,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         );
     }
 
-    private IEnumerable<CXGraphManager> MapManagers(
-        ((ImmutableArray<ComponentDesignerTarget?>, ImmutableArray<string?>), GeneratorOptions) tuple,
-        CancellationToken token
-    )
-    {
-        var ((targets, keys), options) = tuple;
-
-        for (var i = 0; i < targets.Length; i++)
-        {
-            var target = targets[i];
-            var key = keys[i];
-
-            if (target is null || key is null) continue;
-
-            // TODO: handle key updates
-
-            if (_cache.TryGetValue(key, out var manager))
-            {
-                manager = _cache[key] = manager.OnUpdate(key, target, options, token);
-            }
-            else
-            {
-                manager = _cache[key] = CXGraphManager.Create(
-                    this,
-                    key,
-                    target,
-                    options,
-                    token
-                );
-            }
-
-            yield return manager;
-        }
-    }
-
-    private ImmutableArray<string?> GetKeysAndUpdateCachedEntries(
+    private static ImmutableArray<string?> GetKeys(
         ImmutableArray<ComponentDesignerTarget?> target,
         CancellationToken token
     )
@@ -172,17 +274,13 @@ public sealed class SourceGenerator : IIncrementalGenerator
             result[i] = key;
         }
 
-        foreach (var key in _cache.Keys.Except(result))
-        {
-            if (key is not null) _cache.Remove(key);
-        }
-
         return [..result];
     }
 
-    private static ComponentDesignerTarget? MapPossibleComponentDesignerCall(GeneratorSyntaxContext context,
-        CancellationToken token)
-        => MapPossibleComponentDesignerCall(context.SemanticModel, context.Node, token);
+    private static ComponentDesignerTarget? MapPossibleComponentDesignerCall(
+        GeneratorSyntaxContext context,
+        CancellationToken token
+    ) => MapPossibleComponentDesignerCall(context.SemanticModel, context.Node, token);
 
     public static ComponentDesignerTarget? MapPossibleComponentDesignerCall(
         SemanticModel semanticModel,
@@ -213,16 +311,18 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
 
         return new ComponentDesignerTarget(
-            semanticModel.Compilation,
-            invocationSyntax.SyntaxTree,
             interceptLocation,
             semanticModel.GetEnclosingSymbol(invocationSyntax.SpanStart, token)
                 ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            cxDesigner,
-            locationInfo,
-            [..interpolationInfos],
-            operation.TargetMethod.Parameters[0].Type.SpecialType is not SpecialType.System_String,
-            quoteCount
+            new CXDesignerGeneratorState(
+                cxDesigner,
+                locationInfo,
+                quoteCount,
+                operation.TargetMethod.Parameters[0].Type.SpecialType is not SpecialType.System_String,
+                [..interpolationInfos],
+                semanticModel,
+                invocationSyntax.SyntaxTree
+            )
         );
 
         static bool TryGetCXDesigner(

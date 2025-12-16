@@ -2,15 +2,17 @@
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
 
-public sealed class ButtonComponentState : ComponentState
-{
-    public ButtonKind InferredKind { get; set; } = ButtonKind.Default;
-}
+public sealed record ButtonComponentState(
+    GraphNode OwningGraphNode,
+    ICXNode Source,
+    ButtonKind? InferredKind = null
+) : ComponentState(OwningGraphNode, Source);
 
 public enum ButtonKind
 {
@@ -21,6 +23,16 @@ public enum ButtonKind
 
 public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 {
+    public static readonly ImmutableArray<string> ValidButtonStyles =
+    [
+        "primary",
+        "secondary",
+        "success",
+        "danger",
+        "link",
+        "premium"
+    ];
+    
     public const string BUTTON_STYLE_ENUM = "Discord.ButtonStyle";
     public const int BUTTON_STYLE_LINK_VALUE = 5;
     public const int BUTTON_STYLE_PREMIUM_VALUE = 6;
@@ -128,36 +140,40 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
          *  - the auto row has less than 5 children
          *  - the children of the auto row is either buttons or dynamic nodes
          */
-        static bool CanAddToAutoRow(CXGraph.Node node)
-            => node is { Inner: AutoActionRowComponentNode, Children.Count: < 5 } &&
-               node
+        static bool CanAddToAutoRow(GraphNode graphNode)
+            => graphNode is { Inner: AutoActionRowComponentNode, Children.Count: < 5 } &&
+               graphNode
                    .Children
                    .All(x => x.Inner is ButtonComponentNode or IDynamicComponentNode);
     }
 
-    public override ButtonComponentState? CreateState(ComponentStateInitializationContext context)
+    public override ButtonComponentState? CreateState(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        if (context.Node is not CXElement element) return null;
+        if (context.CXNode is not CXElement element) return null;
 
-        var state = new ButtonComponentState()
-        {
-            Source = element
-        };
+        var state = new ButtonComponentState(
+            context.GraphNode,
+            context.CXNode
+        );
 
         if (element.Children.Count > 0 && element.Children[0] is CXValue value)
             state.SubstitutePropertyValue(Label, value);
-
-        InferButtonKind(state);
-
-        return state;
+        
+        return state with
+        {
+            InferredKind = InferButtonKind(context.GraphContext, state, diagnostics)
+        };
     }
+    
 
-    public override void UpdateState(ref ButtonComponentState state, IComponentContext context)
-    {
-        state.InferredKind = FurtherInferredButtonKindWithContext(state, context);
-    }
-
-    private void InferButtonKind(ButtonComponentState state)
+    private ButtonKind? InferButtonKind(
+        IComponentContext context,
+        ButtonComponentState state,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
         if (
             state.GetProperty(Url).IsSpecified &&
@@ -165,49 +181,44 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
             !state.GetProperty(SkuId).IsSpecified
         )
         {
-            state.InferredKind = ButtonKind.Link;
+            return ButtonKind.Link;
         }
-        else if (
+
+        if (
             !state.GetProperty(Url).IsSpecified &&
             !state.GetProperty(CustomId).IsSpecified &&
             state.GetProperty(SkuId).IsSpecified
         )
         {
-            state.InferredKind = ButtonKind.Premium;
+            return ButtonKind.Premium;
         }
-        else if (state.GetProperty(Style).TryGetLiteralValue(out var style))
+
+        var styleProperty = state.GetProperty(Style);
+        switch (styleProperty.Value)
         {
-            state.InferredKind = style.ToLowerInvariant() switch
-            {
-                "link" => ButtonKind.Link,
-                "premium" => ButtonKind.Premium,
-                _ => ButtonKind.Default
-            };
-        }
-    }
-
-    private ButtonKind FurtherInferredButtonKindWithContext(ButtonComponentState state, IComponentContext context)
-    {
-        if (state.InferredKind is not ButtonKind.Default) return state.InferredKind;
-
-        // check for interpolated constants
-        var style = state.GetProperty(Style);
-
-        switch (style.Value)
-        {
-            case CXValue.Multipart multipart when Renderers.IsLoneInterpolatedLiteral(context, multipart, out var info):
+            case CXValue.Multipart multipart
+                when Renderers.IsLoneInterpolatedLiteral(context, multipart, out var info):
                 return FromInterpolation(info);
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(context.GetInterpolationInfo(interpolation));
+            case not null when styleProperty.TryGetLiteralValue(out var literal):
+                switch (literal.ToLowerInvariant())
+                {
+                    case "link": return ButtonKind.Link;
+                    case "premium": return ButtonKind.Premium;
+                    case var invalid when !ValidButtonStyles.Contains(invalid.ToLowerInvariant()):
+                        return null;
+                }
+                break;
         }
 
-        return state.InferredKind;
-
+        return ButtonKind.Default;
+        
         ButtonKind FromInterpolation(DesignerInterpolationInfo info)
         {
             var constant = info.Constant;
 
-            if (!constant.HasValue) return state.InferredKind;
+            if (!constant.HasValue) return ButtonKind.Default;
 
             switch (constant.Value)
             {
@@ -229,9 +240,10 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
                     break;
             }
 
-            return state.InferredKind;
+            return ButtonKind.Default;
         }
     }
+    
 
     public override void Validate(
         ButtonComponentState state,
@@ -244,7 +256,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         if (
             label.Attribute?.Value is not null &&
             label.Value is not null &&
-            label.Value != label.Attribute.Value
+            !label.Value.Equals(label.Attribute.Value)
         )
         {
             diagnostics.Add(
@@ -312,7 +324,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
     {
         Result<string> style;
 
-        if (state.InferredKind is not ButtonKind.Default)
+        if (state.InferredKind is not null and not ButtonKind.Default)
             style = $"global::{BUTTON_STYLE_ENUM}.{state.InferredKind}";
         else
         {

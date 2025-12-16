@@ -16,11 +16,13 @@ public sealed class DesignerInterpolationInfo(
     public TextSpan Span { get; } = span;
     public ITypeSymbol? Symbol { get; } = symbol;
     public Optional<object?> Constant { get; } = constant;
-
+    
     public bool Equals(DesignerInterpolationInfo? other)
     {
         if (other is null) return false;
+        
         if (ReferenceEquals(this, other)) return true;
+        
         return Id == other.Id &&
                Span.Equals(other.Span) &&
                Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==

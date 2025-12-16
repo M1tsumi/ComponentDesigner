@@ -1,0 +1,208 @@
+﻿using System.Collections.Immutable;
+using System.Text;
+using Discord.CX;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Xunit.Abstractions;
+
+namespace UnitTests.GeneratorTests;
+
+public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
+{
+    private readonly ITestOutputHelper _output;
+    private GeneratorDriver _driver;
+    private SyntaxTree? _tree;
+    private Compilation _compilation;
+
+    public BaseGeneratorTest(ITestOutputHelper output)
+    {
+        _output = output;
+        var generator = new SourceGenerator();
+
+        _driver = CSharpGeneratorDriver.Create(
+            [generator.AsSourceGenerator()],
+            driverOptions: new GeneratorDriverOptions(
+                disabledOutputs: IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true
+            )
+        );
+        _compilation = Compilations.Create();
+    }
+
+    public void Dispose()
+    {
+        EOF();
+    }
+
+    public void RunCX(
+        string cx,
+        string? expected = null,
+        string? pretext = null,
+        bool allowParsingErrors = false,
+        GeneratorOptions? options = null,
+        string? additionalMethods = null,
+        string testClassName = "TestClass",
+        string testFuncName = "Run",
+        bool hasInterpolations = true,
+        int quoteCount = 3
+    )
+    {
+        var quotes = new string('"', quoteCount);
+        var dollar = hasInterpolations ? "$" : string.Empty;
+        var pad = hasInterpolations ? new(' ', dollar.Length) : string.Empty;
+        var cxString = new StringBuilder();
+
+        cxString.Append(dollar).Append(quotes);
+
+        if (quoteCount >= 3)
+        {
+            cxString.AppendLine();
+            cxString.Append(pad);
+        }
+
+
+        cxString.Append(quoteCount >= 3 ? cx.WithNewlinePadding(pad.Length) : cx);
+
+        if (quoteCount >= 3)
+        {
+            cxString.AppendLine();
+            cxString.Append(pad);
+        }
+
+        cxString.Append(quotes);
+
+        var source =
+            $$""""
+              using Discord;
+              using System.Collections.Generic;
+              using System.Linq;
+
+              public class {{testClassName}}
+              {
+                  public void {{testFuncName}}()
+                  {
+                      {{pretext}}
+                      ComponentDesigner.cx(
+                          {{cxString.ToString().WithNewlinePadding(4)}}
+                      );
+                  }
+                  {{additionalMethods?.WithNewlinePadding(4)}}
+              }
+              """";
+
+        _output.WriteLine($"CX:\n{cxString}");
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+
+        if (_tree is not null)
+        {
+            _compilation = _compilation.ReplaceSyntaxTree(_tree, syntaxTree);
+            _tree = syntaxTree;
+        }
+        else
+        {
+            _compilation = _compilation.AddSyntaxTrees(_tree = syntaxTree);
+        }
+
+        var result = RunGeneratorsAndAssertOutput(_compilation, []);
+        
+        // push diagnostics
+        base.PushDiagnostics(
+            result.Diagnostics.Select(x => new DiagnosticInfo(
+                x.Descriptor,
+                x.Location.SourceSpan
+            ))
+        );
+
+        if (expected is not null)
+        {
+            var rendered = result.Results[0]
+                .TrackedSteps[TrackingNames.RENDER_GRAPH][0]
+                .Outputs[0].Value as RenderedGraph;
+
+            Assert.NotNull(rendered?.EmittedSource);
+            
+            Assert.Equal(expected, rendered.EmittedSource);
+        }
+    }
+
+    private GeneratorDriverRunResult RunGeneratorsAndAssertOutput(
+        Compilation compilation,
+        string[]? trackingNames = null)
+    {
+        var clone = _compilation.Clone();
+        _driver = _driver.RunGenerators(_compilation);
+
+        var firstRunResult = _driver.GetRunResult();
+
+        var secondRunResult = _driver
+            .RunGenerators(clone)
+            .GetRunResult();
+
+        AssertRunEquals(firstRunResult, secondRunResult, trackingNames);
+
+        if (!secondRunResult.Results[0].TrackedOutputSteps.IsEmpty)
+        {
+            Assert.All(
+                secondRunResult
+                    .Results[0]
+                    .TrackedOutputSteps
+                    .SelectMany(x => x.Value)
+                    .SelectMany(x => x.Outputs),
+                x =>
+                    Assert.Equal(IncrementalStepRunReason.Cached, x.Reason)
+            );
+        }
+        
+        return firstRunResult;
+    }
+
+    private void AssertRunEquals(GeneratorDriverRunResult a, GeneratorDriverRunResult b, string[]? trackingNames)
+    {
+        if (trackingNames is null) return;
+
+        var trackedSteps1 = GetTrackedSteps(a, trackingNames);
+        var trackedSteps2 = GetTrackedSteps(b, trackingNames);
+
+        if (trackingNames.Length is 0)
+        {
+            Assert.Empty(trackedSteps1);
+            Assert.Empty(trackedSteps2);
+
+            return;
+        }
+
+        Assert.Equal(trackedSteps1.Count, trackedSteps2.Count);
+        Assert.True(trackedSteps1.Keys.ToHashSet().SetEquals(trackedSteps2.Keys));
+
+        foreach (var (name, steps) in trackedSteps1)
+        {
+            var steps2 = trackedSteps2[name];
+
+            Assert.Equal(steps.Length, steps2.Length);
+
+            for (var i = 0; i < steps.Length; i++)
+            {
+                var stepA = steps[i];
+                var stepB = steps2[i];
+
+                Assert.Equal(
+                    stepA.Outputs.Select(x => x.Value),
+                    stepB.Outputs.Select(x => x.Value)
+                );
+
+                Assert.All(stepB.Outputs, x =>
+                    Assert.True(x.Reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged)
+                );
+            }
+        }
+
+
+        static Dictionary<string, ImmutableArray<IncrementalGeneratorRunStep>> GetTrackedSteps(
+            GeneratorDriverRunResult runResult, string[]? trackingNames
+        ) => runResult.Results[0]
+            .TrackedSteps
+            .Where(step => trackingNames.Contains(step.Key))
+            .ToDictionary(x => x.Key, x => x.Value);
+    }
+}

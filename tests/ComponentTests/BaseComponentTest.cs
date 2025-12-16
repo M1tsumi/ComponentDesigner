@@ -9,11 +9,18 @@ namespace UnitTests.ComponentTests;
 
 public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWithDiagnostics
 {
-    protected CXGraph CurrentGraph => _graph!.Value;
+    protected CXGraph CurrentGraph
+    {
+        get
+        {
+            Assert.NotNull(_graph);
+            return _graph!;
+        }
+    }
 
     private CXGraph? _graph;
     private ComponentContext? _context;
-    private IEnumerator<CXGraph.Node>? _nodeEnumerator;
+    private IEnumerator<GraphNode>? _nodeEnumerator;
 
     public void Graph(
         string cx,
@@ -82,33 +89,39 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
 
         var target = Targets.FromSource(source);
 
-        var manager = CXGraphManager.Create(
-            new SourceGenerator(),
+        var state = SourceGenerator.CreateGraphState(
             "<global>:0",
             target,
-            options ?? GeneratorOptions.Default,
+            options ?? GeneratorOptions.Default
+        );
+
+        var graph = CXGraph.Create(
+            state,
+            old: null,
             CancellationToken.None
         );
         
-        output.WriteLine($"AST:\n{manager.Document.ToStructuralFormat()}");
-        output.WriteLine($"DOT:\n{manager.Document.ToDOTFormat()}");
+        output.WriteLine($"AST:\n{graph.Document.ToStructuralFormat()}");
+        output.WriteLine($"DOT:\n{graph.Document.ToDOTFormat()}");
 
-        Assert.Equal(allowParsingErrors, manager.Document.HasErrors);
+        Assert.Equal(allowParsingErrors, graph.Document.HasErrors);
 
-        _graph = manager.Graph;
-        _nodeEnumerator = _graph.Value.RootNodes.SelectMany(EnumerateNodes).GetEnumerator();
-        _context = new(_graph.Value);
+        graph = graph.UpdateFromCompilation(target.Compilation, CancellationToken.None);
+        
+        _graph = graph;
+        _nodeEnumerator = _graph.RootNodes.SelectMany(EnumerateNodes).GetEnumerator();
+        _context = new(_graph);
     }
 
-    private IEnumerable<CXGraph.Node> EnumerateNodes(CXGraph.Node node)
+    private IEnumerable<GraphNode> EnumerateNodes(GraphNode graphNode)
     {
-        yield return node;
+        yield return graphNode;
 
-        foreach (var attrNode in node.AttributeNodes)
+        foreach (var attrNode in graphNode.AttributeNodes)
         foreach (var child in EnumerateNodes(attrNode))
             yield return child;
 
-        foreach (var childNode in node.Children)
+        foreach (var childNode in graphNode.Children)
         foreach (var child in EnumerateNodes(childNode))
             yield return child;
     }
@@ -120,7 +133,7 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
 
         var diagnostics = new List<DiagnosticInfo>();
         
-        _graph.Value.Validate(_context, diagnostics);
+        _graph.Validate(_context, diagnostics);
 
         if (hasErrors.HasValue)
             Assert.Equal(hasErrors.Value, diagnostics.Any(x => x.Descriptor.DefaultSeverity is DiagnosticSeverity.Error));
@@ -137,19 +150,19 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
 
         AssertEmptyDiagnostics();
 
-        var result = _graph.Value.Render(_context);
+        var result = _graph.Render(_context);
 
         PushDiagnostics(result.Diagnostics);
 
         if (expected is not null)
         {
-            Assert.True(result.HasResult);
-            Assert.Equal(expected, result.Value);
+            Assert.NotNull(result.EmittedSource);
+            Assert.Equal(expected, result.EmittedSource);
         }
     }
 
 
-    private CXGraph.Node NextGraphNode()
+    private GraphNode NextGraphNode()
     {
         Assert.NotNull(_nodeEnumerator);
         Assert.True(_nodeEnumerator.MoveNext());
@@ -167,12 +180,12 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
     protected T Node<T>() where T : ComponentNode
         => Node<T>(out _);
 
-    protected T Node<T>(out CXGraph.Node graphNode) where T : ComponentNode
+    protected T Node<T>(out GraphNode graphGraphNode) where T : ComponentNode
     {
-        graphNode = NextGraphNode();
+        graphGraphNode = NextGraphNode();
 
-        Assert.IsType<T>(graphNode.Inner);
+        Assert.IsType<T>(graphGraphNode.Inner);
 
-        return (T)graphNode.Inner;
+        return (T)graphGraphNode.Inner;
     }
 }

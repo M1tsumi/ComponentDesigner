@@ -13,12 +13,11 @@ using InterpolationIndex = int;
 
 public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryComponentNode.MediaGalleryState>
 {
-    public sealed class MediaGalleryState : ComponentState
-    {
-        // Store interpolations with their position index in the source children
-        // Info is not stored - it's retrieved from context during Validate/Render
-        public required EquatableArray<InterpolationIndex> Interpolations { get; init; }
-    }
+    public sealed record MediaGalleryState(
+        GraphNode OwningGraphNode,
+        ICXNode Source,
+        EquatableArray<InterpolationIndex> Interpolations
+    ) : ComponentState(OwningGraphNode, Source);
 
     public override string Name => "media-gallery";
 
@@ -36,12 +35,24 @@ public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryCompon
         ];
     }
 
-    public override MediaGalleryState? CreateState(ComponentStateInitializationContext context)
+    public override void AddGraphNode(ComponentGraphInitializationContext context)
     {
-        if (context.Node is not CXElement element) return null;
+        context.Push(
+            this,
+            cxNode: context.CXNode,
+            // we handle interpolated children manually
+            children: context.CXNode is CXElement element
+                ? element.Children.OfType<CXElement>()
+                : null
+        );
+    }
 
-        // Add children for normal processing (media-gallery-item elements)
-        context.AddChildren(element.Children);
+    public override MediaGalleryState? CreateState(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
+    {
+        if (context.CXNode is not CXElement element) return null;
 
         // Extract interpolations from children for later processing, tracking their position
         var interpolations = new List<InterpolationIndex>();
@@ -50,11 +61,7 @@ public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryCompon
             ExtractInterpolations(element.Children[i], i, interpolations);
         }
 
-        return new MediaGalleryState
-        {
-            Source = element,
-            Interpolations = [..interpolations]
-        };
+        return new MediaGalleryState(context.GraphNode, context.CXNode, [..interpolations]);
     }
 
     private void ExtractInterpolations(CXNode node, int childIndex, List<InterpolationIndex> interpolations)

@@ -8,9 +8,13 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX.Nodes.Components.Custom;
 
-public sealed class FunctionalComponentNodeState : ComponentState
+public sealed record FunctionalComponentNodeState(
+    GraphNode OwningGraphNode,
+    ICXNode Source,
+    EquatableArray<ComponentChildrenAdapter.ComponentChild> Children
+) : ComponentState(OwningGraphNode, Source)
 {
-    public IReadOnlyList<ComponentChildrenAdapter.ComponentChild> Children { get; init; }
+    public new EquatableArray<ComponentChildrenAdapter.ComponentChild> Children { get; init; } = Children;
 }
 
 public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeState>, IDynamicComponentNode
@@ -95,12 +99,10 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
         );
     }
 
-    public override FunctionalComponentNodeState? CreateState(ComponentStateInitializationContext context)
-        => new()
-        {
-            Source = context.Node,
-            Children = _adapter?.AdaptToState(context) ?? []
-        };
+    public override FunctionalComponentNodeState? CreateState(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    ) => new(context.GraphNode, context.CXNode, _adapter?.AdaptToState(context) ?? []);
 
     private string MethodReference =>
         $"{Method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{Method.Name}";

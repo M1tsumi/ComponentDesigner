@@ -10,10 +10,11 @@ namespace Discord.CX.Nodes.Components;
 
 using static ComponentBuilderKindUtils;
 
-public sealed class InterleavedState : ComponentState
-{
-    public required int InterpolationId { get; init; }
-}
+public sealed record InterleavedState(
+    GraphNode OwningGraphNode,
+    ICXNode Source,
+    int InterpolationId
+) : ComponentState(OwningGraphNode, Source);
 
 public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, IDynamicComponentNode
 {
@@ -50,11 +51,12 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
         return false;
     }
 
-    public override InterleavedState? CreateState(ComponentStateInitializationContext context)
+    public override InterleavedState? CreateState(ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics)
     {
         int id;
 
-        switch (context.Node)
+        switch (context.CXNode)
         {
             case CXValue.Interpolation interpolation:
                 id = interpolation.Document.GetInterpolationIndex(interpolation.Token);
@@ -65,11 +67,11 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
             default: return null;
         }
 
-        return new InterleavedState()
-        {
-            InterpolationId = id,
-            Source = context.Node
-        };
+        return new InterleavedState(
+            context.GraphNode,
+            context.CXNode,
+            id
+        );
     }
 
 

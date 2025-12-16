@@ -19,19 +19,22 @@ public enum SelectKind
 
 public sealed class SelectMenuComponentNode : ComponentNode
 {
-    public sealed class MissingTypeState : ComponentState;
+    public sealed record MissingTypeState(GraphNode OwningGraphNode, ICXNode Source)
+        : ComponentState(OwningGraphNode, Source);
 
-    public sealed class InvalidTypeState : ComponentState
-    {
-        public string? Kind { get; init; }
-    }
+    public sealed record InvalidTypeState(
+        GraphNode OwningGraphNode,
+        ICXNode Source,
+        string? Kind = null
+    ) : ComponentState(OwningGraphNode, Source);
 
-    public sealed class SelectState : ComponentState
-    {
-        public SelectKind Kind { get; init; }
-        public IReadOnlyList<SelectMenuDefaultValue> Defaults { get; init; } = [];
-        public List<SelectMenuInterpolatedOption> InterpolatedOptions { get; } = [];
-    }
+    public sealed record SelectState(
+        GraphNode OwningGraphNode,
+        ICXNode Source,
+        SelectKind Kind,
+        EquatableArray<SelectMenuDefaultValue> Defaults,
+        EquatableArray<SelectMenuInterpolatedOption> InterpolatedOptions
+    ) : ComponentState(OwningGraphNode, Source);
 
     public override string Name => "select-menu";
 
@@ -118,31 +121,34 @@ public sealed class SelectMenuComponentNode : ComponentNode
             context.ParentGraphNode.Inner is AutoActionRowComponentNode
         )
         {
-            base.AddGraphNode(context);
+            context.Push(
+                this,
+                cxNode: context.CXNode
+            );
             return;
         }
 
         context.Push(AutoActionRowComponentNode.Instance, children: [(CXNode)context.CXNode]);
     }
 
-    public override ComponentState? Create(ComponentStateInitializationContext context)
+    public override ComponentState? Create(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        if (context.Node is not CXElement element) return null;
+        if (context.CXNode is not CXElement element) return null;
 
         var typeAttribute = element.Attributes
             .FirstOrDefault(x => x.Identifier.Value.ToLowerInvariant() is "type");
 
-        if (typeAttribute is null) return new MissingTypeState() { Source = context.Node };
+        if (typeAttribute is null)
+            return new MissingTypeState(context.GraphNode, context.CXNode);
 
         if (typeAttribute.Value is not CXValue.StringLiteral { HasInterpolations: false } typeValue)
-            return new InvalidTypeState() { Source = context.Node, };
+            return new InvalidTypeState(context.GraphNode, context.CXNode);
 
         if (!TryGetSelectKind(typeValue.Tokens.ToString(), out var kind))
-            return new InvalidTypeState()
-            {
-                Source = context.Node,
-                Kind = typeValue.Tokens.ToString()
-            };
+            return new InvalidTypeState(context.GraphNode, context.CXNode, typeValue.Tokens.ToString());
 
         var defaults = new List<SelectMenuDefaultValue>();
 
@@ -152,16 +158,11 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 defaults.AddRange(element.Children.SelectMany(FlattenNode).Select(SelectMenuDefaultValue.Create));
                 break;
             case SelectKind.String:
-                context.AddChildren(element.Children);
+                context.AddChildren(element.Children.OfType<CXElement>());
                 break;
         }
 
-        return new SelectState()
-        {
-            Source = element,
-            Kind = kind,
-            Defaults = defaults
-        };
+        return new SelectState(context.GraphNode, context.CXNode, kind, [..defaults], []);
 
         static IEnumerable<ICXNode> FlattenNode(CXNode node)
             => node switch
@@ -293,27 +294,44 @@ public sealed class SelectMenuComponentNode : ComponentNode
                     Diagnostics.TooManyStringSelectMenuChildren,
                     TextSpan.FromBounds(
                         state.Children.Skip(Constants.STRING_SELECT_MAX_VALUES).First()
-                            .State.Source.Span.Start,
+                            .State!.Source.Span.Start,
                         state.Children.Skip(Constants.STRING_SELECT_MAX_VALUES).Last()
-                            .State.Source.Span.End
+                            .State!.Source.Span.End
                     )
                 );
                 break;
         }
+    }
 
-        // update interpolation candidates
-        state.InterpolatedOptions.Clear();
+    private static bool IsValidStringSelectChild(ComponentNode node)
+        => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
 
-        var candidates = GetCandidateInterpolationOptions(state.Source).ToArray();
-
-        if (candidates.Length is 0) return;
-
-        foreach (var candidate in candidates)
+    public override ComponentState UpdateState(
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
+    {
+        if (state is SelectState { Kind: SelectKind.String } selectState)
         {
-            if (SelectMenuInterpolatedOption.TryCreate(context, candidate, diagnostics, out var option))
-                state.InterpolatedOptions.Add(option);
+            // update interpolation candidates
+            var interpolatedOptions = new List<SelectMenuInterpolatedOption>();
+
+            var candidates = GetCandidateInterpolationOptions(state.Source).ToArray();
+
+            foreach (var candidate in candidates)
+            {
+                if (SelectMenuInterpolatedOption.TryCreate(context, candidate, diagnostics, out var option))
+                    interpolatedOptions.Add(option);
+            }
+
+            return selectState with
+            {
+                InterpolatedOptions = [..interpolatedOptions]
+            };
         }
 
+        return state;
 
         static IEnumerable<ICXNode> GetCandidateInterpolationOptions(ICXNode node)
         {
@@ -334,9 +352,6 @@ public sealed class SelectMenuComponentNode : ComponentNode
             }
         }
     }
-
-    private static bool IsValidStringSelectChild(ComponentNode node)
-        => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
 
     public override Result<string> Render(ComponentState state, IComponentContext context,
         ComponentRenderingOptions options)
@@ -385,7 +400,8 @@ public sealed class SelectMenuComponentNode : ComponentNode
                          string
                              .Join(
                                  $",{Environment.NewLine}",
-                                 ((IEnumerable<string>)[
+                                 ((IEnumerable<string>)
+                                 [
                                      $"type: {ToDiscordComponentType(context, selectState.Kind)}",
                                      props,
                                      children,

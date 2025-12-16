@@ -13,7 +13,7 @@ public sealed class ComponentChildrenAdapter
     public delegate Result<string> Renderer(
         IComponentContext context,
         ComponentState state,
-        IReadOnlyList<ComponentChild> children
+        EquatableArray<ComponentChild> children
     );
 
     public Renderer ChildrenRenderer { get; }
@@ -92,9 +92,9 @@ public sealed class ComponentChildrenAdapter
         );
     }
 
-    public IReadOnlyList<ComponentChild> AdaptToState(ComponentStateInitializationContext context)
+    public EquatableArray<ComponentChild> AdaptToState(ComponentStateInitializationContext context)
     {
-        if (context.Node is not CXElement element) return [];
+        if (context.CXNode is not CXElement element) return [];
 
         var children = new List<ComponentChild>();
 
@@ -134,13 +134,13 @@ public sealed class ComponentChildrenAdapter
             }
         }
 
-        return children;
+        return [..children];
     }
 
     private Result<string> RenderComponent(
         IComponentContext context,
         ComponentState state,
-        IReadOnlyList<ComponentChild> children
+        EquatableArray<ComponentChild> children
     )
     {
         if (_componentBuilderKind is ComponentBuilderKind.None) return string.Empty;
@@ -337,7 +337,7 @@ public sealed class ComponentChildrenAdapter
     private Result<string> RenderNonComponent(
         IComponentContext context,
         ComponentState state,
-        IReadOnlyList<ComponentChild> children
+        EquatableArray<ComponentChild> children
     )
     {
         if (!IsCollectionType)

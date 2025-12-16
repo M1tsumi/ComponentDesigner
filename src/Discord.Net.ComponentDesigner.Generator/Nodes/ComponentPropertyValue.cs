@@ -7,7 +7,7 @@ namespace Discord.CX.Nodes;
 public sealed record ComponentPropertyValue(
     ComponentProperty Property,
     CXAttribute? Attribute,
-    CXGraph.Node? Node = null
+    GraphNode? Node = null
 ) : IComponentPropertyValue
 {
     private CXValue? _value;
@@ -61,7 +61,7 @@ public sealed record ComponentPropertyValue(
         if (!isOptional && !IsSpecified)
         {
             diagnostics.Add(
-                Diagnostics.MissingRequiredProperty(state.OwningNode?.Inner.Name, Property.Name),
+                Diagnostics.MissingRequiredProperty(state.OwningGraphNode?.Inner.Name, Property.Name),
                 state.Source
             );
         }
@@ -70,7 +70,7 @@ public sealed record ComponentPropertyValue(
         {
             diagnostics.Add(
                 Diagnostics.MissingRequiredProperty(
-                    state.OwningNode?.Inner.Name,
+                    state.OwningGraphNode?.Inner.Name,
                     Property.Name
                 ),
                 Attribute ?? state.Source

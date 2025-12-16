@@ -7,48 +7,28 @@ using Microsoft.CodeAnalysis.Text;
 namespace Discord.CX;
 
 public sealed class ComponentDesignerTarget(
-    Compilation compilation,
-    SyntaxTree syntaxTree,
     InterceptableLocation interceptLocation,
     string? parentKey,
-    string cxDesigner,
-    LocationInfo cxDesignerLocation,
-    EquatableArray<DesignerInterpolationInfo> interpolations,
-    bool usesDesigner,
-    int cxQuoteCount
+    CXDesignerGeneratorState cx
 ) : IEquatable<ComponentDesignerTarget>
 {
     // both compilation and syntax tree is used sparingly; try not to rely on these
-    public Compilation Compilation { get; } = compilation;
-    public SyntaxTree SyntaxTree { get; } = syntaxTree;
+    public Compilation Compilation => CX.SemanticModel.Compilation;
+    public SyntaxTree SyntaxTree => CX.SyntaxTree;
 
     public InterceptableLocation InterceptLocation { get; } = interceptLocation;
     public string? ParentKey { get; } = parentKey;
-    public string CXDesigner { get; } = cxDesigner;
-    public LocationInfo CXDesignerLocation { get; } = cxDesignerLocation;
-    public EquatableArray<DesignerInterpolationInfo> Interpolations { get; } = interpolations;
-    public bool UsesDesigner { get; } = usesDesigner;
-    public int CXQuoteCount { get; } = cxQuoteCount;
-
-    public TextSpan CXDesignerSpan => CXDesignerLocation.TextSpan;
+    public CXDesignerGeneratorState CX { get; } = cx;
 
     public override int GetHashCode()
         => Hash.Combine(
             InterceptLocation,
             ParentKey,
-            CXDesigner,
-            CXDesignerLocation,
-            Interpolations,
-            UsesDesigner,
-            CXQuoteCount
+            CX
         );
 
     public bool Equals(ComponentDesignerTarget other)
         => InterceptLocation.Equals(other.InterceptLocation) &&
            ParentKey == other.ParentKey &&
-           CXDesigner == other.CXDesigner &&
-           CXDesignerLocation.Equals(other.CXDesignerLocation) &&
-           Interpolations.Equals(other.Interpolations) &&
-           UsesDesigner == other.UsesDesigner &&
-           CXQuoteCount == other.CXQuoteCount;
+           CX.Equals(other.CX);
 }

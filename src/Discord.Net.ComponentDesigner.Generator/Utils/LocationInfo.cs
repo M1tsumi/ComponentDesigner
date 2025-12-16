@@ -1,4 +1,6 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Linq;
+using System.Text;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX;
@@ -18,4 +20,9 @@ public sealed record LocationInfo(
         => location.SourceTree is null
             ? null
             : new(location.SourceTree.FilePath, location.SourceSpan, location.GetLineSpan().Span);
+
+    public override string ToString()
+    {
+        return $"{FilePath} @ {LineSpan} : {TextSpan}";
+    }
 }

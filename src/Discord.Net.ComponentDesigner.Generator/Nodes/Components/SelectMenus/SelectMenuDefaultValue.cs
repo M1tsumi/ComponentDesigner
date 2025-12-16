@@ -8,7 +8,7 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components.SelectMenus;
 
-public abstract class SelectMenuDefaultValue
+public abstract class SelectMenuDefaultValue : IEquatable<SelectMenuDefaultValue>
 {
     public abstract ICXNode Owner { get; }
     public abstract SelectMenuDefaultValueKind Kind { get; }
@@ -57,6 +57,14 @@ public abstract class SelectMenuDefaultValue
         }
     }
 
+    public virtual bool Equals(SelectMenuDefaultValue other)
+    {
+        if (ReferenceEquals(this, other)) return true;
+
+        return Kind == other.Kind && Owner.Equals(other.Owner);
+    }
+    
+    
     private sealed class InvalidNode(ICXNode node) : SelectMenuDefaultValue
     {
         public override ICXNode Owner => node;
@@ -81,6 +89,7 @@ public abstract class SelectMenuDefaultValue
             Diagnostics.InvalidSelectMenuDefaultKind(node.GetType().Name),
             node
         );
+
     }
 
     public sealed class Interpolation(CXToken interpolation) : SelectMenuDefaultValue
@@ -407,4 +416,5 @@ public abstract class SelectMenuDefaultValue
             }
         }
     }
+
 }

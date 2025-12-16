@@ -29,11 +29,14 @@ public sealed class TextDisplayComponentNode : ComponentNode
         ];
     }
 
-    public override ComponentState? Create(ComponentStateInitializationContext context)
+    public override ComponentState? Create(
+        ComponentStateInitializationContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        var state = base.Create(context)!;
+        var state = base.Create(context, diagnostics)!;
 
-        if (context.Node is CXElement { Children.Count: 1 } element && element.Children[0] is CXValue value)
+        if (context.CXNode is CXElement { Children.Count: 1 } element && element.Children[0] is CXValue value)
             state.SubstitutePropertyValue(Content, value);
 
         return state;
