@@ -47,6 +47,12 @@ public sealed class SourceGenerator : IIncrementalGenerator
             => Hash.Combine(Key, InterceptLocation, Location, UsesDesigner);
     }
 
+    internal IncrementalValueProvider<(ImmutableArray<RenderedGraph> Left, ImmutableArray<Glue> Right)> Provider
+    {
+        get;
+        private set;
+    }
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var targetProvider = context
@@ -56,14 +62,16 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 MapPossibleComponentDesignerCall
             )
             .WithTrackingName(TrackingNames.INITIAL_TARGET)
-            .Collect();
+            .Collect()
+            .WithTrackingName(TrackingNames.ALL_TARGETS);
 
         var keyMapperProvider = targetProvider
             .Select(GetKeys)
             .WithTrackingName(TrackingNames.MAP_KEYS);
 
         var combinedKeys = targetProvider
-            .Combine(keyMapperProvider);
+            .Combine(keyMapperProvider)
+            .WithTrackingName(TrackingNames.KEYS_AND_TARGETS);
 
         var glueProvider =
             combinedKeys
@@ -72,6 +80,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
         var graphProvider = combinedKeys
             .Combine(GeneratorOptions.CreateProvider(context))
+            .WithTrackingName(TrackingNames.GRAPH_STATE_PARAMETERS)
             .SelectMany(CreateGraphState)
             .WithTrackingName(TrackingNames.CREATE_GRAPH_STATE)
             .Select(CreateGraph)
@@ -80,26 +89,26 @@ public sealed class SourceGenerator : IIncrementalGenerator
         // inject compilation
         graphProvider = graphProvider
             .Combine(context.CompilationProvider)
+            .WithTrackingName(TrackingNames.GRAPH_COMPILATION_INJECTION)
             .Select(UpdateFromCompilation)
             .WithTrackingName(TrackingNames.UPDATE_GRAPH_STATE);
 
-        var finalProvider = graphProvider
+        Provider = graphProvider
             .Select(RenderGraph)
             .WithTrackingName(TrackingNames.RENDER_GRAPH)
             .Collect()
-            .Combine(glueProvider.Collect())
+            .WithTrackingName(TrackingNames.ALL_RENDERS)
+            .Combine(glueProvider.Collect().WithTrackingName(TrackingNames.ALL_GLUE))
             .WithTrackingName(TrackingNames.RENDER_AND_GLUE_EMIT);
 
-        var graph = finalProvider.ToDOTTree();
-
         context.RegisterSourceOutput(
-            finalProvider,
+            Provider,
             Generate
         );
     }
 
     internal static IEnumerable<Glue> CreateClue(
-        (ImmutableArray<ComponentDesignerTarget?> Targets, ImmutableArray<string?> Keys) tuple,
+        (ImmutableArray<ComponentDesignerTarget?> Targets, EquatableArray<string> Keys) tuple,
         CancellationToken token
     )
     {
@@ -110,7 +119,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
             var target = targets[i];
             var key = keys[i];
 
-            if (target is null || key is null) continue;
+            if (target is null || string.IsNullOrWhiteSpace(key)) continue;
 
             yield return new Glue(
                 key,
@@ -137,7 +146,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
     }
 
     internal static IEnumerable<GraphGeneratorState> CreateGraphState(
-        ((ImmutableArray<ComponentDesignerTarget?> Left, ImmutableArray<string?> Right) Left, GeneratorOptions Right)
+        ((ImmutableArray<ComponentDesignerTarget?> Left, EquatableArray<string> Right) Left, GeneratorOptions Right)
             tuple,
         CancellationToken token)
     {
@@ -148,7 +157,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
             var target = targets[i];
             var key = keys[i];
 
-            if (target is null || key is null) continue;
+            if (target is null || string.IsNullOrWhiteSpace(key)) continue;
 
             yield return CreateGraphState(key, target, options);
         }
@@ -242,12 +251,12 @@ public sealed class SourceGenerator : IIncrementalGenerator
         );
     }
 
-    private static ImmutableArray<string?> GetKeys(
+    private static EquatableArray<string> GetKeys(
         ImmutableArray<ComponentDesignerTarget?> target,
         CancellationToken token
     )
     {
-        var result = new string?[target.Length];
+        var result = new string[target.Length];
 
         var map = new Dictionary<string, int>();
         var globalCount = 0;

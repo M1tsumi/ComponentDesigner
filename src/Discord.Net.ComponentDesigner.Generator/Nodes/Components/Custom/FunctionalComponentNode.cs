@@ -54,8 +54,11 @@ public class FunctionalComponentNode : ComponentNode<FunctionalComponentNodeStat
             : null;
     }
 
-    public static FunctionalComponentNode Create(IMethodSymbol method, ComponentBuilderKind kind,
-        Compilation compilation)
+    public static FunctionalComponentNode Create(
+        IMethodSymbol method,
+        ComponentBuilderKind kind,
+        Compilation compilation
+    )
     {
         var properties = new List<ComponentProperty>();
         IParameterSymbol? childrenParameter = null;
