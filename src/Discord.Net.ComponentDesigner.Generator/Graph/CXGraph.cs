@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Discord.CX.Comparers;
 using Discord.CX.Nodes;
 using Discord.CX.Nodes.Components;
 using Discord.CX.Nodes.Components.Custom;
@@ -150,7 +151,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
         {
             return this;
         }
-        
+
         var context = new GraphUpdateContext(
             this,
             target
@@ -169,7 +170,15 @@ public sealed class CXGraph : IEquatable<CXGraph>
             hasUpdatedState |= !ReferenceEquals(node, rootNodes[i]);
         }
 
-        if (hasUpdatedState || diagnostics.Count is not 0)
+        if (
+            hasUpdatedState ||
+            diagnostics.Count is not 0 ||
+            // any changes to the interpolations should cause a re-render
+            !CX.InterpolationInfos.SequenceEqual(
+                target.CX.InterpolationInfos,
+                DesignerInterpolationInfoComparer.WithoutSpan
+            )
+        )
         {
             return new CXGraph(
                 Key,
