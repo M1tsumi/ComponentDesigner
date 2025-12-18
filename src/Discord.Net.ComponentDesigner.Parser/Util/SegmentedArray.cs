@@ -6,6 +6,14 @@ using System.Runtime.CompilerServices;
 
 namespace Discord.CX.Util;
 
+// based off of https://github.com/dotnet/roslyn/blob/4e1e9a3c7ef8c65012f29674a1e170c0ba015159/src/Dependencies/Collections/Segmented/SegmentedArray%601.cs#L22
+
+/// <summary>
+///     Defines a fixed-size collection with the same API surface and behavior as an "SZArray", which is a
+///     single-dimensional zero-based array commonly represented in C# as <c>T[]</c>. The implementation of this
+///     collection uses segmented arrays to avoid placing objects on the Large Object Heap.
+/// </summary>
+/// <typeparam name="T">The type of elements stored in the array.</typeparam>
 internal readonly struct SegmentedArray<T> :
     ICloneable,
     IList,
@@ -15,8 +23,27 @@ internal readonly struct SegmentedArray<T> :
     IReadOnlyList<T>,
     IEquatable<SegmentedArray<T>>
 {
+    /// <summary>
+    /// The number of elements in each page of the segmented array of type <typeparamref name="T"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>The segment size is calculated according to <see cref="Unsafe.SizeOf{T}"/>, performs the IL operation
+    /// defined by <see cref="OpCodes.Sizeof"/>. ECMA-335 defines this operation with the following note:</para>
+    ///
+    /// <para><c>sizeof</c> returns the total size that would be occupied by each element in an array of this type –
+    /// including any padding the implementation chooses to add. Specifically, array elements lie <c>sizeof</c>
+    /// bytes apart.</para>
+    /// </remarks>
     private static int SegmentSize => SegmentedArrayHelper.GetSegmentSize<T>();
+    
+    /// <summary>
+    /// The bit shift to apply to an array index to get the page index within <see cref="_items"/>.
+    /// </summary>
     private static int SegmentShift => SegmentedArrayHelper.GetSegmentShift<T>();
+    
+    /// <summary>
+    /// The bit mask to apply to an array index to get the index within a page of <see cref="_items"/>.
+    /// </summary>
     private static int OffsetMask => SegmentedArrayHelper.GetOffsetMask<T>();
 
     public bool IsFixedSize => true;

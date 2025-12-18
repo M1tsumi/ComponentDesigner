@@ -8,7 +8,7 @@ using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
-public sealed class CXDoc : CXNode
+public sealed class CXDocument : CXNode
 {
     public override CXParser Parser { get; }
 
@@ -22,7 +22,7 @@ public sealed class CXDoc : CXNode
 
     internal StringInternTable StringTable => Parser.Reader.StringTable;
 
-    public CXDoc(
+    public CXDocument(
         CXParser parser,
         IReadOnlyList<CXNode> rootNodes
     )
@@ -46,7 +46,7 @@ public sealed class CXDoc : CXNode
         return index != -1;
     }
 
-    public CXDoc IncrementalParse(
+    public CXDocument IncrementalParse(
         CXSourceReader reader,
         IReadOnlyList<TextChange> changes,
         out IncrementalParseResult result,
@@ -90,7 +90,7 @@ public sealed class CXDoc : CXNode
             affectedRange
         );
 
-        return new CXDoc(parser, children);
+        return new CXDocument(parser, children);
     }
 
     public List<ICXNode> GetFlatGraph()

@@ -7,8 +7,12 @@ namespace Discord.CX.Parser;
 
 partial class CXSourceText
 {
-    public sealed class CompositeText : CXSourceText
+    /// <summary>
+    ///     Represents a sequence of <see cref="CXSourceText"/>.
+    /// </summary>
+    internal sealed class CompositeText : CXSourceText
     {
+        /// <inheritdoc/>
         public override char this[int position]
         {
             get
@@ -17,13 +21,19 @@ partial class CXSourceText
                 return _segments[index][offset];
             }
         }
-
+        
+        /// <inheritdoc/>
         public override int Length { get; }
 
         private readonly ImmutableArray<CXSourceText> _segments;
         private readonly CXSourceText _original;
         private readonly int[] _offsets;
 
+        /// <summary>
+        ///     Constructs a new <see cref="CompositeText"/>.
+        /// </summary>
+        /// <param name="segments">The segments making up this <see cref="CompositeText"/>.</param>
+        /// <param name="original">The original <see cref="CXSourceText"/> that created this composite text.</param>
         public CompositeText(ImmutableArray<CXSourceText> segments, CXSourceText original)
         {
             _segments = segments;
@@ -38,6 +48,12 @@ partial class CXSourceText
             }
         }
 
+        /// <summary>
+        ///     Computes the segment index and offset of a given position.
+        /// </summary>
+        /// <param name="pos">The position to compute the index and offset from.</param>
+        /// <param name="index">The index of the segment containing the given position.</param>
+        /// <param name="offset">The offset within the segment representing the given position.</param>
         private void GetIndexAndOffset(int pos, out int index, out int offset)
         {
             var idx = BinSearchOffsets(pos);
@@ -45,6 +61,11 @@ partial class CXSourceText
             offset = pos - _offsets[index];
         }
 
+        /// <summary>
+        ///     Searches for a position within the segments using a binary search.
+        /// </summary>
+        /// <param name="pos">The position to search for.</param>
+        /// <returns>The index to the segment containing the position.</returns>
         private int BinSearchOffsets(int pos)
         {
             var low = 0;
@@ -69,12 +90,11 @@ partial class CXSourceText
             return ~low;
         }
 
-
-        public static CompositeText Create(
-            ImmutableArray<CXSourceText> segments,
-            CXSourceText original
-        ) => new(segments, original);
-
+        /// <summary>
+        ///     Adds a given <see cref="CXSourceText"/> to a given collection of segments. 
+        /// </summary>
+        /// <param name="segments">The collection to add the segment to.</param>
+        /// <param name="text">The <see cref="CXSourceText"/> to add.</param>
         public static void AddSegments(List<CXSourceText> segments, CXSourceText text)
         {
             if (text is CompositeText composite)
@@ -82,10 +102,15 @@ partial class CXSourceText
             else segments.Add(text);
         }
 
+        /// <summary>
+        ///     Represents line information within a <see cref="CompositeText"/>.
+        /// </summary>
         private sealed class CompositeTextLineInfo : TextLineCollection
         {
+            /// <inheritdoc/>
             public override int Count => _lineCount;
 
+            /// <inheritdoc/>
             public override TextLine this[int index]
             {
                 get
@@ -135,6 +160,10 @@ partial class CXSourceText
             private readonly ImmutableArray<int> _segmentLineNumbers;
             private readonly int _lineCount;
 
+            /// <summary>
+            ///     Constructs a new <see cref="CompositeTextLineInfo"/>.
+            /// </summary>
+            /// <param name="text">The <see cref="CompositeText"/> to represent.</param>
             public CompositeTextLineInfo(CompositeText text)
             {
                 var segmentLineNumbers = new int[text._segments.Length];
@@ -153,6 +182,7 @@ partial class CXSourceText
                 _lineCount = accumulatedLineCount + 1;
             }
 
+            /// <inheritdoc/>
             public override int IndexOf(int position)
             {
                 if (position < 0 || position >= _text.Length)
@@ -166,6 +196,12 @@ partial class CXSourceText
                 return _segmentLineNumbers[index] + lineNumberWithinSegment;
             }
 
+            /// <summary>
+            ///     Computes the inclusive range of segment indexes containing a given line.
+            /// </summary>
+            /// <param name="lineNumber">The line number to find the segment indexes of.</param>
+            /// <param name="firstSegmentIndexInclusive">The first segments inclusive index containing the line.</param>
+            /// <param name="lastSegmentIndexInclusive">The second segments inclusive index containing the line.</param>
             private void GetSegmentIndexRangeContainingLine(
                 int lineNumber,
                 out int firstSegmentIndexInclusive,

@@ -6,15 +6,41 @@ using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Util;
 
+/// <summary>
+///     A utility class to compute basic hash codes.
+/// </summary>
 internal static class Hash
 {
     private const int CombinePrime = 397;
-    
-    public static int Combine<T>(T one) => one?.GetHashCode() ?? 0;
 
+    /// <summary>
+    ///     Gets the has of a single value.
+    /// </summary>
+    /// <param name="value">The value to get the hash of.</param>
+    /// <typeparam name="T">The type of the value to hash.</typeparam>
+    /// <returns>
+    ///     The hash code of the provided value, <c>0</c> if the value is null.
+    /// </returns>
+    public static int Combine<T>(T value) => value?.GetHashCode() ?? 0;
+
+    /// <summary>
+    ///     Combines the hashcodes of two values together.
+    /// </summary>
+    /// <param name="a">The first value to hash.</param>
+    /// <param name="b">The second value to hash.</param>
+    /// <typeparam name="T">The type of the first value to hash.</typeparam>
+    /// <typeparam name="U">The type of the second value to hash.</typeparam>
+    /// <returns>The combined hashcode of the two values.</returns>
     public static int Combine<T, U>(T a, U b)
         => unchecked(((a?.GetHashCode() ?? 0) * CombinePrime) ^ ((b?.GetHashCode() ?? 0) * CombinePrime));
 
+    /// <summary>
+    ///     Combines the hashcodes of the values within a <see cref="ReadOnlySpan{T}"/> 
+    /// </summary>
+    /// <param name="args">The values to hash.</param>
+    /// <returns>
+    ///     The combined hashcode of the values within the provided span.
+    /// </returns>
     public static int Combine(params ReadOnlySpan<object?> args)
     {
         var result = 0;
@@ -27,14 +53,21 @@ internal static class Hash
 
         return result;
     }
-    
+
+    /// <summary>
+    ///     Combines the hashcodes of the values within a <see cref="IEnumerable{T}"/> 
+    /// </summary>
+    /// <param name="args">The values to hash.</param>
+    /// <returns>
+    ///     The combined hashcode of the values within the provided collection.
+    /// </returns>
     public static int Combine(params IEnumerable<object?>? args)
     {
         if (args is null) return 0;
 
         return args.Aggregate(0, Combine);
     }
-    
+
     /// <summary>
     /// The offset bias value used in the FNV-1a algorithm
     /// See http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function

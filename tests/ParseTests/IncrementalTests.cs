@@ -53,7 +53,7 @@ public class IncrementalTests
     
     public void FullRangeIncremental(string cx)
     {
-        var source = new CXSourceText.StringSource(cx);
+        var source = CXSourceText.From(cx);
         var reader = source.CreateReader();
         var doc = CXParser.Parse(reader);
 
@@ -62,7 +62,7 @@ public class IncrementalTests
         foreach (var node in doc.GetFlatGraph())
         {
             // removing the entire graph wont do anything
-            if (node is CXDoc || node.Width == doc.Width) continue;
+            if (node is CXDocument || node.Width == doc.Width) continue;
             
             // empty nodes won't change anything
             if(node.Width is 0) continue;
@@ -94,7 +94,7 @@ public class IncrementalTests
     }
     
 
-    private (CXDoc, CXDoc, IncrementalParseResult) IncrementalRanges(string source, params IReadOnlyList<TextChange> changes)
+    private (CXDocument, CXDocument, IncrementalParseResult) IncrementalRanges(string source, params IReadOnlyList<TextChange> changes)
     {
         var doc = CXParser.Parse(new CXSourceText.StringSource(source).CreateReader());
 
@@ -105,9 +105,9 @@ public class IncrementalTests
         return (doc, newDoc, inc);
     }
     
-    private IEnumerable<CXDoc> Incremental(params string[] sources)
+    private IEnumerable<CXDocument> Incremental(params string[] sources)
     {
-        CXDoc? doc = null;
+        CXDocument? doc = null;
 
         foreach (var cx in sources)
         {
@@ -128,11 +128,11 @@ public class IncrementalTests
         }
     }
 
-    private IEnumerable<(CXDoc, IncrementalParseResult?)> IterativeIncrementalParse(
+    private IEnumerable<(CXDocument, IncrementalParseResult?)> IterativeIncrementalParse(
         string cx,
         CancellationToken token = default)
     {
-        CXDoc? doc = null;
+        CXDocument? doc = null;
         for (var i = 0; i <= cx.Length; i++)
         {
             var source = new CXSourceText.StringSource(i == 0 ? string.Empty : cx.Substring(0, i));

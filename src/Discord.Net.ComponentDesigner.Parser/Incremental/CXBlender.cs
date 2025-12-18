@@ -54,7 +54,7 @@ public sealed class CXBlender
 
     public CXBlender(
         CXLexer lexer,
-        CXDoc document,
+        CXDocument document,
         TextChangeRange changeRange
     )
     {

@@ -3,8 +3,19 @@ using System.Collections.Generic;
 
 namespace Discord.CX.Parser;
 
+/// <summary>
+///     A utility class to walk the AST of a <see cref="ICXNode"/>.
+/// </summary>
 public static class CXTreeWalker
 {
+    /// <summary>
+    ///     Walks the tree of the provided node.
+    /// </summary>
+    /// <param name="root">The node to walk</param>
+    /// <returns>
+    ///     A collection of nodes that were walked in a DFS style traversal, including the provided
+    ///     <paramref name="root"/> node as the first element.
+    /// </returns>
     public static IReadOnlyList<ICXNode> Walk(this ICXNode root)
     {
         var result = new List<ICXNode>();

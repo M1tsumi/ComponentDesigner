@@ -41,7 +41,7 @@ public abstract partial class CXNode : ICXNode
         => _diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error) ||
            Slots.Any(x => x.Value.HasErrors);
 
-    public CXDoc Document
+    public CXDocument Document
     {
         get => TryGetDocument(out var doc) ? doc : throw new InvalidOperationException();
     }
@@ -124,15 +124,15 @@ public abstract partial class CXNode : ICXNode
     // offset/width of any nodes right of the change
     public int Offset => ComputeOffset();
 
-    public IReadOnlyList<ParseSlot> Slots => _slots;
+    public IReadOnlyList<NodeSlot> Slots => _slots;
 
-    private readonly List<ParseSlot> _slots;
+    private readonly List<NodeSlot> _slots;
     private readonly List<CXDiagnostic> _diagnostics;
 
     // cached state
     private CXToken? _firstTerminal;
     private CXToken? _lastTerminal;
-    private CXDoc? _doc;
+    private CXDocument? _doc;
     private int? _graphWidth;
     private IReadOnlyList<ICXNode>? _descendants;
 
@@ -145,7 +145,7 @@ public abstract partial class CXNode : ICXNode
     public void AddDiagnostic(CXDiagnostic diagnostic)
         => _diagnostics.Add(diagnostic);
     
-    private bool TryGetDocument(out CXDoc result)
+    private bool TryGetDocument(out CXDocument result)
     {
         if (_doc is not null)
         {
@@ -157,7 +157,7 @@ public abstract partial class CXNode : ICXNode
 
         while (current is not null)
         {
-            if (current is CXDoc document)
+            if (current is CXDocument document)
             {
                 result = _doc = document;
                 return true;
@@ -209,7 +209,7 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
-    public CXNode FindOwningNode(TextSpan span, out ParseSlot slot)
+    public CXNode FindOwningNode(TextSpan span, out NodeSlot slot)
     {
         var current = this;
         slot = default;

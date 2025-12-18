@@ -52,7 +52,7 @@ partial class ASTFormatter
 
             switch (node)
             {
-                case CXDoc { RootNodes.Count: not 0 } cxDoc:
+                case CXDocument { RootNodes.Count: not 0 } cxDoc:
                 {
                     edges.Add($"{i} -- {{{string.Join(" ", cxDoc.RootNodes.Select(x => Array.IndexOf(flat, x)))}}}");
 

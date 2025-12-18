@@ -68,7 +68,7 @@ public abstract class BaseRendererTest(ITestOutputHelper output) : BaseTestWithD
                 default: throw new ArgumentOutOfRangeException(nameof(mode));
             }
 
-            var document = new CXDoc(
+            var document = new CXDocument(
                 parser,
                 [value]
             );

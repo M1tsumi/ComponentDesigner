@@ -6,22 +6,43 @@ namespace Discord.CX.Parser;
 
 partial class CXSourceText
 {
-    public sealed class SubText : CXSourceText
+    /// <summary>
+    ///     Represents a sub-region of text in a <see cref="CXSourceText"/>.
+    /// </summary>
+    internal sealed class SubText : CXSourceText
     {
+        /// <inheritdoc/>
         public override char this[int position]
             => _underlyingText[position + _span.Start];
 
+        /// <inheritdoc/>
         public override int Length => _span.Length;
 
         private readonly CXSourceText _underlyingText;
         private readonly TextSpan _span;
 
+        /// <summary>
+        ///     Constructs a new <see cref="SubText"/>.
+        /// </summary>
+        /// <param name="underlyingText">
+        ///     The underlying <see cref="CXSourceText"/> in which this sub-text resides.
+        /// </param>
+        /// <param name="span">The bounds of this sub-text.</param>
         public SubText(CXSourceText underlyingText, TextSpan span)
         {
             _underlyingText = underlyingText;
             _span = span;
         }
 
+        /// <summary>
+        ///     Gets a span that represents a region within this <see cref="SubText"/>, normalized to the underlying
+        ///     <see cref="CXSourceText"/>.
+        /// </summary>
+        /// <param name="span">The span to composite.</param>
+        /// <returns>
+        ///     A composited span, relative to this <see cref="SubText"/>s span, normalized to the underlying
+        ///     <see cref="CXSourceText"/>.
+        /// </returns>
         private TextSpan GetCompositeSpan(TextSpan span)
         {
             var compositeStart = Math.Min(_underlyingText.Length, _span.Start + span.Start);
@@ -30,15 +51,22 @@ partial class CXSourceText
             return TextSpan.FromBounds(compositeStart, compositeEnd);
         }
 
+        /// <inheritdoc/>
         protected override TextLineCollection ComputeLines() => new SubTextLineInfo(this);
 
+        /// <inheritdoc/>
         public override CXSourceText GetSubText(TextSpan span)
             => new SubText(_underlyingText, GetCompositeSpan(span));
 
+        /// <summary>
+        ///     Represents line information within a <see cref="SubText"/>.
+        /// </summary>
         private sealed class SubTextLineInfo : TextLineCollection
         {
+            /// <inheritdoc/>
             public override int Count { get; }
 
+            /// <inheritdoc/>
             public override TextLine this[int index]
             {
                 get
@@ -73,6 +101,10 @@ partial class CXSourceText
             private readonly bool _startsWithinSplitCRLF;
             private readonly bool _endsWithinSplitCRLF;
 
+            /// <summary>
+            ///     Constructs a new <see cref="SubTextLineInfo"/>.
+            /// </summary>
+            /// <param name="text">The <see cref="SubText"/> this <see cref="SubTextLineInfo"/> represents.</param>
             public SubTextLineInfo(SubText text)
             {
                 _text = text;
@@ -103,6 +135,7 @@ partial class CXSourceText
                 }
             }
 
+            /// <inheritdoc/>
             public override int IndexOf(int position)
             {
                 if (position < 0 && position > _text._span.Length)

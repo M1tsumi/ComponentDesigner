@@ -20,7 +20,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
     public EquatableArray<GraphNode> RootNodes { get; }
     public EquatableArray<DiagnosticInfo> Diagnostics { get; }
     public IReadOnlyDictionary<ICXNode, GraphNode> NodeMap { get; }
-    public CXDoc Document { get; }
+    public CXDocument Document { get; }
 
     public EquatableArray<DesignerInterpolationInfo> InterpolationInfos => _state.CX.InterpolationInfos;
 
@@ -38,7 +38,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
         EquatableArray<DiagnosticInfo> diagnostics,
         IReadOnlyDictionary<ICXNode, GraphNode> nodeMap,
         GraphGeneratorState state,
-        CXDoc document,
+        CXDocument document,
         EquatableArray<DiagnosticInfo>? updateDiagnostics = null)
     {
         _state = state;

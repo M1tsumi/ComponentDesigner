@@ -9,7 +9,7 @@ namespace UnitTests.ParseTests;
 
 public abstract class BaseParsingTest(ITestOutputHelper output)
 {
-    protected CXDoc? Document { get; private set; }
+    protected CXDocument? Document { get; private set; }
     private IEnumerator<ICXNode>? _enumerator;
     private readonly Stack<CXDiagnostic> _diagnostics = [];
     
@@ -43,14 +43,14 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
         bool allowErrors = false
     )
     {
-        parseFunc ??= (parser) => parser.ParseRootNodes();
+        parseFunc ??= (parser) => parser.ParseTopLevelNodes();
         
         output.WriteLine($"Parsing:\n{cx}");
         
         var parser = new CXParser(CXSourceText.From(cx).CreateReader(interpolations: interpolations));
         var nodes = parseFunc(parser).ToList();
 
-        Document = new CXDoc(parser, nodes);
+        Document = new CXDocument(parser, nodes);
         
         output.WriteLine($"AST:\n{Document.ToStructuralFormat()}");
         output.WriteLine($"DOT:\n{Document.ToDOTFormat()}");

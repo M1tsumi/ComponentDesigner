@@ -22,7 +22,7 @@ public sealed class ComponentDocument
 
     private TextSpan? _incrementalChangeRange;
 
-    private CXDoc? _cxDoc;
+    private CXDocument? _cxDoc;
 
     public ComponentDocument(
         DocumentUri uri,
@@ -35,7 +35,7 @@ public sealed class ComponentDocument
         _source= new CXSourceText.StringSource(source);
     }
 
-    public CXDoc GetCX(CancellationToken cancellationToken = default)
+    public CXDocument GetCX(CancellationToken cancellationToken = default)
     {
         if (_cxDoc?.Source == _source) return _cxDoc;
         

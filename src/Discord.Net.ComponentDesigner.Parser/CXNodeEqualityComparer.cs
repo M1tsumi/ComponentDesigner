@@ -3,11 +3,22 @@ using System.Linq;
 
 namespace Discord.CX.Parser;
 
-public sealed class CXNodeEqualityComparer(SyntaxEqualityFlags flags = SyntaxEqualityFlags.All) :
-    IEqualityComparer<ICXNode>
+/// <summary>
+///     Represents an equality comparer for <see cref="ICXNode"/>.
+/// </summary>
+/// <param name="flags">
+///     The flags used to compare equality between <see cref="ICXNode"/>.
+/// </param>
+public sealed class CXNodeEqualityComparer(
+    SyntaxEqualityFlags flags = SyntaxEqualityFlags.All
+) : IEqualityComparer<ICXNode>
 {
+    /// <summary>
+    ///     The default equality comparer instance.
+    /// </summary>
     public static readonly CXNodeEqualityComparer Default = new();
 
+    /// <inheritdoc/>
     public bool Equals(ICXNode x, ICXNode y)
     {
         if (ReferenceEquals(x, y)) return true;
@@ -19,7 +30,7 @@ public sealed class CXNodeEqualityComparer(SyntaxEqualityFlags flags = SyntaxEqu
         {
             return false;
         }
-        
+
         if (
             (flags & SyntaxEqualityFlags.CompareTrivia) != 0 &&
             (
@@ -47,6 +58,7 @@ public sealed class CXNodeEqualityComparer(SyntaxEqualityFlags flags = SyntaxEqu
         return x.Equals(y);
     }
 
+    /// <inheritdoc/>
     public int GetHashCode(ICXNode obj)
         => obj.GetHashCode();
 }

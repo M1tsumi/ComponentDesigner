@@ -4,11 +4,21 @@ using System.Threading;
 
 namespace Discord.CX.Util;
 
+// based on https://github.com/dotnet/roslyn/blob/4e1e9a3c7ef8c65012f29674a1e170c0ba015159/src/Compilers/Core/Portable/InternalUtilities/StringTable.cs#L17
+
+/// <summary>
+/// This is basically a lossy cache of strings that is searchable by
+/// strings, string sub ranges, character array ranges or string-builder.
+/// </summary>
 public sealed class StringInternTable
 {
+    // entry in the caches
     private struct Entry
     {
+        // hash code of the entry
         public int HashCode;
+        
+        // full text of the item
         public string Text;
 
         public Entry(int hashCode, string value)
@@ -39,11 +49,28 @@ public sealed class StringInternTable
     private const int SharedBucketSize = (1 << SharedBucketBits);
     private const int SharedBucketSizeMask = SharedBucketSize - 1;
 
+    // local (L1) cache
+    // simple fast and not threadsafe cache 
+    // with limited size and "last add wins" expiration policy
+    //
+    // The main purpose of the local cache is to use in long lived
+    // single threaded operations with lots of locality (like parsing).
+    // Local cache is smaller (and thus faster) and is not affected
+    // by cache misses on other threads.
     private readonly Entry[] _localTable = new Entry[LocalSize];
 
+    // shared (L2) threadsafe cache
+    // slightly slower than local cache
+    // we read this cache when having a miss in local cache
+    // writes to local cache will update shared cache as well.
     private static readonly SegmentedArray<Entry> SharedTable = new(SharedSize);
 
+    // essentially a random number 
+    // the usage pattern will randomly use and increment this
+    // the counter is not static to avoid interlocked operations and cross-thread traffic
     private int _localRandom = Environment.TickCount;
+    
+    // same as above but for users that go directly with unbuffered shared cache.
     private static int _sharedRandom = Environment.TickCount;
 
     internal string Add(ReadOnlySpan<char> chars)

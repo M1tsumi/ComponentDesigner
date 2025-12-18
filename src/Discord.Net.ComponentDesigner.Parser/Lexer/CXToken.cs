@@ -111,7 +111,7 @@ public sealed record CXToken(
         Diagnostics: [..diagnostics]
     );
 
-    public CXDoc? Document => Parent?.Document;
+    public CXDocument? Document => Parent?.Document;
 
     public void ResetCachedState()
     {
@@ -158,5 +158,5 @@ public sealed record CXToken(
     }
 
     int ICXNode.GraphWidth => 0;
-    IReadOnlyList<CXNode.ParseSlot> ICXNode.Slots => [];
+    IReadOnlyList<CXNode.NodeSlot> ICXNode.Slots => [];
 }

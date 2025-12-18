@@ -9,7 +9,7 @@ namespace Discord.CX;
 
 public sealed record GraphInitializationContext(
     GraphGeneratorState State,
-    CXDoc Document,
+    CXDocument Document,
     IReadOnlyList<ICXNode> ReusedNodes,
     CXGraph? OldGraph,
     Dictionary<ICXNode, GraphNode> Map,
