@@ -74,7 +74,7 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
         if (node.Slots.Count is 0) yield break;
 
         foreach (var slot in node.Slots)
-        foreach (var next in ProcessNode(slot.Value))
+        foreach (var next in ProcessNode(slot))
         {
             yield return next;
         }

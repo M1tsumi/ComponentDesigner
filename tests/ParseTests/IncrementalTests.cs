@@ -53,7 +53,7 @@ public class IncrementalTests
     
     public void FullRangeIncremental(string cx)
     {
-        var source = CXSourceText.From(cx);
+        var source = new CXSourceText.StringSource(cx);
         var reader = source.CreateReader();
         var doc = CXParser.Parse(reader);
 

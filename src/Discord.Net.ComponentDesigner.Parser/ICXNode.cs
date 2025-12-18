@@ -53,7 +53,7 @@ public interface ICXNode : IEquatable<ICXNode>
     /// <remarks>
     ///     Terminal nodes always return an empty collection.
     /// </remarks>
-    IReadOnlyList<CXNode.NodeSlot> Slots { get; }
+    IReadOnlyList<ICXNode> Slots { get; }
     
     /// <summary>
     ///     Gets the <see cref="CXDocument"/> this node belongs to.

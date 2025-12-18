@@ -32,7 +32,7 @@ public sealed class ComponentDocument
     {
         Uri = uri;
         Version = version;
-        _source= new CXSourceText.StringSource(source);
+        _source= CXSourceText.From(source);
     }
 
     public CXDocument GetCX(CancellationToken cancellationToken = default)

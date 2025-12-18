@@ -122,7 +122,7 @@ public sealed class CXBlender
 
         for (var i = index - 1; i >= 0; i--)
         {
-            delta += current.Parent.Slots[i].Value.GraphWidth + 1;
+            delta += current.Parent.Slots[i].GraphWidth + 1;
         }
 
         cursor = cursor with {Index = cursor.Index - delta};
@@ -140,14 +140,14 @@ public sealed class CXBlender
                 int slotIndex = index + 1,
                 cursorIndex = cursor.Index + current.GraphWidth + 1;
                 slotIndex < parent.Slots.Count;
-                cursorIndex += parent.Slots[slotIndex++].Value.GraphWidth + 1
+                cursorIndex += parent.Slots[slotIndex++].GraphWidth + 1
             )
             {
                 CancellationToken.ThrowIfCancellationRequested();
 
                 var sibling = parent.Slots[slotIndex];
 
-                if (IsNonZeroWidthOrIsEOF(sibling.Value))
+                if (IsNonZeroWidthOrIsEOF(sibling))
                 {
                     cursor = cursor with {Index = cursorIndex};
                     return;
@@ -171,13 +171,13 @@ public sealed class CXBlender
         for (
             int childIndex = 0, childGraphIndex = cursor.Index + 1;
             childIndex < current.Slots.Count;
-            childGraphIndex += current.Slots[childIndex++].Value.GraphWidth + 1
+            childGraphIndex += current.Slots[childIndex++].GraphWidth + 1
         )
         {
             CancellationToken.ThrowIfCancellationRequested();
 
             var child = current.Slots[childIndex];
-            if (IsNonZeroWidthOrIsEOF(child.Value))
+            if (IsNonZeroWidthOrIsEOF(child))
             {
                 cursor = cursor with {Index = childGraphIndex};
                 return;

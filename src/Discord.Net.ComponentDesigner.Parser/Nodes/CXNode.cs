@@ -19,7 +19,7 @@ public abstract partial class CXNode : ICXNode
     public int GraphWidth
         => _graphWidth ??= (
             _slots.Count > 0
-                ? _slots.Count + _slots.Sum(node => node.Value.GraphWidth)
+                ? _slots.Count + _slots.Sum(node => node.GraphWidth)
                 : 0
         );
 
@@ -28,7 +28,7 @@ public abstract partial class CXNode : ICXNode
         get =>
         [
             .._diagnostics
-                .Concat(Slots.SelectMany(x => x.Value.Diagnostics))
+                .Concat(Slots.SelectMany(x => x.Diagnostics))
         ];
         init
         {
@@ -39,7 +39,7 @@ public abstract partial class CXNode : ICXNode
 
     public bool HasErrors
         => _diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error) ||
-           Slots.Any(x => x.Value.HasErrors);
+           Slots.Any(x => x.HasErrors);
 
     public CXDocument Document
     {
@@ -50,14 +50,14 @@ public abstract partial class CXNode : ICXNode
 
     public LexedCXTrivia LeadingTrivia => FirstTerminal?.LeadingTrivia ?? LexedCXTrivia.Empty;
     public LexedCXTrivia TrailingTrivia => LastTerminal?.TrailingTrivia ?? LexedCXTrivia.Empty;
-    
+
     public CXToken? FirstTerminal
     {
         get
         {
             for (var i = 0; i < _slots.Count; i++)
             {
-                switch (_slots[i].Value)
+                switch (_slots[i])
                 {
                     case CXToken token: return _firstTerminal = token;
                     case CXNode { FirstTerminal: { } firstTerminal }: return _firstTerminal = firstTerminal;
@@ -75,7 +75,7 @@ public abstract partial class CXNode : ICXNode
         {
             for (var i = _slots.Count - 1; i >= 0; i--)
             {
-                switch (_slots[i].Value)
+                switch (_slots[i])
                 {
                     case CXToken token: return _lastTerminal = token;
                     case CXNode { LastTerminal: { } lastTerminal }: return _lastTerminal = lastTerminal;
@@ -93,8 +93,8 @@ public abstract partial class CXNode : ICXNode
         [
             .._slots.SelectMany(x => (ICXNode[])
             [
-                x.Value,
-                ..(x.Value as CXNode)?.Descendants ?? []
+                x,
+                ..(x as CXNode)?.Descendants ?? []
             ])
         ]);
 
@@ -124,9 +124,9 @@ public abstract partial class CXNode : ICXNode
     // offset/width of any nodes right of the change
     public int Offset => ComputeOffset();
 
-    public IReadOnlyList<NodeSlot> Slots => _slots;
+    public IReadOnlyList<ICXNode> Slots => _slots;
 
-    private readonly List<NodeSlot> _slots;
+    private readonly List<ICXNode> _slots;
     private readonly List<CXDiagnostic> _diagnostics;
 
     // cached state
@@ -144,7 +144,7 @@ public abstract partial class CXNode : ICXNode
 
     public void AddDiagnostic(CXDiagnostic diagnostic)
         => _diagnostics.Add(diagnostic);
-    
+
     private bool TryGetDocument(out CXDocument result)
     {
         if (_doc is not null)
@@ -188,7 +188,7 @@ public abstract partial class CXNode : ICXNode
 
                 if (!slot.FullSpan.Contains(position)) continue;
 
-                switch (slot.Value)
+                switch (slot)
                 {
                     case CXToken slotToken:
                         token = slotToken;
@@ -209,10 +209,10 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
-    public CXNode FindOwningNode(TextSpan span, out NodeSlot slot)
+    public CXNode FindOwningNode(TextSpan span, out ICXNode slot)
     {
         var current = this;
-        slot = default;
+        slot = null!;
 
         search:
         for (var i = 0; i < current.Slots.Count; i++)
@@ -224,7 +224,7 @@ public abstract partial class CXNode : ICXNode
                 !(span.Start >= slot.FullSpan.Start && span.End < slot.FullSpan.End)
             ) continue;
 
-            if (slot.Value is not CXNode node) break;
+            if (slot is not CXNode node) break;
 
             current = node;
             goto search;
@@ -242,7 +242,7 @@ public abstract partial class CXNode : ICXNode
         if (Parent is null) return -1;
 
         for (var i = 0; i < Parent._slots.Count; i++)
-            if (Parent._slots[i] == this)
+            if (ReferenceEquals(this, Parent._slots[i]))
                 return i;
 
         return -1;
@@ -251,7 +251,7 @@ public abstract partial class CXNode : ICXNode
     public int GetIndexOfSlot(ICXNode node)
     {
         for (var i = 0; i < _slots.Count; i++)
-            if (_slots[i] == node)
+            if (ReferenceEquals(_slots[i], node))
                 return i;
 
         return -1;
@@ -261,8 +261,8 @@ public abstract partial class CXNode : ICXNode
     {
         var a = _slots[index1];
         var b = _slots[index2];
-        _slots[index1] = new(index1, b.Value);
-        _slots[index2] = new(index2, a.Value);
+        _slots[index1] = b;
+        _slots[index2] = a;
     }
 
     private int ComputeOffset()
@@ -277,7 +277,7 @@ public abstract partial class CXNode : ICXNode
         {
             -1 => throw new InvalidOperationException(),
             0 => parentOffset,
-            _ => Parent._slots[parentSlotIndex - 1].Value switch
+            _ => Parent._slots[parentSlotIndex - 1] switch
             {
                 CXNode sibling => sibling.Offset + sibling.Width,
                 CXToken token => token.FullSpan.End,
@@ -290,7 +290,7 @@ public abstract partial class CXNode : ICXNode
     {
         if (Slots.Count is 0) return 0;
 
-        return Slots.Sum(x => x.Value switch
+        return Slots.Sum(x => x switch
         {
             CXToken token => token.FullSpan.Length,
             CXNode node => node.Width,
@@ -304,18 +304,18 @@ public abstract partial class CXNode : ICXNode
     {
         index = -1;
 
-        if (node.Parent != this) return false;
+        if (node.Parent is null || !node.Parent.Equals(this)) return false;
 
         index = node.GetParentSlotIndex();
 
-        return index >= 0 && index < _slots.Count && _slots.ElementAt(index) == node;
+        return index >= 0 && index < _slots.Count && _slots[index].Equals(node);
     }
 
-    protected void UpdateSlot(CXNode old, CXNode @new)
+    protected void UpdateSlot(CXNode oldNode, CXNode newNode)
     {
-        if (!IsGraphChild(old, out var slotIndex)) return;
+        if (!IsGraphChild(oldNode, out var slotIndex)) return;
 
-        _slots[slotIndex] = new(slotIndex, @new);
+        _slots[slotIndex] = newNode;
     }
 
     protected void RemoveSlot(CXNode node)
@@ -334,7 +334,7 @@ public abstract partial class CXNode : ICXNode
         Width += node.Width;
 
         node.Parent = this;
-        _slots.Add(new(_slots.Count, node));
+        _slots.Add(node);
     }
 
     protected void Slot(IEnumerable<ICXNode> nodes)
@@ -365,7 +365,7 @@ public abstract partial class CXNode : ICXNode
         return _slots.SequenceEqual(other._slots);
     }
 
-    public bool Equals(ICXNode other)
+    public bool Equals(ICXNode? other)
         => other is CXNode node && Equals(node);
 
     public override bool Equals(object? obj)
@@ -407,7 +407,7 @@ public abstract partial class CXNode : ICXNode
             if (node.Slots.Count - 1 > index)
                 stack.Push((node, index + 1));
 
-            switch (child.Value)
+            switch (child)
             {
                 case CXToken token:
                     tokens.Add(token);

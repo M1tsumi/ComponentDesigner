@@ -45,7 +45,7 @@ public static class CXTreeWalker
 
                     // enqueue child
                     stack.Push(
-                        (concreteNode.Slots[index].Value, 0)
+                        (concreteNode.Slots[index], 0)
                     );
 
                     continue;

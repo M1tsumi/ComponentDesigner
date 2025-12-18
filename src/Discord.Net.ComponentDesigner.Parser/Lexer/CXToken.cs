@@ -34,7 +34,7 @@ public sealed record CXToken(
             {
                 -1 => throw new InvalidOperationException(),
                 0 => parentOffset,
-                _ => Parent.Slots[parentSlotIndex - 1].Value switch
+                _ => Parent.Slots[parentSlotIndex - 1] switch
                 {
                     CXNode sibling => sibling.Offset + sibling.Width,
                     CXToken token => token.Offset + token.Width,
@@ -140,7 +140,7 @@ public sealed record CXToken(
                Value == other.Value;
     }
 
-    public bool Equals(ICXNode other)
+    public bool Equals(ICXNode? other)
         => other is CXToken token && Equals(token);
     
     public override int GetHashCode()
@@ -158,5 +158,5 @@ public sealed record CXToken(
     }
 
     int ICXNode.GraphWidth => 0;
-    IReadOnlyList<CXNode.NodeSlot> ICXNode.Slots => [];
+    IReadOnlyList<ICXNode> ICXNode.Slots => [];
 }
