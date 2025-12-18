@@ -1,10 +1,11 @@
 ﻿using Discord.CX;
 using Discord.CX.Nodes;
 using Microsoft.CodeAnalysis;
+using Xunit.Abstractions;
 
 namespace UnitTests.RendererTests;
 
-public sealed class IntegerTests : BaseRendererTest
+public sealed class IntegerTests(ITestOutputHelper output) : BaseRendererTest(output)
 {
     [Fact]
     public void BasicIntegers()

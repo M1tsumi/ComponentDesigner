@@ -2,6 +2,7 @@
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace Discord.CX.Nodes.Components.SelectMenus;
 
@@ -17,7 +18,7 @@ public sealed class SelectMenuOptionComponentNode : ComponentNode
     public ComponentProperty Emoji { get; }
     public ComponentProperty Default { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     protected override bool AllowChildrenInCX => true;
 

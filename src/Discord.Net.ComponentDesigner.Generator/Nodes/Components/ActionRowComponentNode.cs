@@ -3,6 +3,7 @@ using Discord.CX.Parser;
 using Discord.CX.Nodes.Components.SelectMenus;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -19,7 +20,7 @@ public class ActionRowComponentNode : ComponentNode
 
     public ComponentProperty Id { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     private static readonly ComponentRenderingOptions ChildRenderingOptions = new(
         TypingContext: new(

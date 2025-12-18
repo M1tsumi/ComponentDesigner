@@ -17,27 +17,36 @@ using static DiagnosticInfo;
 
 public static class Renderers
 {
-    public static PropertyRenderer CreateDefault(ComponentProperty property)
-    {
-        return (context, value) => { return string.Empty; };
-    }
+    public static RenderResult DefaultRenderer(
+        IComponentContext context,
+        IComponentPropertyValue value,
+        PropertyRenderingOptions options
+    ) => "default";
 
-    public static PropertyRenderer CreateRenderer(ITypeSymbol type)
+    public static PropertyRenderer CreateRenderer(
+        Compilation compilation,
+        ITypeSymbol type
+    )
     {
         if (type.SpecialType == SpecialType.System_String)
             return Renderers.String;
 
-        // TODO: more ways to extract renderers
+        if (type.SpecialType is SpecialType.System_Int32)
+            return Integer;
 
-        return (context, propValue) =>
+        if (compilation.GetKnownTypes().ColorType!.Equals(type, SymbolEqualityComparer.Default))
+            return Color;
+        
+        // TODO: more ways to extract renderers
+        return (context, propValue, options) =>
         {
             switch (propValue.Value)
             {
                 case CXValue.Interpolation interpolation:
                     var builder = new Builder();
-                    
+
                     var info = context.GetInterpolationInfo(interpolation);
-                    
+
                     if (
                         !context.Compilation.HasImplicitConversion(
                             info.Symbol,
@@ -57,7 +66,11 @@ public static class Renderers
                             type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                         )
                     );
-                default: return "default";
+                default:
+                    return FromDiagnostic(
+                        Diagnostics.TypeMismatch("<interpolation>", propValue.Value?.GetType().Name ?? "unknown"),
+                        propValue.Span
+                    );
             }
         };
     }
@@ -80,22 +93,16 @@ public static class Renderers
         return false;
     }
 
-    public static PropertyRenderer ComponentAsProperty(ComponentRenderingOptions options)
-        => (context, propertyValue) => ComponentAsProperty(context, propertyValue, options);
-
-    public static Result<string> ComponentAsProperty(IComponentContext context, IComponentPropertyValue propertyValue)
-        => ComponentAsProperty(context, propertyValue, ComponentRenderingOptions.Default);
-
-    private static Result<string> ComponentAsProperty(
+    public static Result<string> ComponentAsProperty(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
-        ComponentRenderingOptions options
+        PropertyRenderingOptions options
     )
     {
         switch (propertyValue.Value)
         {
             case CXValue.Element when propertyValue.Node is not null:
-                return propertyValue.Node.Render(context, options);
+                return propertyValue.Node.Render(context, options.ToComponentOptions());
             case CXValue.Interpolation interpolation:
             {
                 // ensure its a component builder
@@ -184,17 +191,24 @@ public static class Renderers
         }
     }
 
-    public static RenderResult UnfurledMediaItem(IComponentContext context, IComponentPropertyValue propertyValue)
-        => String(context, propertyValue)
-            .Map(x =>
-                $"new {
-                    context.KnownTypes
-                        .UnfurledMediaItemPropertiesType
-                        !.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                }({x})"
-            );
+    public static RenderResult UnfurledMediaItem(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    ) => String(context, propertyValue, options)
+        .Map(x =>
+            $"new {
+                context.KnownTypes
+                    .UnfurledMediaItemPropertiesType
+                    !.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            }({x})"
+        );
 
-    public static RenderResult Integer(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Integer(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    )
     {
         switch (propertyValue.Value)
         {
@@ -223,16 +237,6 @@ public static class Renderers
         {
             if (info.Constant.Value is int || int.TryParse(info.Constant.Value?.ToString(), out _))
                 return info.Constant.Value!.ToString();
-
-            // if (info.Constant.HasValue)
-            // {
-            //     context.AddDiagnostic(
-            //         Diagnostics.TypeMismatch,
-            //         owner,
-            //         info.Constant.Value!.GetType().Name,
-            //         "int"
-            //     );
-            // }
 
             if (
                 context.Compilation.HasImplicitConversion(
@@ -263,7 +267,11 @@ public static class Renderers
         }
     }
 
-    public static RenderResult Boolean(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Boolean(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    )
     {
         switch (propertyValue.Value)
         {
@@ -364,7 +372,11 @@ public static class Renderers
         return _colorPresets.TryGetValue(value.ToLowerInvariant(), out fieldName);
     }
 
-    public static RenderResult Color(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Color(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    )
     {
         var colorSymbol = context.KnownTypes.ColorType;
         var qualifiedColor = colorSymbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -490,10 +502,13 @@ public static class Renderers
         }
     }
 
-    public static RenderResult Snowflake(IComponentContext context, IComponentPropertyValue propertyValue)
-        => Snowflake(context, propertyValue.Value);
+    public static RenderResult Snowflake(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    ) => Snowflake(context, propertyValue.Value, options);
 
-    public static RenderResult Snowflake(IComponentContext context, CXValue? value)
+    public static RenderResult Snowflake(IComponentContext context, CXValue? value, PropertyRenderingOptions options)
     {
         switch (value)
         {
@@ -556,7 +571,11 @@ public static class Renderers
             => $"ulong.Parse({input})";
     }
 
-    public static RenderResult String(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult String(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    )
     {
         switch (propertyValue.Value)
         {
@@ -784,7 +803,7 @@ public static class Renderers
         ITypeSymbol? symbol = null;
         Dictionary<string, string> variants = [];
 
-        return (context, propertyValue) =>
+        return (context, propertyValue, options) =>
         {
             if (symbol is null || variants.Count is 0)
             {
@@ -858,7 +877,11 @@ public static class Renderers
         };
     }
 
-    public static RenderResult Emoji(IComponentContext context, IComponentPropertyValue propertyValue)
+    public static RenderResult Emoji(
+        IComponentContext context,
+        IComponentPropertyValue propertyValue,
+        PropertyRenderingOptions options
+    )
     {
         var isDiscordEmote = false;
         var isEmoji = false;

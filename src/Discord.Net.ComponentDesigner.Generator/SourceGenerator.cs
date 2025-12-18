@@ -17,6 +17,12 @@ using Discord.CX.Utils;
 
 namespace Discord.CX;
 
+using UpdateGraphStateParams =
+    (
+    ImmutableArray<CXGraph> Left,
+    (ImmutableArray<ComponentDesignerTarget?> Left, EquatableArray<string> Right) Right
+    );
+
 [Generator]
 public sealed class SourceGenerator : IIncrementalGenerator
 {
@@ -62,6 +68,8 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 MapPossibleComponentDesignerCall
             )
             .WithTrackingName(TrackingNames.INITIAL_TARGET)
+            .Where(x => x is not null)
+            .WithTrackingName(TrackingNames.FILTER_NOT_NULL_TARGETS)
             .Collect()
             .WithTrackingName(TrackingNames.ALL_TARGETS);
 
@@ -88,9 +96,11 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
         // inject compilation
         graphProvider = graphProvider
-            .Combine(context.CompilationProvider)
-            .WithTrackingName(TrackingNames.GRAPH_COMPILATION_INJECTION)
-            .Select(UpdateFromCompilation)
+            .Collect()
+            .WithTrackingName(TrackingNames.ALL_GRAPHS)
+            .Combine(combinedKeys)
+            .WithTrackingName(TrackingNames.ALL_GRAPHS_AND_KEYS)
+            .SelectMany(UpdateGraphState)
             .WithTrackingName(TrackingNames.UPDATE_GRAPH_STATE);
 
         Provider = graphProvider
@@ -134,10 +144,37 @@ public sealed class SourceGenerator : IIncrementalGenerator
     internal static RenderedGraph RenderGraph(CXGraph graph, CancellationToken token)
         => graph.Render(token: token);
 
-    internal static CXGraph UpdateFromCompilation(
-        (CXGraph Graph, Compilation compilation) tuple,
+    internal static IEnumerable<CXGraph> UpdateGraphState(
+        UpdateGraphStateParams tuple,
         CancellationToken token
-    ) => tuple.Graph.UpdateFromCompilation(tuple.compilation, token);
+    )
+    {
+        var (graphs, (targets, keys)) = tuple;
+
+        // at this point in the pipeline, nothing should be removed from the provider arrays, any non-mapped target is
+        // null across graphs, targets, and keys
+        Debug.Assert(
+            graphs.Length == targets.Length &&
+            targets.Length == keys.Count
+        );
+
+        for (var i = 0; i < graphs.Length; i++)
+        {
+            var graph = graphs[i];
+            var target = targets[i];
+            var key = keys[i];
+
+            // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            if (graph is null || target is null || key is null)
+            {
+                Debug.Fail("Pipeline contains null values");
+                continue;
+            }
+            // ReSharper restore ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+
+            yield return graph.Update(target!, token);
+        }
+    }
 
     internal static CXGraph CreateGraph(GraphGeneratorState state, CancellationToken token)
     {

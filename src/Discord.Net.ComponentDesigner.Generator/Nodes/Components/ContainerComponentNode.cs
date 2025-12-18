@@ -1,6 +1,7 @@
 ﻿using System;
 using Discord.CX.Parser;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -16,7 +17,7 @@ public sealed class ContainerComponentNode : ComponentNode
     public ComponentProperty AccentColor { get; }
     public ComponentProperty Spoiler { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     private static readonly ComponentRenderingOptions ChildRenderingOptions = new(
         TypingContext: new(

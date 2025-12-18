@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -14,7 +15,7 @@ public sealed class SeparatorComponentNode : ComponentNode
     public ComponentProperty Divider { get; }
     public ComponentProperty Spacing { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public SeparatorComponentNode()
     {

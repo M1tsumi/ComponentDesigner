@@ -8,10 +8,11 @@ using Discord.CX.Nodes.Components;
 
 namespace Discord.CX.Nodes;
 
-public sealed class ComponentContext : IComponentContext
+public class ComponentContext : IComponentContext
 {
     public KnownTypes KnownTypes => Compilation.GetKnownTypes();
-    public Compilation Compilation => _graph.Compilation;
+    public virtual Compilation Compilation => _graph.Compilation;
+    public virtual CXDesignerGeneratorState CX => _graph.CX;
 
     public ComponentTypingContext RootTypingContext { get; }
 

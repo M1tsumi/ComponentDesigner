@@ -15,7 +15,7 @@ public sealed class SectionComponentNode : ComponentNode
     public override bool HasChildren => true;
 
     public ComponentProperty Accessory { get; }
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     private static readonly ComponentRenderingOptions ChildrenRenderingOptions = new(
         TypingContext: new(
@@ -39,7 +39,7 @@ public sealed class SectionComponentNode : ComponentNode
             Accessory = new(
                 "accessory",
                 isOptional: true,
-                renderer: Renderers.ComponentAsProperty(AccessoryRenderingOptions)
+                renderer: Renderers.ComponentAsProperty
             )
         ];
     }
@@ -140,7 +140,7 @@ public sealed class SectionComponentNode : ComponentNode
 
         var renderedAccessory = (
             accessoryPropertyValue.HasValue
-                ? Accessory.Renderer(context, accessoryPropertyValue)
+                ? Accessory.Renderer(context, accessoryPropertyValue, AccessoryRenderingOptions.ToPropertyOptions())
                 : (
                     state
                         .Children

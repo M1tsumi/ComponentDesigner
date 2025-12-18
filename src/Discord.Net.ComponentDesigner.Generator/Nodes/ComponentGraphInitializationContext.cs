@@ -31,9 +31,8 @@ public readonly struct ComponentGraphInitializationContext
     {
         if (parent is not null)
         {
-            parent.Children.Add(
-                CXGraph.CreateFromInitialization(init, _graphContext, parent)
-            );
+            if(CXGraph.CreateFromInitialization(init, _graphContext, parent) is {} child)
+                parent.Children.Add(child);
         }
         else
         {

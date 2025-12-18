@@ -16,6 +16,9 @@ public sealed class GraphGeneratorState(
     public Compilation Compilation => CX.SemanticModel.Compilation;
     public CXDesignerGeneratorState CX { get; init; } = cx;
 
+    public GraphGeneratorState WithCX(CXDesignerGeneratorState cx)
+        => new(Key, GeneratorOptions, cx);
+    
     public bool Equals(GraphGeneratorState other)
         => Key == other.Key &&
            GeneratorOptions.Equals(other.GeneratorOptions) &&

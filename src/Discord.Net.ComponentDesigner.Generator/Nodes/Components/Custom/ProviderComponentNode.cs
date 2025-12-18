@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
@@ -11,7 +12,7 @@ public sealed class ProviderComponentNode : ComponentNode
     private readonly INamedTypeSymbol _providerSymbol;
     public override string Name => $"<provider {_providerSymbol.ToDisplayString()}>";
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public ProviderComponentNode(
         INamedTypeSymbol stateSymbol,
@@ -61,12 +62,12 @@ public sealed class ProviderComponentNode : ComponentNode
                     propName,
                     isOptional,
                     aliases: aliases!,
-                    renderer: Renderers.CreateRenderer(property.Type)
+                    renderer: Renderers.CreateRenderer(compilation, property.Type)
                 )
             );
         }
 
-        Properties = properties;
+        Properties = [..properties];
     }
 
 

@@ -27,7 +27,7 @@ public static class EquatableArray
 
     public static EquatableArray<T> Create<T>(ReadOnlySpan<T> values)
         where T : IEquatable<T>
-        => new([..values]);
+        => new(values.ToArray());
 }
 
 /// <summary>
@@ -52,6 +52,11 @@ public readonly struct EquatableArray<T> :
     public EquatableArray(ImmutableArray<T> array)
     {
         this._array = Unsafe.As<ImmutableArray<T>, T[]?>(ref array);
+    }
+
+    public EquatableArray(T[] array)
+    {
+        _array = array;
     }
 
     /// <summary>

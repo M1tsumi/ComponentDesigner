@@ -26,6 +26,8 @@ public sealed record GraphInitializationContext(
     public ComponentTypingContext RootTypingContext => ComponentTypingContext.Default;
 
     public EquatableArray<DesignerInterpolationInfo> Interpolations => State.CX.InterpolationInfos;
+    public CXDesignerGeneratorState CX => State.CX;
+    
     public bool IsIncremental => OldGraph is not null && IncrementalParseResult is not null;
 
     public bool TryReuse(ICXNode node, GraphNode? parent, out GraphNode graphGraphNode)

@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.ComponentTests;
 
-public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWithDiagnostics
+public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWithDiagnostics(output)
 {
     protected CXGraph CurrentGraph
     {
@@ -106,7 +106,7 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
 
         Assert.Equal(allowParsingErrors, graph.Document.HasErrors);
 
-        graph = graph.UpdateFromCompilation(target.Compilation, CancellationToken.None);
+        graph = graph.Update(target, CancellationToken.None);
         
         _graph = graph;
         _nodeEnumerator = _graph.RootNodes.SelectMany(EnumerateNodes).GetEnumerator();
@@ -134,13 +134,14 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
         var diagnostics = new List<DiagnosticInfo>();
         
         _graph.Validate(_context, diagnostics);
-
-        if (hasErrors.HasValue)
-            Assert.Equal(hasErrors.Value, diagnostics.Any(x => x.Descriptor.DefaultSeverity is DiagnosticSeverity.Error));
-
+        
         AssertEmptyDiagnostics();
 
         PushDiagnostics(diagnostics);
+        
+        if (hasErrors.HasValue)
+            Assert.Equal(hasErrors.Value, diagnostics.Any(x => x.Descriptor.DefaultSeverity is DiagnosticSeverity.Error));
+
     }
 
     protected void Renders(string? expected = null)

@@ -11,7 +11,8 @@ public interface IComponentContext
 {
     KnownTypes KnownTypes { get; }
     Compilation Compilation { get; }
-
+    CXDesignerGeneratorState CX { get; }
+    
     string GetDesignerValue(int index, string? type = null);
 
     DesignerInterpolationInfo GetInterpolationInfo(int index);

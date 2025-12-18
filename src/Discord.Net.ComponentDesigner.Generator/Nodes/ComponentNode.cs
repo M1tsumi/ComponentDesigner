@@ -1,6 +1,7 @@
 ﻿using Discord.CX.Parser;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -68,7 +69,7 @@ public abstract class ComponentNode
 
     public virtual bool HasChildren => false;
 
-    public virtual IReadOnlyList<ComponentProperty> Properties { get; } = [];
+    public virtual ImmutableArray<ComponentProperty> Properties { get; } = [];
 
     protected virtual bool AllowChildrenInCX => HasChildren;
 
@@ -78,8 +79,19 @@ public abstract class ComponentNode
         IList<DiagnosticInfo> diagnostics
     )
     {
+        ValidateProperties(state, Properties, context, diagnostics);
+        ValidateChildren(state, context, diagnostics);
+    }
+
+    protected void ValidateProperties(
+        ComponentState state,
+        ImmutableArray<ComponentProperty> properties,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
+    {
         // validate properties
-        foreach (var property in Properties)
+        foreach (var property in properties)
         {
             var propertyValue = state.GetProperty(property);
 
@@ -96,7 +108,7 @@ public abstract class ComponentNode
             // report any unknown properties
             foreach (var attribute in element.Attributes)
             {
-                if (!TryGetPropertyFromName(attribute.Identifier.Value, out _))
+                if (!TryGetPropertyFromName(properties, attribute.Identifier.Value, out _))
                 {
                     diagnostics.Add(
                         Diagnostics.UnknownProperty(
@@ -107,21 +119,39 @@ public abstract class ComponentNode
                     );
                 }
             }
-
-            // report invalid children
-            if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
-            {
-                diagnostics.Add(
-                    Diagnostics.ComponentDoesntAllowChildren(Name),
-                    element.Children
-                );
-            }
         }
     }
 
-    private bool TryGetPropertyFromName(string name, out ComponentProperty result)
+    protected void ValidateChildren(
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        foreach (var property in Properties)
+        if (state.Source is not CXElement element) return;
+        
+        // report invalid children
+        if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
+        {
+            diagnostics.Add(
+                Diagnostics.ComponentDoesntAllowChildren(Name),
+                element.Children
+            );
+        }
+    }
+
+    private bool TryGetPropertyFromName(
+        string name,
+        out ComponentProperty result
+    ) => TryGetPropertyFromName(Properties, name, out result);
+
+    private static bool TryGetPropertyFromName(
+        ImmutableArray<ComponentProperty> properties,
+        string name,
+        out ComponentProperty result
+    )
+    {
+        foreach (var property in properties)
         {
             if (property.Name == name || property.Aliases.Contains(name))
             {
@@ -201,60 +231,4 @@ public abstract class ComponentNode
 
     public static bool TryGetNode(string name, out ComponentNode node)
         => _nodes.TryGetValue(name, out node);
-
-    public static bool TryGetProviderNode(
-        SemanticModel cxSemanticModel,
-        int position,
-        string name,
-        out ComponentNode node
-    )
-    {
-        foreach (var candidate in cxSemanticModel.LookupSymbols(position, name: name))
-        {
-            if (candidate is INamedTypeSymbol typeSymbol)
-            {
-                var providerInterface = typeSymbol
-                    .AllInterfaces
-                    .FirstOrDefault(x =>
-                        x.IsGenericType &&
-                        x.ConstructedFrom.Equals(
-                            cxSemanticModel.Compilation.GetKnownTypes().ICXProviderType,
-                            SymbolEqualityComparer.Default
-                        )
-                    );
-
-                if (providerInterface is null ||
-                    providerInterface.TypeArguments[0] is not INamedTypeSymbol stateSymbol) continue;
-
-                node = new ProviderComponentNode(stateSymbol, typeSymbol, cxSemanticModel.Compilation);
-                return true;
-            }
-
-            if (candidate is IMethodSymbol methodSymbol)
-            {
-                if (!methodSymbol.IsStatic)
-                {
-                    continue;
-                }
-
-                if (methodSymbol.DeclaredAccessibility is not Accessibility.Public and not Accessibility.Internal)
-                    continue;
-
-                if (
-                    !ComponentBuilderKindUtils.IsValidComponentBuilderType(
-                        methodSymbol.ReturnType,
-                        cxSemanticModel.Compilation,
-                        out var kind
-                    )
-                ) continue;
-
-                node = FunctionalComponentNode.Create(methodSymbol, kind, cxSemanticModel.Compilation);
-                return true;
-            }
-        }
-
-
-        node = null!;
-        return false;
-    }
 }

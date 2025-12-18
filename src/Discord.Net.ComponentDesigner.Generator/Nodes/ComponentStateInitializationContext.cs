@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using Discord.CX.Parser;
+using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes;
 
 public readonly struct ComponentStateInitializationContext
 {
+    public CXDesignerGeneratorState CX => GraphContext.State.CX;
+    public Compilation Compilation => GraphContext.Compilation;
     public GeneratorOptions Options => GraphContext.Options;
     public GraphInitializationContext GraphContext { get; }
     public IReadOnlyList<CXNode> Children => _children;

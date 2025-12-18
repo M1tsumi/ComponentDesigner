@@ -1,11 +1,12 @@
 ﻿using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 using DiagnosticInfo = Discord.CX.DiagnosticInfo;
 
 namespace UnitTests;
 
-public abstract class BaseTestWithDiagnostics
+public abstract class BaseTestWithDiagnostics(ITestOutputHelper output)
 {
     private readonly Queue<DiagnosticInfo> _diagnostics = [];
     private readonly HashSet<DiagnosticInfo> _expectedDiagnostics = [];
@@ -24,8 +25,13 @@ public abstract class BaseTestWithDiagnostics
     protected void PushDiagnostics(IEnumerable<DiagnosticInfo> diagnostics)
     {
         foreach (var diagnostic in diagnostics)
+        {
             if (!_expectedDiagnostics.Contains(diagnostic))
+            {
+                output.WriteLine($"{diagnostic.Span}: [{diagnostic.Descriptor.Category} {diagnostic.Descriptor.Title}] {diagnostic.Descriptor.MessageFormat}");
                 _diagnostics.Enqueue(diagnostic);
+            }
+        }
     }
 
     protected DiagnosticInfo Diagnostic(
@@ -56,14 +62,47 @@ public abstract class BaseTestWithDiagnostics
 
         var diagnostic = _diagnostics.Dequeue();
 
+        AssertDiagnostic(diagnostic, id, title, message, severity, span);
+        
+        _expectedDiagnostics.Add(diagnostic);
+
+        return diagnostic;
+    }
+
+    protected static DiagnosticInfo AssertDiagnostic(
+        DiagnosticInfo diagnostic,
+        DiagnosticDescriptor descriptor,
+        ICXNode node
+    ) => AssertDiagnostic(diagnostic, descriptor, node.Span);
+    
+    protected static DiagnosticInfo AssertDiagnostic(
+        DiagnosticInfo diagnostic,
+        DiagnosticDescriptor descriptor,
+        TextSpan? span = null
+    ) => AssertDiagnostic(
+        diagnostic,
+        descriptor.Id,
+        descriptor.Title.ToString(),
+        descriptor.MessageFormat.ToString(),
+        descriptor.DefaultSeverity,
+        span
+    );
+    
+    protected static DiagnosticInfo AssertDiagnostic(
+        DiagnosticInfo diagnostic,
+        string id,
+        string? title = null,
+        string? message = null,
+        DiagnosticSeverity? severity = null,
+        TextSpan? span = null
+    )
+    {
         Assert.Equal(id, diagnostic.Descriptor.Id);
 
         if (title is not null) Assert.Equal(title, diagnostic.Descriptor.Title);
         if (message is not null) Assert.Equal(message, diagnostic.Descriptor.MessageFormat);
         if (severity is not null) Assert.Equal(severity, diagnostic.Descriptor.DefaultSeverity);
         if (span is not null) Assert.Equal(span, diagnostic.Span);
-
-        _expectedDiagnostics.Add(diagnostic);
 
         return diagnostic;
     }

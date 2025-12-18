@@ -1,8 +1,10 @@
 ﻿using Discord.CX.Parser;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -26,7 +28,20 @@ public sealed class SelectMenuComponentNode : ComponentNode
         GraphNode OwningGraphNode,
         ICXNode Source,
         string? Kind = null
-    ) : ComponentState(OwningGraphNode, Source);
+    ) : ComponentState(OwningGraphNode, Source)
+    {
+        public bool Equals(InvalidTypeState? other)
+        {
+            if (other is null) return false;
+
+            return
+                Kind == other.Kind &&
+                base.Equals(other);
+        }
+
+        public override int GetHashCode()
+            => Hash.Combine(Kind, base.GetHashCode());
+    }
 
     public sealed record SelectState(
         GraphNode OwningGraphNode,
@@ -34,7 +49,22 @@ public sealed class SelectMenuComponentNode : ComponentNode
         SelectKind Kind,
         EquatableArray<SelectMenuDefaultValue> Defaults,
         EquatableArray<SelectMenuInterpolatedOption> InterpolatedOptions
-    ) : ComponentState(OwningGraphNode, Source);
+    ) : ComponentState(OwningGraphNode, Source)
+    {
+        public bool Equals(SelectState? other)
+        {
+            if (other is null) return false;
+
+            return
+                Kind == other.Kind &&
+                Defaults.Equals(other.Defaults) &&
+                InterpolatedOptions.Equals(other.InterpolatedOptions) &&
+                base.Equals(other);
+        }
+
+        public override int GetHashCode()
+            => Hash.Combine(Kind, Defaults, InterpolatedOptions, base.GetHashCode());
+    }
 
     public override string Name => "select-menu";
 
@@ -49,7 +79,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
     public ComponentProperty Required { get; }
     public ComponentProperty Disabled { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public override bool HasChildren => true;
 

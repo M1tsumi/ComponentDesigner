@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Discord.CX.Parser;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -17,13 +19,26 @@ public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryCompon
         GraphNode OwningGraphNode,
         ICXNode Source,
         EquatableArray<InterpolationIndex> Interpolations
-    ) : ComponentState(OwningGraphNode, Source);
+    ) : ComponentState(OwningGraphNode, Source)
+    {
+        public bool Equals(MediaGalleryState? other)
+        {
+            if (other is null) return false;
+
+            return
+                Interpolations.Equals(other.Interpolations) &&
+                base.Equals(other);
+        }
+
+        public override int GetHashCode()
+            => Hash.Combine(Interpolations, base.GetHashCode());
+    }
 
     public override string Name => "media-gallery";
 
     public override IReadOnlyList<string> Aliases { get; } = ["gallery"];
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public override bool HasChildren => true;
 

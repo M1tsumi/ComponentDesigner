@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Discord.CX.Util;
 
 namespace Discord.CX.Nodes;
 
@@ -43,7 +44,7 @@ public record ComponentState(
                 .FirstOrDefault(x => ReferenceEquals(x.State.Source, element.Value));
         }
 
-        return _properties[property] = new(property, attribute, node);
+        return _properties[property] = new(property, attribute, Source.Span, node);
     }
 
     public void ReportPropertyNotAllowed(
@@ -126,7 +127,7 @@ public record ComponentState(
     public void SubstitutePropertyValue(ComponentProperty property, CXValue value)
     {
         if (!_properties.TryGetValue(property, out var existing))
-            _properties[property] = new(property, null) { Value = value };
+            _properties[property] = new(property, null, Source.Span) { Value = value };
         else
             _properties[property] = _properties[property] with { Value = value };
     }
@@ -135,7 +136,17 @@ public record ComponentState(
         ComponentNode node,
         IComponentContext context,
         bool asInitializers = false,
-        Predicate<ComponentProperty>? ignorePredicate = null)
+        Predicate<ComponentProperty>? ignorePredicate = null,
+        PropertyRenderingOptions? options = null
+    ) => RenderProperties(node.Properties, context, asInitializers, ignorePredicate, options);
+    
+    public Result<string> RenderProperties(
+        IEnumerable<ComponentProperty> properties,
+        IComponentContext context,
+        bool asInitializers = false,
+        Predicate<ComponentProperty>? ignorePredicate = null,
+        PropertyRenderingOptions? options = null
+    )
     {
         // TODO: correct handling?
         if (Source is not CXElement element) return string.Empty;
@@ -145,7 +156,7 @@ public record ComponentState(
 
         var success = true;
 
-        foreach (var property in node.Properties)
+        foreach (var property in properties)
         {
             if (ignorePredicate?.Invoke(property) is true) continue;
 
@@ -153,7 +164,7 @@ public record ComponentState(
 
             if (propertyValue.CanOmitFromSource) continue;
 
-            var propertyResult = property.Renderer(context, propertyValue);
+            var propertyResult = property.Renderer(context, propertyValue, options ?? PropertyRenderingOptions.Default);
 
             if (propertyResult.HasResult)
             {
@@ -192,7 +203,7 @@ public record ComponentState(
         ComponentRenderingOptions options = default
     )
     {
-        if (OwningGraphNode is null || !HasChildren) return string.Empty;
+        if (!HasChildren) return string.Empty;
 
         IEnumerable<GraphNode> children = OwningGraphNode.Children;
 
@@ -206,6 +217,14 @@ public record ComponentState(
 
     public virtual bool Equals(ComponentState? other)
     {
-        return ReferenceEquals(this, other);
+        if (other is null) return false;
+        
+        if (ReferenceEquals(this, other)) return true;
+
+        return
+            Source.Equals(other.Source);
     }
+
+    public override int GetHashCode()
+        => Source.GetHashCode();
 }

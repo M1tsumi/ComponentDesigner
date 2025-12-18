@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Discord.CX.Nodes.Components.SelectMenus;
 using Discord.CX.Parser;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis.Text;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -13,7 +15,21 @@ public sealed record LabelComponentState(
     ICXNode Source,
     CXValue? ChildValue,
     CXElement? ChildElement
-) : ComponentState(OwningGraphNode, Source);
+) : ComponentState(OwningGraphNode, Source)
+{
+    public bool Equals(LabelComponentState? other)
+    {
+        if (other is null) return false;
+
+        return
+            (ChildValue?.Equals(other.ChildValue) ?? other.ChildValue is null) &&
+            (ChildElement?.Equals(other.ChildElement) ?? other.ChildElement is null) &&
+            base.Equals(other);
+    }
+
+    public override int GetHashCode()
+        => Hash.Combine(ChildValue, ChildElement, base.GetHashCode());
+}
 
 public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 {
@@ -25,7 +41,7 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
 
     public override bool HasChildren => true;
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     private static readonly ComponentRenderingOptions ChildRenderingOptions = new(
         TypingContext: new(

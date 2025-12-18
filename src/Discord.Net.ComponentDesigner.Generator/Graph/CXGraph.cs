@@ -6,7 +6,9 @@ using System.Linq;
 using System.Threading;
 using Discord.CX.Nodes;
 using Discord.CX.Nodes.Components;
+using Discord.CX.Nodes.Components.Custom;
 using Discord.CX.Parser;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX;
@@ -22,8 +24,12 @@ public sealed class CXGraph : IEquatable<CXGraph>
     public EquatableArray<DesignerInterpolationInfo> InterpolationInfos => _state.CX.InterpolationInfos;
 
     public Compilation Compilation => _state.Compilation;
+    public CXDesignerGeneratorState CX => _state.CX;
 
     private readonly GraphGeneratorState _state;
+
+    private readonly EquatableArray<DiagnosticInfo> _diagnostics;
+    private readonly EquatableArray<DiagnosticInfo>? _updateDiagnostics;
 
     private CXGraph(
         string key,
@@ -31,15 +37,21 @@ public sealed class CXGraph : IEquatable<CXGraph>
         EquatableArray<DiagnosticInfo> diagnostics,
         IReadOnlyDictionary<ICXNode, GraphNode> nodeMap,
         GraphGeneratorState state,
-        CXDoc document
-    )
+        CXDoc document,
+        EquatableArray<DiagnosticInfo>? updateDiagnostics = null)
     {
         _state = state;
         Document = document;
-        Diagnostics = diagnostics;
         NodeMap = nodeMap;
         Key = key;
         RootNodes = rootNodes;
+
+        _diagnostics = diagnostics;
+        _updateDiagnostics = updateDiagnostics;
+
+        Diagnostics = updateDiagnostics is not null
+            ? [..diagnostics, ..updateDiagnostics]
+            : diagnostics;
     }
 
     public static CXGraph Create(
@@ -59,7 +71,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
         var doc = CXParser.Parse(reader, token);
 
         var parserDiagnostics = doc.Diagnostics.Select(x => new DiagnosticInfo(
-            CX.Diagnostics.CreateParsingDiagnostic(x),
+            Discord.CX.Diagnostics.CreateParsingDiagnostic(x),
             x.Span
         ));
 
@@ -109,31 +121,66 @@ public sealed class CXGraph : IEquatable<CXGraph>
         );
     }
 
-    public CXGraph UpdateFromCompilation(Compilation compilation, CancellationToken token)
+    private sealed class GraphUpdateContext : ComponentContext
     {
-        var context = new ComponentContext(
-            this
+        public override Compilation Compilation => _target.Compilation;
+
+        public override CXDesignerGeneratorState CX => _target.CX;
+
+        private readonly CXGraph _graph;
+        private readonly ComponentDesignerTarget _target;
+
+        public GraphUpdateContext(
+            CXGraph graph,
+            ComponentDesignerTarget target
+        ) : base(graph)
+        {
+            _graph = graph;
+            _target = target;
+        }
+    }
+
+    public CXGraph Update(
+        ComponentDesignerTarget target,
+        CancellationToken token
+    )
+    {
+        // no action needed if we're on the same compilation
+        if (ReferenceEquals(target.Compilation, _state.Compilation))
+        {
+            return this;
+        }
+        
+        var context = new GraphUpdateContext(
+            this,
+            target
         );
 
         var diagnostics = new List<DiagnosticInfo>();
 
-
         var hasUpdatedState = false;
 
-        foreach (var rootNode in RootNodes)
+        var rootNodes = new GraphNode[RootNodes.Count];
+
+        for (var i = 0; i < RootNodes.Count; i++)
         {
-            hasUpdatedState |= rootNode.UpdateState(context, diagnostics);
+            var node = RootNodes[i];
+            rootNodes[i] = node.UpdateState(context, diagnostics);
+            hasUpdatedState |= !ReferenceEquals(node, rootNodes[i]);
         }
 
         if (hasUpdatedState || diagnostics.Count is not 0)
+        {
             return new CXGraph(
                 Key,
-                RootNodes,
-                [..Diagnostics, ..diagnostics],
+                [..rootNodes],
+                _diagnostics,
                 NodeMap,
-                _state,
-                Document
+                _state.WithCX(context.CX),
+                Document,
+                [..diagnostics]
             );
+        }
 
         return this;
     }
@@ -205,7 +252,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
                     {
                         context.Diagnostics.Add(
                             new DiagnosticInfo(
-                                CX.Diagnostics.UnknownComponent(token.Kind.ToString()),
+                                Discord.CX.Diagnostics.UnknownComponent(token.Kind.ToString()),
                                 cxNode.Span
                             )
                         );
@@ -219,7 +266,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
             default:
                 context.Diagnostics.Add(
                     new(
-                        CX.Diagnostics.UnknownComponent(cxNode.GetType().ToString()),
+                        Discord.CX.Diagnostics.UnknownComponent(cxNode.GetType().ToString()),
                         cxNode.Span
                     )
                 );
@@ -237,23 +284,11 @@ public sealed class CXGraph : IEquatable<CXGraph>
             }
 
             if (
-                !ComponentNode.TryGetNode(element.Identifier, out var componentNode) &&
-                !ComponentNode.TryGetProviderNode(
-                    context.State.CX.SemanticModel,
-                    context.State.CX.Location.TextSpan.Start,
-                    element.Identifier,
-                    out componentNode
-                )
+                !ComponentNode.TryGetNode(element.Identifier, out var componentNode)
             )
             {
-                context.Diagnostics.Add(
-                    new(
-                        CX.Diagnostics.UnknownComponent(element.Identifier),
-                        element.Span
-                    )
-                );
-
-                return [];
+                // assume custom component
+                componentNode = FunctionalComponentNode.Instance;
             }
 
             var initContext = new ComponentGraphInitializationContext(
@@ -314,7 +349,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
 
             context.Diagnostics.Add(
                 new(
-                    CX.Diagnostics.UnknownComponent(
+                    Discord.CX.Diagnostics.UnknownComponent(
                         info.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                         ?? "<interleaved>"
                     ),
@@ -399,4 +434,14 @@ public sealed class CXGraph : IEquatable<CXGraph>
         => Key == other.Key &&
            RootNodes.Equals(other.RootNodes) &&
            Diagnostics.Equals(other.Diagnostics);
+
+    public override bool Equals(object? obj)
+        => obj is CXGraph other && Equals(other);
+
+    public override int GetHashCode()
+        => Hash.Combine(
+            Key,
+            RootNodes.Aggregate(0, Hash.Combine),
+            Diagnostics
+        );
 }

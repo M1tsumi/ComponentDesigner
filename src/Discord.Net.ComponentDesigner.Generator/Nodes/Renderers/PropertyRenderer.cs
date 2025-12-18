@@ -2,5 +2,6 @@
 
 public delegate Result<string> PropertyRenderer(
     IComponentContext context,
-    IComponentPropertyValue value
+    IComponentPropertyValue value,
+    PropertyRenderingOptions options
 );

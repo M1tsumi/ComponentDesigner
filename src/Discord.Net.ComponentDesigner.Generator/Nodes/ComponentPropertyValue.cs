@@ -1,15 +1,29 @@
 ﻿using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX.Nodes;
 
 public sealed record ComponentPropertyValue(
     ComponentProperty Property,
     CXAttribute? Attribute,
+    TextSpan SourceSpan,
     GraphNode? Node = null
 ) : IComponentPropertyValue
 {
+    public TextSpan Span
+    {
+        get
+        {
+            if (Value is not null) return Value.Span;
+
+            if (Attribute is not null) return Attribute.Span;
+
+            return SourceSpan;
+        }
+    }
+    
     private CXValue? _value;
 
     public CXValue? Value

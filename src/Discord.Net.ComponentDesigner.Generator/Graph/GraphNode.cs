@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Discord.CX.Nodes;
+using Discord.CX.Util;
 
 namespace Discord.CX;
 
@@ -19,7 +20,7 @@ public sealed class GraphNode : IEquatable<GraphNode>
     public GraphNode? Parent { get; private set; }
 
     private Result<string>? _render;
-    
+
     public GraphNode(
         ComponentNode inner,
         ComponentState? state,
@@ -43,36 +44,44 @@ public sealed class GraphNode : IEquatable<GraphNode>
         return this;
     }
 
-    public bool UpdateState(IComponentContext context, IList<DiagnosticInfo> diagnostics)
+    public GraphNode UpdateState(
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        var result = false;
+        var recreate = false;
+        var children = new GraphNode[Children.Count];
+        var attrNodes = new GraphNode[AttributeNodes.Count];
 
-        foreach (var attributeNode in AttributeNodes)
-            result |= attributeNode.UpdateState(context, diagnostics);
-
-        foreach (var child in Children)
-            result |= child.UpdateState(context, diagnostics);
-
-        if (State is null)
+        for (var i = 0; i < Children.Count; i++)
         {
-            goto updateSelf;
+            var child = Children[i];
+            children[i] = child.UpdateState(context, diagnostics);
+            recreate |= !ReferenceEquals(child, children[i]);
         }
 
-        var newState = Inner.UpdateState(State, context, diagnostics);
-
-        result |= !newState.Equals(State);
-
-        State = newState;
-
-        updateSelf:
-
-        if (result)
+        for (var i = 0; i < AttributeNodes.Count; i++)
         {
-            // clear cached render
-            _render = null;
+            var child = AttributeNodes[i];
+            attrNodes[i] = child.UpdateState(context, diagnostics);
+            recreate |= !ReferenceEquals(child, attrNodes[i]);
+        }
+        
+        var newState = State is null ? State : Inner.UpdateState(State, context, diagnostics);
+        recreate |= (!newState?.Equals(State) ?? State is not null);
+        
+        if (recreate)
+        {
+            return new(
+                Inner,
+                newState,
+                [..children],
+                [..attrNodes],
+                Parent
+            );
         }
 
-        return result;
+        return this;
     }
 
     public Result<string> Render(IComponentContext context, ComponentRenderingOptions options = default)
@@ -97,4 +106,10 @@ public sealed class GraphNode : IEquatable<GraphNode>
            Inner.Equals(other.Inner) &&
            Children.SequenceEqual(other.Children) &&
            AttributeNodes.SequenceEqual(other.AttributeNodes);
+
+    public override bool Equals(object? obj)
+        => obj is GraphNode other && Equals(other);
+
+    public override int GetHashCode()
+        => Hash.Combine(Inner, State, Children.Aggregate(0, Hash.Combine), AttributeNodes.Aggregate(0, Hash.Combine));
 }

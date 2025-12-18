@@ -1,4 +1,6 @@
-﻿using Discord.CX.Parser;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX;
@@ -496,6 +498,51 @@ public static partial class Diagnostics
         "DC0055",
         "Invalid interpolated component",
         $"'{interleaved}' cannot be used in an expected context of '{context}'",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static DiagnosticDescriptor DuplicateChildParameter(string method) => new(
+        "DC0056",
+        "Duplicate child parameter",
+        $"'{method}' cannot specify a children parameter twice",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static DiagnosticDescriptor InvalidFunctionalComponentReturnType(string method, string type) => new(
+        "DC0056",
+        "Invalid functional component return type",
+        $"'{method}' returns `{type}` instead of a valid component type",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static DiagnosticDescriptor InvalidFunctionalComponentKind(string symbol, string reason) => new(
+        "DC0057",
+        "Invalid functional component",
+        $"cannot use '{symbol}' as a functional component: {reason}",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static DiagnosticDescriptor AmbiguousFunctionalComponent(params IEnumerable<string> symbols) => new(
+        "DC0058",
+        "Invalid functional component",
+        $"Ambiguous functional component: {string.Join(", ", symbols.Select(x => $"'{x}'"))}",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor ExpectedScalarFunctionalComponentChildValue = new(
+        "DC0059",
+        "Invalid functional component child",
+        $"expected scalar values (text or interpolations)",
         "Components",
         DiagnosticSeverity.Error,
         true

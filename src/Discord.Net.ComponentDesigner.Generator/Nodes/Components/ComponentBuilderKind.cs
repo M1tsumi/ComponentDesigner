@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes.Components;
@@ -35,7 +36,7 @@ public static class ComponentBuilderKindUtils
 
         return kind is ComponentBuilderKind.MessageComponent or ComponentBuilderKind.CXMessageComponent;
     }
-    
+
     public static bool IsValidComponentBuilderType(
         ITypeSymbol? symbol,
         Compilation compilation,
@@ -51,7 +52,7 @@ public static class ComponentBuilderKindUtils
 
         if (current.SpecialType is not SpecialType.System_String)
             current.TryGetEnumerableType(out enumerableType);
-        
+
         if (enumerableType is not null)
         {
             kind |= ComponentBuilderKind.CollectionOf;
@@ -62,20 +63,21 @@ public static class ComponentBuilderKindUtils
             kind |= ComponentBuilderKind.MessageComponent;
         else if (current.IsInTypeTree(compilation.GetKnownTypes().IMessageComponentBuilderType))
             kind |= ComponentBuilderKind.IMessageComponentBuilder;
-        else if(current.IsInTypeTree(compilation.GetKnownTypes().IMessageComponentType))
+        else if (current.IsInTypeTree(compilation.GetKnownTypes().IMessageComponentType))
             kind |= ComponentBuilderKind.IMessageComponent;
         else if (current.IsInTypeTree(compilation.GetKnownTypes().CXMessageComponentType))
             kind |= ComponentBuilderKind.CXMessageComponent;
-        
+
         return (kind & ComponentBuilderKind.ComponentMask) is not 0;
     }
-    
+
     public static bool IsValidComponentBuilderType(
         ITypeSymbol? symbol,
         Compilation compilation
     ) => IsValidComponentBuilderType(symbol, compilation, out _);
-    
-    public static bool TryConvertBasic(string source, ComponentBuilderKind from, ComponentBuilderKind to, out string result)
+
+    public static bool TryConvertBasic(string source, ComponentBuilderKind from, ComponentBuilderKind to,
+        out string result)
         => (result = ConvertBasic(source, from, to)!) is not null;
 
     public static bool TryConvert(
@@ -110,7 +112,11 @@ public static class ComponentBuilderKindUtils
             case (true, false):
             {
                 var converter = ConvertBasic("x", fromBasicKind, toBasicKind);
-                return converter is not null ? $"{source}.Select(x => {converter})" : null;
+                return converter is not null
+                    ? converter is not "x"
+                        ? $"{source}.Select(x => {converter})"
+                        : source
+                    : null;
             }
             case (false, true):
             {
@@ -141,8 +147,9 @@ public static class ComponentBuilderKindUtils
             case (true, true):
                 switch (fromBasicKind, toBasicKind)
                 {
-                    case (ComponentBuilderKind.MessageComponent or ComponentBuilderKind.CXMessageComponent, ComponentBuilderKind
-                        .IMessageComponent):
+                    case (ComponentBuilderKind.MessageComponent or ComponentBuilderKind.CXMessageComponent,
+                        ComponentBuilderKind
+                            .IMessageComponent):
                         return $"{spread}{source}.SelectMany(x => x.Components)";
                     case (ComponentBuilderKind.MessageComponent, ComponentBuilderKind.IMessageComponentBuilder):
                         return $"{spread}{source}.SelectMany(x => x.Components.Select(x => x.ToBuilder()))";
@@ -151,7 +158,9 @@ public static class ComponentBuilderKindUtils
                     default:
                         var converter = ConvertBasic("x", fromBasicKind, toBasicKind);
                         return converter is not null
-                            ? $"{spread}{source}.Select(x => {converter})"
+                            ? converter is not "x"
+                                ? $"{spread}{source}.Select(x => {converter})"
+                                : $"{spread}{source}"
                             : null;
                 }
         }
@@ -227,5 +236,38 @@ public static class ComponentBuilderKindUtils
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
+    }
+
+    public static Result<string> Conform(
+        string code,
+        ComponentBuilderKind kind,
+        ComponentTypingContext typingContext,
+        ICXNode source
+    )
+    {
+        var value = Convert(
+            code,
+            kind,
+            typingContext.ConformingType,
+            typingContext.CanSplat
+        );
+
+        if (value is null)
+        {
+            /*
+             * we've failed to convert, this case implies that whatever the type of this interleaved node is, it doesn't
+             * conform to the current constraints
+             */
+
+            return Result<string>.FromDiagnostic(
+                Diagnostics.InvalidInterleavedComponentInCurrentContext(
+                    kind.ToString(),
+                    typingContext.ConformingType.ToString()
+                ),
+                source
+            );
+        }
+
+        return value;
     }
 }

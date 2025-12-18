@@ -23,7 +23,7 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
     private SyntaxTree? _tree;
     private Compilation _compilation;
 
-    public BaseGeneratorTest(ITestOutputHelper output)
+    public BaseGeneratorTest(ITestOutputHelper output) : base(output)
     {
         _output = output;
         _generator = new SourceGenerator();
@@ -45,7 +45,6 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
 
     public GeneratorDriverRunResult RunCX(
         string cx,
-        string? expected = null,
         string? pretext = null,
         bool allowParsingErrors = false,
         GeneratorOptions? options = null,
@@ -54,7 +53,8 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
         string testFuncName = "Run",
         bool hasInterpolations = true,
         int quoteCount = 3,
-        string[]? trackingNames = null
+        string[]? trackingNames = null,
+        bool pushDiagnostics = false
     )
     {
         var quotes = new string('"', quoteCount);
@@ -115,24 +115,16 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
 
         var result = RunGeneratorsAndAssertOutput(_compilation, trackingNames ?? AllTrackingNames);
 
-        // push diagnostics
-        base.PushDiagnostics(
-            result.Diagnostics.Select(x => new DiagnosticInfo(
-                x.Descriptor,
-                x.Location.SourceSpan
-            ))
-        );
-
-        if (expected is not null)
+        if (pushDiagnostics)
         {
-            var rendered = result.Results[0]
-                .TrackedSteps[TrackingNames.RENDER_GRAPH][0]
-                .Outputs[0].Value as RenderedGraph;
-
-            Assert.NotNull(rendered?.EmittedSource);
-
-            Assert.Equal(expected, rendered.EmittedSource);
+            base.PushDiagnostics(
+                result.Diagnostics.Select(x => new DiagnosticInfo(
+                    x.Descriptor,
+                    x.Location.SourceSpan
+                ))
+            );
         }
+       
 
         return result;
     }
@@ -146,13 +138,9 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
 
         var firstRunResult = _driver.GetRunResult();
 
-        LogRunVisual(firstRunResult);
-
         var secondRunResult = _driver
             .RunGenerators(clone)
             .GetRunResult();
-
-        //AssertRunEquals(firstRunResult, secondRunResult, trackingNames);
 
         if (!secondRunResult.Results[0].TrackedOutputSteps.IsEmpty)
         {
@@ -168,6 +156,22 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
         }
 
         return firstRunResult;
+    }
+
+    protected void AssertStepResult(GeneratorDriverRunResult result, string name, IncrementalStepRunReason step)
+    {
+        Assert.Equal(step, result.Results[0].TrackedSteps[name][0].Outputs[0].Reason);
+    }
+    
+    protected void AssertRenders(GeneratorDriverRunResult result, string expected)
+    {
+        var rendered = result.Results[0]
+            .TrackedSteps[TrackingNames.RENDER_GRAPH][0]
+            .Outputs[0].Value as RenderedGraph;
+
+        Assert.NotNull(rendered?.EmittedSource);
+
+        Assert.Equal(expected, rendered.EmittedSource);
     }
 
     protected T GetStepValue<T>(GeneratorDriverRunResult result, string name)

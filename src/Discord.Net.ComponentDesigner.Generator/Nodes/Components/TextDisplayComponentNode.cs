@@ -1,6 +1,7 @@
 ﻿using System;
 using Discord.CX.Parser;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -13,7 +14,7 @@ public sealed class TextDisplayComponentNode : ComponentNode
 
     public ComponentProperty Content { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     protected override bool AllowChildrenInCX => true;
 

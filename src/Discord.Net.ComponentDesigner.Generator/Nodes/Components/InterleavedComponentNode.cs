@@ -3,6 +3,7 @@ using Discord.CX.Parser;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
@@ -14,7 +15,20 @@ public sealed record InterleavedState(
     GraphNode OwningGraphNode,
     ICXNode Source,
     int InterpolationId
-) : ComponentState(OwningGraphNode, Source);
+) : ComponentState(OwningGraphNode, Source)
+{
+    public bool Equals(InterleavedState? other)
+    {
+        if (other is null) return false;
+
+        return
+            InterpolationId == other.InterpolationId &&
+            base.Equals(other);
+    }
+
+    public override int GetHashCode()
+        => Hash.Combine(InterpolationId, base.GetHashCode());
+}
 
 public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, IDynamicComponentNode
 {

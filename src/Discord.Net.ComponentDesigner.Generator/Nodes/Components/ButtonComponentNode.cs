@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using Discord.CX.Util;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -12,8 +13,19 @@ public sealed record ButtonComponentState(
     GraphNode OwningGraphNode,
     ICXNode Source,
     ButtonKind? InferredKind = null
-) : ComponentState(OwningGraphNode, Source);
+) : ComponentState(OwningGraphNode, Source)
+{
+    public bool Equals(ButtonComponentState? other)
+    {
+        if (other is null) return false;
 
+        return InferredKind == other.InferredKind && base.Equals(other);
+    }
+    
+
+    public override int GetHashCode()
+        => Hash.Combine(InferredKind, base.GetHashCode());
+}
 public enum ButtonKind
 {
     Default,
@@ -39,7 +51,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
     public override string Name => "button";
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public ComponentProperty Id { get; }
     public ComponentProperty Style { get; }
@@ -333,7 +345,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
             style = stylePropertyValue.Value is null
                 ? $"global::{BUTTON_STYLE_ENUM}.Primary"
-                : Style.Renderer(context, stylePropertyValue);
+                : Style.Renderer(context, stylePropertyValue, PropertyRenderingOptions.Default);
         }
 
         return style

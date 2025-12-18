@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Nodes.Components;
@@ -13,7 +14,7 @@ public sealed class MediaGalleryItemComponentNode : ComponentNode
     public ComponentProperty Description { get; }
     public ComponentProperty Spoiler { get; }
 
-    public override IReadOnlyList<ComponentProperty> Properties { get; }
+    public override ImmutableArray<ComponentProperty> Properties { get; }
 
     public MediaGalleryItemComponentNode()
     {

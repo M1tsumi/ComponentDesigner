@@ -2,10 +2,11 @@
 using Discord.CX.Nodes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.RendererTests;
 
-public sealed class StringTests : BaseRendererTest
+public sealed class StringTests(ITestOutputHelper output) : BaseRendererTest(output)
 {
     [Fact]
     public void BasicString()

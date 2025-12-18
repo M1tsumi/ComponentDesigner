@@ -3,10 +3,11 @@ using Discord.CX.Nodes;
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Xunit.Abstractions;
 
 namespace UnitTests.RendererTests;
 
-public abstract class BaseRendererTest : BaseTestWithDiagnostics
+public abstract class BaseRendererTest(ITestOutputHelper output) : BaseTestWithDiagnostics(output)
 {
     protected Compilation Compilation => _compilation ??= Compilations.Create();
 
@@ -29,7 +30,8 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
         bool requiresValue = true,
         bool isOptional = false,
         string? propertyName = null,
-        int? wrappingQuoteCount = null
+        int? wrappingQuoteCount = null,
+        PropertyRenderingOptions? options = null
     )
     {
         AssertEmptyDiagnostics();
@@ -75,8 +77,15 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
 
         var context = new MockComponentContext(
             Compilation,
-            parser?.Lexer.InterpolationMap ?? [],
-            interpolations ?? []
+            new CXDesignerGeneratorState(
+                cx ?? string.Empty,
+                default,
+                wrappingQuoteCount ?? 1,
+                true,
+                [..interpolations ?? []],
+                null!,
+                null!
+            )
         );
 
         var propValue = new MockPropertyValue(
@@ -87,10 +96,11 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
             isAttributeValue,
             requiresValue,
             isOptional,
-            propertyName ?? "test-property"
+            propertyName ?? "test-property",
+            value?.Span ?? default
         );
 
-        var result = renderer(context, propValue);
+        var result = renderer(context, propValue, options ?? PropertyRenderingOptions.Default);
 
         PushDiagnostics(result.Diagnostics);
 
@@ -99,7 +109,6 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
             Assert.True(result.HasResult);
             Assert.Equal(expected, result.Value);
         }
-        
     }
 
     private sealed record MockPropertyValue(
@@ -110,17 +119,17 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
         bool IsAttributeValue,
         bool RequiresValue,
         bool IsOptional,
-        string PropertyName
+        string PropertyName,
+        TextSpan Span
     ) : IComponentPropertyValue;
 
     private sealed class MockComponentContext : IComponentContext
     {
-        private readonly CXToken[] _interpolationMap;
-        private readonly DesignerInterpolationInfo[] _interpolations;
         private readonly Dictionary<string, int> _varsCount = [];
-        
+
         public KnownTypes KnownTypes => Compilation.GetKnownTypes();
         public Compilation Compilation { get; }
+        public CXDesignerGeneratorState CX { get; }
 
         public ComponentTypingContext RootTypingContext => ComponentTypingContext.Default;
 
@@ -138,13 +147,11 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
 
         public MockComponentContext(
             Compilation compilation,
-            CXToken[] interpolationMap,
-            DesignerInterpolationInfo[] interpolations
+            CXDesignerGeneratorState cx
         )
         {
-            _interpolationMap = interpolationMap;
-            _interpolations = interpolations;
             Compilation = compilation;
+            CX = cx;
         }
 
 
@@ -153,9 +160,9 @@ public abstract class BaseRendererTest : BaseTestWithDiagnostics
 
 
         public DesignerInterpolationInfo GetInterpolationInfo(int index)
-            => _interpolations[index];
+            => CX.InterpolationInfos[index];
 
         public DesignerInterpolationInfo GetInterpolationInfo(CXToken token)
-            => GetInterpolationInfo(Array.IndexOf(_interpolationMap, token));
+            => GetInterpolationInfo(token.InterpolationIndex!.Value);
     }
 }
