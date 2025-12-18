@@ -181,6 +181,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
             return new InvalidTypeState(context.GraphNode, context.CXNode, typeValue.Tokens.ToString());
 
         var defaults = new List<SelectMenuDefaultValue>();
+        var interpolatedOptions = new List<SelectMenuInterpolatedOption>();
 
         switch (kind)
         {
@@ -189,10 +190,42 @@ public sealed class SelectMenuComponentNode : ComponentNode
                 break;
             case SelectKind.String:
                 context.AddChildren(element.Children.OfType<CXElement>());
+                var candidates = GetCandidateInterpolationOptions(context.CXNode).ToArray();
+
+                foreach (var candidate in candidates)
+                {
+                    if (
+                        SelectMenuInterpolatedOption.TryCreate(
+                            context.GraphContext,
+                            candidate,
+                            diagnostics,
+                            out var option)
+                    ) interpolatedOptions.Add(option);
+                }
+
                 break;
         }
 
-        return new SelectState(context.GraphNode, context.CXNode, kind, [..defaults], []);
+        return new SelectState(context.GraphNode, context.CXNode, kind, [..defaults], [..interpolatedOptions]);
+
+        static IEnumerable<ICXNode> GetCandidateInterpolationOptions(ICXNode node)
+        {
+            if (node is not CXElement element) yield break;
+
+            foreach
+            (
+                var child
+                in element.Children.SelectMany(IEnumerable<ICXNode> (x) =>
+                    x is CXValue.Multipart mp ? mp.Tokens : [x]
+                )
+            )
+            {
+                if (
+                    child is CXToken { Kind: CXTokenKind.Interpolation } ||
+                    child is CXValue.Interpolation
+                ) yield return child;
+            }
+        }
 
         static IEnumerable<ICXNode> FlattenNode(CXNode node)
             => node switch
@@ -335,53 +368,6 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
     private static bool IsValidStringSelectChild(ComponentNode node)
         => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
-
-    public override ComponentState UpdateState(
-        ComponentState state,
-        IComponentContext context,
-        IList<DiagnosticInfo> diagnostics
-    )
-    {
-        if (state is SelectState { Kind: SelectKind.String } selectState)
-        {
-            // update interpolation candidates
-            var interpolatedOptions = new List<SelectMenuInterpolatedOption>();
-
-            var candidates = GetCandidateInterpolationOptions(state.Source).ToArray();
-
-            foreach (var candidate in candidates)
-            {
-                if (SelectMenuInterpolatedOption.TryCreate(context, candidate, diagnostics, out var option))
-                    interpolatedOptions.Add(option);
-            }
-
-            return selectState with
-            {
-                InterpolatedOptions = [..interpolatedOptions]
-            };
-        }
-
-        return state;
-
-        static IEnumerable<ICXNode> GetCandidateInterpolationOptions(ICXNode node)
-        {
-            if (node is not CXElement element) yield break;
-
-            foreach
-            (
-                var child
-                in element.Children.SelectMany(IEnumerable<ICXNode> (x) =>
-                    x is CXValue.Multipart mp ? mp.Tokens : [x]
-                )
-            )
-            {
-                if (
-                    child is CXToken { Kind: CXTokenKind.Interpolation } ||
-                    child is CXValue.Interpolation
-                ) yield return child;
-            }
-        }
-    }
 
     public override Result<string> Render(ComponentState state, IComponentContext context,
         ComponentRenderingOptions options)
