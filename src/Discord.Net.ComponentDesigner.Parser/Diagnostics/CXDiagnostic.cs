@@ -6,13 +6,23 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX.Parser;
 
+/// <summary>
+///     A data type describing a diagnostic emitted from the <see cref="CXParser"/>.
+/// </summary>
+/// <param name="Severity">The default severity of this diagnostic.</param>
+/// <param name="Code">The unique code of this diagnostic.</param>
+/// <param name="Message">A message describing the diagnostic in a human-readable way.</param>
 public readonly record struct CXDiagnosticDescriptor(
     DiagnosticSeverity Severity,
     CXErrorCode Code,
     string Message
 )
 {
-     public static CXDiagnosticDescriptor MissingElementClosingTag(CXToken? identifier)
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for a missing elements closing tag.
+    /// </summary>
+    /// <param name="identifier">The elements identifier who is missing a closing tag.</param>
+    public static CXDiagnosticDescriptor MissingElementClosingTag(CXToken? identifier)
         => new(
             DiagnosticSeverity.Error,
             CXErrorCode.MissingElementClosingTag,
@@ -21,27 +31,43 @@ public readonly record struct CXDiagnosticDescriptor(
                 : "Missing fragment closing tag"
         );
 
-     public static CXDiagnosticDescriptor InvalidRootElement(CXToken token)
-         => new(
-             DiagnosticSeverity.Error,
-             CXErrorCode.InvalidRootElement,
-             $"'{token.Kind}' is not a valid root element"
-         );
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an invalid root element.
+    /// </summary>
+    /// <param name="token">The token that caused this diagnostic to be produced.</param>
+    public static CXDiagnosticDescriptor InvalidRootElement(CXToken token)
+        => new(
+            DiagnosticSeverity.Error,
+            CXErrorCode.InvalidRootElement,
+            $"'{token.Kind}' is not a valid root element"
+        );
 
-     public static CXDiagnosticDescriptor InvalidElementChildToken(CXToken token)
-         => new(
-             DiagnosticSeverity.Error,
-             CXErrorCode.InvalidElementChildToken,
-             $"'{token.Kind}' is not a valid child of an element"
-         );
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an invalid child of an element.
+    /// </summary>
+    /// <param name="token">The token that caused this diagnostic to be produced.</param>
+    public static CXDiagnosticDescriptor InvalidElementChildToken(CXToken token)
+        => new(
+            DiagnosticSeverity.Error,
+            CXErrorCode.InvalidElementChildToken,
+            $"'{token.Kind}' is not a valid child of an element"
+        );
 
-     public static CXDiagnosticDescriptor InvalidStringLiteralToken(CXToken token)
-         => new(
-             DiagnosticSeverity.Error,
-             CXErrorCode.InvalidStringLiteralToken,
-             $"'{token.Kind}' is not valid within a string literal"
-         );
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an invalid string literal token.
+    /// </summary>
+    /// <param name="token">The token that caused this diagnostic to be produced.</param>
+    public static CXDiagnosticDescriptor InvalidStringLiteralToken(CXToken token)
+        => new(
+            DiagnosticSeverity.Error,
+            CXErrorCode.InvalidStringLiteralToken,
+            $"'{token.Kind}' is not valid within a string literal"
+        );
 
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an invalid attribute value.
+    /// </summary>
+    /// <param name="token">The token that caused this diagnostic to be produced.</param>
     public static CXDiagnosticDescriptor InvalidAttributeValue(CXToken token)
     {
         if (
@@ -64,6 +90,11 @@ public readonly record struct CXDiagnosticDescriptor(
         );
     }
 
+    /// <summary>
+    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an unexpected token.
+    /// </summary>
+    /// <param name="token">The token that caused this diagnostic to be produced.</param>
+    /// <param name="expected">The expected token kinds.</param>
     public static CXDiagnosticDescriptor UnexpectedToken(
         CXToken token,
         params CXTokenKind[] expected
@@ -73,6 +104,12 @@ public readonly record struct CXDiagnosticDescriptor(
         $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'"
     );
 
+    /// <summary>
+    ///     Formats an array of expected token kinds in a human-readable mannar.
+    /// </summary>
+    /// <param name="kinds">The different kinds of expected tokens.</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentOutOfRangeException">The <paramref name="kinds"/> array was empty.</exception>
     private static string FormatExpected(CXTokenKind[] kinds)
     {
         if (kinds.Length is 0) throw new ArgumentOutOfRangeException(nameof(kinds));
@@ -84,12 +121,22 @@ public readonly record struct CXDiagnosticDescriptor(
     }
 }
 
+/// <summary>
+///     A data type representing a diagnostic pointing to a specific location with a source. 
+/// </summary>
+/// <param name="Descriptor">The <see cref="CXDiagnosticDescriptor"/> describing the diagnostic.</param>
+/// <param name="Span">The location within the source this diagnostic points to.</param>
 public readonly record struct CXDiagnostic(
     CXDiagnosticDescriptor Descriptor,
     TextSpan Span
 )
 {
+    /// <inheritdoc cref="CXDiagnosticDescriptor.Severity"/>
     public DiagnosticSeverity Severity => Descriptor.Severity;
+    
+    /// <inheritdoc cref="CXDiagnosticDescriptor.Code"/>
     public CXErrorCode Code => Descriptor.Code;
+    
+    /// <inheritdoc cref="CXDiagnosticDescriptor.Message"/>
     public string Message => Descriptor.Message;
 }
