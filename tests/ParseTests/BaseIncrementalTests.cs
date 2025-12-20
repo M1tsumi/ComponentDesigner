@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using DiffPlex.DiffBuilder;
-using DiffPlex.DiffBuilder.Model;
 using Discord.CX;
 using Discord.CX.Parser;
 using Microsoft.CodeAnalysis.Text;

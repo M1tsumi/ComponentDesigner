@@ -5,7 +5,7 @@ namespace UnitTests.ParseTests;
 
 public sealed class IncrementalParsingTests(ITestOutputHelper output) : BaseIncrementalTests(output)
 {
-    // [Fact]
+    //[Fact]
     public void AttributeAdded()
     {
         Parse("<foo />");
@@ -30,6 +30,72 @@ public sealed class IncrementalParsingTests(ITestOutputHelper output) : BaseIncr
                     Ident("bar", reused: false);
                 }
 
+                T(CXTokenKind.ForwardSlashGreaterThan, reused: true);
+            }
+        }
+    }
+    
+    //[Fact]
+    public void AttributeRemoved()
+    {
+        Parse("<foo bar />");
+        {
+            Element();
+            {
+                T(CXTokenKind.LessThan);
+                Ident("foo");
+                
+                Attribute();
+                {
+                    Ident("bar");
+                }
+                
+                T(CXTokenKind.ForwardSlashGreaterThan);
+            }
+        }
+
+        Parse("<foo />");
+        {
+            Element(reused: false);
+            {
+                T(CXTokenKind.LessThan, reused: true);
+                Ident("foo", reused: true);
+                T(CXTokenKind.ForwardSlashGreaterThan, reused: true);
+            }
+        }
+    }
+    
+    //[Fact]
+    public void AttributeNameChange()
+    {
+        Parse("<foo bar />");
+        {
+            Element();
+            {
+                T(CXTokenKind.LessThan);
+                Ident("foo");
+                
+                Attribute();
+                {
+                    Ident("bar");
+                }
+                
+                T(CXTokenKind.ForwardSlashGreaterThan);
+            }
+        }
+
+        Parse("<foo baz/>");
+        {
+            Element(reused: false);
+            {
+                T(CXTokenKind.LessThan, reused: true);
+                Ident("foo", reused: true);
+                
+                Attribute(reused: false);
+                {
+                    Ident("baz", reused: false);
+                }
+                
                 T(CXTokenKind.ForwardSlashGreaterThan, reused: true);
             }
         }
