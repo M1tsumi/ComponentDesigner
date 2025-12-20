@@ -103,7 +103,7 @@ public sealed class CXDocument : CXNode
     /// </param>
     /// <param name="token">A cancellation token used to cancel incremental parsing.</param>
     /// <returns>A new <see cref="CXDocument"/> containing the new AST tree.</returns>
-    [Obsolete("This is untested and most likely doesn't work anymore", error: true)]
+    [Obsolete("This is untested and most likely doesn't work anymore")]
     public CXDocument IncrementalParse(
         CXSourceReader reader,
         IReadOnlyList<TextChange> changes,

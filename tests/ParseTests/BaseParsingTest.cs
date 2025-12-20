@@ -58,8 +58,11 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
 
         Document = new CXDocument(parser, nodes);
 
-        output.WriteLine($"AST:\n{Document.ToStructuralFormat()}");
-        output.WriteLine($"DOT:\n{Document.ToDOTFormat()}");
+        var structural = Document.ToStructuralFormat();
+        var dot = Document.ToDOTFormat();
+        
+        output.WriteLine($"AST:\n{structural}");
+        output.WriteLine($"DOT:\n{dot}");
 
         if (!allowErrors) Assert.False(Document.HasErrors);
 
