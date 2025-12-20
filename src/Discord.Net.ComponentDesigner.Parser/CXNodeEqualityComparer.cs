@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
@@ -19,13 +20,16 @@ public sealed class CXNodeEqualityComparer(
     public static readonly CXNodeEqualityComparer Default = new();
 
     /// <inheritdoc/>
-    public bool Equals(ICXNode x, ICXNode y)
+    public bool Equals(ICXNode? x, ICXNode? y)
     {
+        if (x is null) return y is null;
+        if (y is null) return false;
+        
         if (ReferenceEquals(x, y)) return true;
 
         if (
             (flags & SyntaxEqualityFlags.CompareSourceDocument) != 0 &&
-            (!x.Document?.Equals(y.Document) ?? y.Document is not null)
+            !ReferenceEquals(x.Document, y.Document)
         )
         {
             return false;
@@ -55,10 +59,46 @@ public sealed class CXNodeEqualityComparer(
             !x.Span.Equals(y.Span)
         ) return false;
 
-        return x.Equals(y);
+        return (x, y) switch
+        {
+            (CXToken t1, CXToken t2) =>
+                t1.Kind == t2.Kind &&
+                t1.Value == t2.Value,
+            (CXNode n1, CXNode n2) =>
+                n1.Slots.SequenceEqual(n2.Slots, this),
+            
+            // 'CXNode' should handle this case, but add it just in case.
+            (ICXCollection c1, ICXCollection c2) => 
+                c1.ToList().SequenceEqual(c2.ToList(), this),
+            
+            // no matching types, they don't equal
+            _ => false
+        };
     }
 
     /// <inheritdoc/>
     public int GetHashCode(ICXNode obj)
-        => obj.GetHashCode();
+    {
+        var hash = 0;
+
+        if ((flags & SyntaxEqualityFlags.CompareLocation) != 0)
+            hash = Hash.Combine(hash, obj.Span);
+
+        if ((flags & SyntaxEqualityFlags.CompareTrivia) != 0)
+            hash = Hash.Combine(hash, obj.LeadingTrivia, obj.TrailingTrivia);
+
+        if ((flags & SyntaxEqualityFlags.CompareDiagnostics) != 0)
+            hash = Hash.Combine(hash, obj.Diagnostics.Aggregate(0, Hash.Combine));
+
+        return Hash.Combine(
+            hash,
+            obj switch
+            {
+                CXToken token => Hash.Combine(token.Kind, token.Value),
+                CXNode node => node.Slots.Aggregate(0, Hash.Combine),
+                ICXCollection col => col.ToList().Aggregate(0, Hash.Combine),
+                _ => 0
+            }
+        );
+    }
 }

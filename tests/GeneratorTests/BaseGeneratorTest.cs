@@ -184,7 +184,8 @@ public abstract class BaseGeneratorTest : BaseTestWithDiagnostics, IDisposable
     
     protected void LogRunVisual(GeneratorDriverRunResult result)
     {
-        var tree = _generator.Provider
+        var tree = _generator
+            .Provider
             .ToDOTTree(
                 result.Results[0]
                     .TrackedSteps

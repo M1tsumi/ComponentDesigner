@@ -48,5 +48,6 @@ public sealed class FileComponentNode : ComponentNode
                     .PrefixIfSome(4)
                     .WrapIfSome(Environment.NewLine)
             })"
-        );
+        )
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

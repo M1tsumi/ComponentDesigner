@@ -122,21 +122,20 @@ public static partial class ASTFormatter
                         var prop = props[i];
 
                         if (
-                            !prop.GetMethod.IsPublic ||
+                            !prop.GetMethod!.IsPublic ||
                             prop.GetIndexParameters().Length is not 0 ||
                             prop.Name
                             is nameof(ICXNode.Parent)
                             or nameof(ICXNode.Document)
                             or nameof(ICXNode.Slots)
-                            or nameof(CXNode.Parser)
                             or nameof(CXNode.FirstTerminal)
                             or nameof(CXNode.LastTerminal)
                             or nameof(CXNode.Descendants)
                             or nameof(CXNode.Ancestors)
-                            or nameof(CXNode.Offset)
+                            or "Offset"
                             or nameof(CXNode.Width)
                             or nameof(CXNode.GraphWidth)
-                            or nameof(CXDocument.Source)
+                            or "Source"
                             or nameof(CXDocument.Tokens)
                             or nameof(CXDocument.StringTable)
                             or nameof(CXElement.IsFragment)

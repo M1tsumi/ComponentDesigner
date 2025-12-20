@@ -83,5 +83,6 @@ public sealed class FileUploadComponentNode : ComponentNode
                     .PrefixIfSome(4)
                     .WrapIfSome(Environment.NewLine)
             })"
-        );
+        )
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

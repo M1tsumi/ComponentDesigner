@@ -62,14 +62,14 @@ partial class ASTFormatter
                 {
                     AddEdges(
                         i,
-                        cxElement.ElementStartOpenToken,
-                        cxElement.ElementStartNameToken,
-                        cxElement.Attributes,
-                        cxElement.ElementStartCloseToken,
+                        cxElement.OpeningTag.StartToken,
+                        cxElement.OpeningTag.IdentifierToken,
+                        cxElement.OpeningTag.Attributes,
+                        cxElement.OpeningTag.EndToken,
                         cxElement.Children,
-                        cxElement.ElementEndOpenToken,
-                        cxElement.ElementEndNameToken,
-                        cxElement.ElementEndCloseToken
+                        cxElement.ClosingTag.StartToken,
+                        cxElement.ClosingTag.IdentifierToken,
+                        cxElement.ClosingTag.EndToken
                     );
 
                     break;
@@ -77,7 +77,7 @@ partial class ASTFormatter
                 case CXAttribute cxAttribute:
                     AddEdges(
                         i,
-                        cxAttribute.Identifier,
+                        cxAttribute.IdentifierToken,
                         cxAttribute.EqualsToken,
                         cxAttribute.Value
                     );

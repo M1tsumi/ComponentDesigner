@@ -51,7 +51,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
         _updateDiagnostics = updateDiagnostics;
 
         Diagnostics = updateDiagnostics is not null
-            ? [..diagnostics, ..updateDiagnostics]
+            ? [..diagnostics, ..updateDiagnostics.Value]
             : diagnostics;
     }
 
@@ -71,10 +71,12 @@ public sealed class CXGraph : IEquatable<CXGraph>
 
         var doc = CXParser.Parse(reader, token);
 
-        var parserDiagnostics = doc.Diagnostics.Select(x => new DiagnosticInfo(
-            Discord.CX.Diagnostics.CreateParsingDiagnostic(x),
-            x.Span
-        ));
+        var parserDiagnostics = doc
+            .AllDiagnostics
+            .Select(x => new DiagnosticInfo(
+                Discord.CX.Diagnostics.CreateParsingDiagnostic(x),
+                x.Span
+            ));
 
         if (doc.HasErrors)
         {
@@ -282,8 +284,11 @@ public sealed class CXGraph : IEquatable<CXGraph>
                 return [];
         }
 
-        static IEnumerable<GraphNode> CreateElementNodes(CXElement element, GraphNode? parent,
-            GraphInitializationContext context)
+        static IEnumerable<GraphNode> CreateElementNodes(
+            CXElement element,
+            GraphNode? parent,
+            GraphInitializationContext context
+        )
         {
             if (element.IsFragment)
             {
@@ -409,7 +414,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
             node
         );
 
-        if (state?.Source is CXElement { Attributes: { Count: > 0 } attributes })
+        if (state?.Source is CXElement { OpeningTag.Attributes: { Count: > 0 } attributes })
         {
             foreach (var attribute in attributes)
             {

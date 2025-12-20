@@ -20,9 +20,10 @@ public interface ICXNode : IEquatable<ICXNode>
     TextSpan Span { get; }
 
     /// <summary>
-    ///     Gets the width in characters of this node.
+    ///     Gets the full width in characters of this node.
     /// </summary>
     int Width { get; }
+    
 
     /// <summary>
     ///     Gets the width of this node in the AST.
@@ -36,12 +37,7 @@ public interface ICXNode : IEquatable<ICXNode>
     ///     Gets whether this node contains any <see cref="CXDiagnostic"/> with an error severity. 
     /// </summary>
     bool HasErrors { get; }
-
-    /// <summary>
-    ///     Gets a read-only collection of diagnostics relating to this node.
-    /// </summary>
-    IReadOnlyList<CXDiagnostic> Diagnostics { get; }
-
+    
     /// <summary>
     ///     Gets or sets the non-terminal parent of this node.
     /// </summary>
@@ -73,6 +69,11 @@ public interface ICXNode : IEquatable<ICXNode>
     ///     Gets the lexed trailing trivia belonging to this node.
     /// </summary>
     LexedCXTrivia TrailingTrivia { get; }
+    
+    /// <summary>
+    ///     Gets a read-only list of diagnostic descriptors relating to this node.
+    /// </summary>
+    internal IReadOnlyList<CXDiagnosticDescriptor> DiagnosticDescriptors { get; init; }
     
     /// <summary>
     ///     Resets any computations that this node has cached.

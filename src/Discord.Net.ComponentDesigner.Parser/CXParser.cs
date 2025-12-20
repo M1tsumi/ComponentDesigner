@@ -176,9 +176,9 @@ public sealed class CXParser
 
         return new CXValue.Invalid()
         {
-            Diagnostics =
+            DiagnosticDescriptors = 
             [
-                CXDiagnostic.InvalidRootElement(CurrentToken)
+                CXDiagnosticDescriptor.InvalidRootElement(CurrentToken)
             ]
         };
     }
@@ -205,7 +205,7 @@ public sealed class CXParser
         // reset the lexer mode to default.
         using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
 
-        var diagnostics = new List<CXDiagnostic>();
+        var diagnostics = new List<CXDiagnosticDescriptor>();
 
         var start = Expect(CXTokenKind.LessThan);
 
@@ -246,10 +246,10 @@ public sealed class CXParser
 
                 ParseClosingElement(
                     end,
+                    diagnostics,
                     out var endStart,
                     out var endIdent,
-                    out var endClose,
-                    out var onCreate
+                    out var endClose
                 );
 
                 var element = new CXElement(
@@ -261,9 +261,8 @@ public sealed class CXParser
                     endStart,
                     endIdent,
                     endClose
-                ) { Diagnostics = diagnostics };
+                ) { DiagnosticDescriptors = diagnostics };
 
-                onCreate?.Invoke(element);
 
                 return element;
 
@@ -281,14 +280,12 @@ public sealed class CXParser
 
         void ParseClosingElement(
             CXToken elementEnd,
+            List<CXDiagnosticDescriptor> diagnostics,
             out CXToken elementEndStart,
             out CXToken? elementEndIdent,
-            out CXToken elementEndClose,
-            out Action<CXElement>? onCreate
+            out CXToken elementEndClose
         )
         {
-            onCreate = null;
-
             /*
              * store a sentinel to roll back to if the element closing tag is semantically incorrect. We'll roll back
              * in that case and assume that the tokens consumed were not meant for us.
@@ -334,7 +331,7 @@ public sealed class CXParser
             )
             {
                 // add the diagnostic to the node
-                onCreate = node => { node.AddDiagnostic(CXDiagnostic.MissingElementClosingTag(identifier, node)); };
+                diagnostics.Add(CXDiagnosticDescriptor.MissingElementClosingTag(identifier));
 
                 // create the missing tokens for the element.
                 elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash);
@@ -368,7 +365,7 @@ public sealed class CXParser
         }
 
         var children = new List<CXNode>();
-        var diagnostics = new List<CXDiagnostic>();
+        var diagnostics = new List<CXDiagnosticDescriptor>();
 
         // set the lexer mode to element values
         using (Lexer.SetMode(CXLexer.LexMode.ElementValue))
@@ -380,7 +377,7 @@ public sealed class CXParser
             }
         }
 
-        return new CXCollection<CXNode>(children) { Diagnostics = diagnostics };
+        return new CXCollection<CXNode>(children) { DiagnosticDescriptors = diagnostics };
     }
 
     /// <summary>
@@ -398,7 +395,7 @@ public sealed class CXParser
     /// <exception cref="InvalidOperationException">
     ///     An unhandled token kind was included for a <see cref="CXValue.Multipart"/>.
     /// </exception>
-    internal bool TryParseElementChild(List<CXDiagnostic> diagnostics, out CXNode node)
+    internal bool TryParseElementChild(List<CXDiagnosticDescriptor> diagnostics, out CXNode node)
     {
         // check for incremental node
         if (IsIncremental && CurrentBlendedASTNode is CXValue or CXElement)
@@ -435,7 +432,7 @@ public sealed class CXParser
                 // we've got something we're not expecting, add a diagnostic and get out.
                 default:
                     if (parts.Count is 0)
-                        diagnostics.Add(CXDiagnostic.InvalidElementChildToken(CurrentToken));
+                        diagnostics.Add(CXDiagnosticDescriptor.InvalidElementChildToken(CurrentToken));
 
                     goto case CXTokenKind.Invalid;
             }
@@ -608,9 +605,9 @@ public sealed class CXParser
                 default:
                     return new CXValue.Invalid()
                     {
-                        Diagnostics =
+                        DiagnosticDescriptors =
                         [
-                            CXDiagnostic.InvalidAttributeValue(CurrentToken)
+                            CXDiagnosticDescriptor.InvalidAttributeValue(CurrentToken)
                         ]
                     };
             }
@@ -637,7 +634,7 @@ public sealed class CXParser
             return value;
         }
 
-        var diagnostics = new List<CXDiagnostic>();
+        var diagnostics = new List<CXDiagnosticDescriptor>();
         var tokens = new List<CXToken>();
 
         // expect a string literal start
@@ -673,7 +670,7 @@ public sealed class CXParser
                 // anything else is not expected
                 default:
                     diagnostics.Add(
-                        CXDiagnostic.InvalidStringLiteralToken(CurrentToken)
+                        CXDiagnosticDescriptor.InvalidStringLiteralToken(CurrentToken)
                     );
                     goto end;
             }
@@ -687,7 +684,7 @@ public sealed class CXParser
             stringLiteralStartToken,
             new CXCollection<CXToken>(tokens),
             stringLiteralEndToken
-        ) { Diagnostics = diagnostics };
+        ) { DiagnosticDescriptors = diagnostics };
     }
 
     /// <summary>
@@ -763,7 +760,10 @@ public sealed class CXParser
 
                 return CXToken.CreateMissing(
                     kinds[0],
-                    CXDiagnostic.UnexpectedToken(current, kinds.ToArray())
+                    current.Value,
+                    current.LeadingTrivia,
+                    current.TrailingTrivia,
+                    CXDiagnosticDescriptor.UnexpectedToken(current, kinds.ToArray())
                 );
         }
     }
@@ -782,7 +782,10 @@ public sealed class CXParser
         {
             return CXToken.CreateMissing(
                 kind,
-                CXDiagnostic.UnexpectedToken(token, kind)
+                token.Value,
+                token.LeadingTrivia,
+                token.TrailingTrivia,
+                CXDiagnosticDescriptor.UnexpectedToken(token, kind)
             );
         }
 

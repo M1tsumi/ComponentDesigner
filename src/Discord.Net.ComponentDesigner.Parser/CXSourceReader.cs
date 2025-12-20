@@ -12,8 +12,8 @@ using RelativeTextSpan = TextSpan;
 using NormalizedTextSpan = TextSpan;
 
 /// <summary>
-///     Represents a class used to read from a <see cref="CXSourceText"/> and understand additional language features like
-///     interpolations and source location offsetting. 
+///     Represents a class used to read from a <see cref="CXSourceText"/> and understand additional language features
+///     like interpolations and source location offsetting. 
 /// </summary>
 public sealed class CXSourceReader
 {

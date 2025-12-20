@@ -48,7 +48,7 @@ public sealed class ButtonTests(ITestOutputHelper output) : BaseComponentTest(ou
         {
             var button = Node<ButtonComponentNode>(out var buttonNode);
 
-            var id = buttonNode.State.GetProperty(button.Id);
+            var id = buttonNode.State!.GetProperty(button.Id);
             var customId = buttonNode.State.GetProperty(button.CustomId);
             var style = buttonNode.State.GetProperty(button.Style);
             var label = buttonNode.State.GetProperty(button.Label);
@@ -95,7 +95,7 @@ public sealed class ButtonTests(ITestOutputHelper output) : BaseComponentTest(ou
         {
             var button = Node<ButtonComponentNode>(out var buttonNode);
 
-            var sku = buttonNode.State.GetProperty(button.SkuId);
+            var sku = buttonNode.State!.GetProperty(button.SkuId);
             var url = buttonNode.State.GetProperty(button.Url);
 
             Assert.NotNull(sku.Attribute);

@@ -169,7 +169,7 @@ public sealed class SelectMenuComponentNode : ComponentNode
         if (context.CXNode is not CXElement element) return null;
 
         var typeAttribute = element.Attributes
-            .FirstOrDefault(x => x.Identifier.Value.ToLowerInvariant() is "type");
+            .FirstOrDefault(x => x.Identifier.ToLowerInvariant() is "type");
 
         if (typeAttribute is null)
             return new MissingTypeState(context.GraphNode, context.CXNode);
@@ -369,8 +369,11 @@ public sealed class SelectMenuComponentNode : ComponentNode
     private static bool IsValidStringSelectChild(ComponentNode node)
         => node is IDynamicComponentNode or SelectMenuOptionComponentNode;
 
-    public override Result<string> Render(ComponentState state, IComponentContext context,
-        ComponentRenderingOptions options)
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    )
     {
         if (state is not SelectState selectState) return default;
 
@@ -430,7 +433,8 @@ public sealed class SelectMenuComponentNode : ComponentNode
                              .WrapIfSome(Environment.NewLine)
                      })
                      """;
-            });
+            })
+            .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 
         static IEnumerable<ComponentNodeRenderer<SelectState>> GetStringSelectOrderedChildrenRenderers(
             SelectState state,

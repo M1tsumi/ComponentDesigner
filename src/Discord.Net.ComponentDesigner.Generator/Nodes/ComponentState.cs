@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Discord.CX.Nodes.Components;
 using Discord.CX.Util;
 
 namespace Discord.CX.Nodes;
@@ -33,7 +34,7 @@ public record ComponentState(
         var attribute = (Source as CXElement)?
             .Attributes
             .FirstOrDefault(x =>
-                property.Name == x.Identifier.Value || property.Aliases.Contains(x.Identifier.Value)
+                property.Name == x.Identifier || property.Aliases.Contains(x.Identifier)
             );
 
         GraphNode? node = null;
@@ -59,7 +60,7 @@ public record ComponentState(
             diagnostics.Add(
                 Diagnostics.PropertyNotAllowed(
                     OwningGraphNode?.Inner.Name ?? "Unknown",
-                    propertyValue.Attribute!.Identifier.Value
+                    propertyValue.Attribute!.IdentifierToken.Value
                 ),
                 propertyValue.Attribute
             );
@@ -113,7 +114,7 @@ public record ComponentState(
     {
         foreach (var child in Children)
         {
-            if (ReferenceEquals(child.State.Source, node))
+            if (ReferenceEquals(child.State!.Source, node))
             {
                 childGraphNode = child;
                 return true;
@@ -215,6 +216,9 @@ public record ComponentState(
             .Map(x => string.Join($",{Environment.NewLine}", x));
     }
 
+    public Func<string, Result<string>> ConformResult(ComponentBuilderKind kind, ComponentTypingContext? context)
+        => ComponentBuilderKindUtils.Conform(Source, kind, context);
+    
     public virtual bool Equals(ComponentState? other)
     {
         if (other is null) return false;

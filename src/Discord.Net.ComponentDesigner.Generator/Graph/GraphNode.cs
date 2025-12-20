@@ -11,7 +11,11 @@ public sealed class GraphNode : IEquatable<GraphNode>
 {
     public ComponentNode Inner { get; }
 
-    public ComponentState? State { get; set; }
+    public ComponentState State
+    {
+        get => _state ?? throw new InvalidOperationException("Attempt to access node state before initialization");
+        set => _state = value;
+    }
 
     public List<GraphNode> Children { get; }
 
@@ -19,6 +23,7 @@ public sealed class GraphNode : IEquatable<GraphNode>
 
     public GraphNode? Parent { get; private set; }
 
+    private ComponentState? _state;
     private Result<string>? _render;
 
     public GraphNode(
@@ -31,7 +36,7 @@ public sealed class GraphNode : IEquatable<GraphNode>
     )
     {
         Inner = inner;
-        State = state;
+        _state = state;
         Children = children;
         AttributeNodes = attributeNodes;
         Parent = parent;
@@ -67,8 +72,8 @@ public sealed class GraphNode : IEquatable<GraphNode>
             recreate |= !ReferenceEquals(child, attrNodes[i]);
         }
         
-        var newState = State is null ? State : Inner.UpdateState(State, context, diagnostics);
-        recreate |= (!newState?.Equals(State) ?? State is not null);
+        var newState = _state is null ? _state : Inner.UpdateState(_state, context, diagnostics);
+        recreate |= (!newState?.Equals(_state) ?? _state is not null);
         
         if (recreate)
         {
@@ -83,26 +88,46 @@ public sealed class GraphNode : IEquatable<GraphNode>
 
         return this;
     }
-
+    
     public Result<string> Render(IComponentContext context, ComponentRenderingOptions options = default)
     {
         // state is late-bound
-        Debug.Assert(State is not null);
+        Debug.Assert(_state is not null, "State should not be null by render time");
 
         return _render ??= Inner.Render(State!, context, options);
     }
 
     public void Validate(IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
-        if (State is not null)
+        // state is late-bound
+        Debug.Assert(_state is not null, "State should not be null by validation time");
+        
+        if (_state is not null)
             Inner.Validate(State, context, diagnostics);
 
         foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context, diagnostics);
         foreach (var child in Children) child.Validate(context, diagnostics);
     }
 
+    public string ToPathString()
+    {
+        var nodes = new List<GraphNode>();
+
+        var current = this;
+
+        while (current is not null)
+        {
+            nodes.Add(current);
+            current = current.Parent;
+        }
+
+        nodes.Reverse();
+
+        return string.Join(" -> ", nodes.Select(x => x.Inner.Name));
+    }
+    
     public bool Equals(GraphNode other)
-        => (State?.Equals(other.State) ?? other.State is null) &&
+        => (_state?.Equals(other.State) ?? other._state is null) &&
            Inner.Equals(other.Inner) &&
            Children.SequenceEqual(other.Children) &&
            AttributeNodes.SequenceEqual(other.AttributeNodes);
@@ -111,5 +136,5 @@ public sealed class GraphNode : IEquatable<GraphNode>
         => obj is GraphNode other && Equals(other);
 
     public override int GetHashCode()
-        => Hash.Combine(Inner, State, Children.Aggregate(0, Hash.Combine), AttributeNodes.Aggregate(0, Hash.Combine));
+        => Hash.Combine(Inner, _state, Children.Aggregate(0, Hash.Combine), AttributeNodes.Aggregate(0, Hash.Combine));
 }

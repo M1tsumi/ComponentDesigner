@@ -159,7 +159,7 @@ public sealed class ContainerTests(ITestOutputHelper output) : BaseComponentTest
         );
         {
             var container = Node<ContainerComponentNode>(out var graphNode);
-            var color = graphNode.State.GetProperty(container.AccentColor);
+            var color = graphNode.State!.GetProperty(container.AccentColor);
 
             Assert.True(color.IsSpecified);
             Assert.True(color.HasValue);

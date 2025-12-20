@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Discord.CX.Parser;
 using Discord.CX.Util;
@@ -20,6 +21,10 @@ public sealed record FunctionalComponentState(
     ComponentBuilderKind? ChildrenComponentKind
 ) : ComponentState(OwningGraphNode, Source)
 {
+    [MemberNotNullWhen(true, nameof(ChildrenParameter), nameof(ChildrenComponentKind))]
+    public bool HasComponentChildren
+        => ChildrenParameter is not null && ChildrenComponentKind is not null and not ComponentBuilderKind.None;
+
     public new CXElement Source { get; init; } = Source;
 
     public bool Equals(FunctionalComponentState? other)
@@ -301,7 +306,7 @@ public sealed class FunctionalComponentNode :
 
             var property = new ComponentProperty(
                 parameter.Name,
-                isOptional: parameter.HasExplicitDefaultValue || childParameterAttribute is not null,
+                isOptional: parameter.HasExplicitDefaultValue,
                 renderer: renderer
             );
 
@@ -353,7 +358,7 @@ public sealed class FunctionalComponentNode :
         if (ComponentBuilderKindUtils.IsValidComponentBuilderType(childrenType, compilation, out var kind))
         {
             childrenKind = kind;
-            return RenderElementChildren;
+            return Renderers.DefaultRenderer;
         }
 
         childrenKind = null;
@@ -386,96 +391,90 @@ public sealed class FunctionalComponentNode :
         }
 
         return Renderers.CreateRenderer(compilation, childrenType);
+    }
 
+    private static Result<string> RenderElementChildren(
+        FunctionalComponentState state,
+        IComponentContext context,
+        PropertyRenderingOptions options
+    )
+    {
+        if (state.Source.Children.Count is 0 || state.ChildrenComponentKind is null or ComponentBuilderKind.None)
+            return string.Empty;
 
-        static Result<string> RenderElementChildren(
-            IComponentContext context,
-            IComponentPropertyValue value,
-            PropertyRenderingOptions options
-        )
+        var graphIndex = 0;
+
+        var renderers = new List<BoundComponentNodeRenderer>();
+        var nodes = new List<ICXNode>();
+
+        foreach (var child in state.Source.Children)
         {
-            if (value.Node?.State is not FunctionalComponentState state) return default;
-
-            if (state.Source.Children.Count is 0) return string.Empty;
-
-            var graphIndex = 0;
-
-            var result = new List<Result<string>>();
-
-            foreach (var child in state.Source.Children)
+            switch (child)
             {
-                switch (child)
+                case CXElement element:
                 {
-                    case CXElement element:
-                    {
-                        var index = graphIndex++;
-                        var graphNode = state.OwningGraphNode.Children.ElementAtOrDefault(index);
+                    var index = graphIndex++;
+                    var graphNode = state.OwningGraphNode.Children.ElementAtOrDefault(index);
 
-                        if (graphNode is null)
+                    if (graphNode is null)
+                    {
+                        // diagnostics should come from that nodes attempt to create state, we can just bail
+                        return Result<string>.Empty;
+                    }
+
+                    renderers.Add(graphNode.Render);
+                    nodes.Add(element);
+                    break;
+                }
+                case CXValue.Interpolation interpolation:
+                {
+                    renderers.Add(Interpolation(interpolation, context.GetInterpolationInfo(interpolation)));
+                    nodes.Add(interpolation);
+                    break;
+                }
+                case CXValue.Multipart multipart:
+                {
+                    foreach (var token in multipart.Tokens)
+                    {
+                        nodes.Add(token);
+
+                        if (token.InterpolationIndex is { } index)
                         {
-                            // diagnostics should come from that nodes attempt to create state, we can just bail
-                            return default;
+                            renderers.Add(Interpolation(token, context.GetInterpolationInfo(index)));
                         }
-
-                        result.Add(graphNode.Render(context, options.ToComponentOptions()));
-                        break;
-                    }
-                    case CXValue.Interpolation interpolation:
-                    {
-                        result.Add(Interpolation(
-                            context,
-                            interpolation,
-                            context.GetInterpolationInfo(interpolation),
-                            options
-                        ));
-                        break;
-                    }
-                    case CXValue.Multipart multipart:
-                    {
-                        foreach (var part in multipart.Tokens)
+                        else
                         {
-                            if (part.InterpolationIndex is { } index)
-                            {
-                                result.Add(Interpolation(
-                                    context,
-                                    part,
-                                    context.GetInterpolationInfo(index),
-                                    options
-                                ));
-                                continue;
-                            }
-
-                            result.Add(
-                                Result<string>.FromDiagnostic(
-                                    Diagnostics.UnknownComponent(part.Kind.ToString()),
-                                    part
+                            renderers.Add((componentContext, renderingOptions) => new DiagnosticInfo(
+                                    Diagnostics.TypeMismatch("component", token.Kind.ToString()),
+                                    token
                                 )
                             );
                         }
-
-                        break;
                     }
-                    default:
-                        result.Add(
-                            Result<string>.FromDiagnostic(
-                                Diagnostics.UnknownComponent(child.GetType().Name),
-                                child
-                            )
-                        );
-                        break;
+
+                    break;
                 }
+                default:
+                    renderers.Add((componentContext, renderingOptions) => new DiagnosticInfo(
+                            Diagnostics.TypeMismatch("component", child.GetType().Name),
+                            child
+                        )
+                    );
+                    nodes.Add(child);
+                    break;
             }
+        }
 
-            return result
-                .FlattenAll()
-                .Map(x => string.Join($",{Environment.NewLine}", x));
+        return CreateChildMapper(state.ChildrenComponentKind.Value)(
+            state,
+            context,
+            state.ChildrenParameter!,
+            renderers,
+            nodes
+        );
 
-            static Result<string> Interpolation(
-                IComponentContext context,
-                ICXNode source,
-                DesignerInterpolationInfo info,
-                PropertyRenderingOptions options
-            )
+        static BoundComponentNodeRenderer Interpolation(ICXNode node, DesignerInterpolationInfo info)
+            => (context, options) =>
             {
                 if (
                     !ComponentBuilderKindUtils.IsValidComponentBuilderType(
@@ -485,26 +484,142 @@ public sealed class FunctionalComponentNode :
                     )
                 )
                 {
-                    return Result<string>.FromDiagnostic(
-                        Diagnostics.UnknownComponent(info.Symbol!.ToDisplayString()),
-                        source
+                    return new DiagnosticInfo(
+                        Diagnostics.TypeMismatch("component", info.Symbol!.ToDisplayString()),
+                        node
                     );
                 }
 
-                return ComponentBuilderKindUtils.Conform(
-                    context.GetDesignerValue(info, info.Symbol!.ToDisplayString()),
-                    kind,
-                    options.TypingContext ?? context.RootTypingContext,
-                    source
+                var source = context.GetDesignerValue(info, info.Symbol!.ToDisplayString());
+
+                return ComponentBuilderKindUtils
+                    .Conform(
+                        source,
+                        kind,
+                        options.TypingContext ?? context.RootTypingContext,
+                        node
+                    );
+            };
+    }
+
+    private delegate Result<string> ChildMapper(
+        FunctionalComponentState state,
+        IComponentContext context,
+        ComponentProperty property,
+        IReadOnlyList<BoundComponentNodeRenderer> renderers,
+        IReadOnlyList<ICXNode> nodes
+    );
+
+    private static ChildMapper CreateChildMapper(
+        ComponentBuilderKind kind
+    )
+    {
+        switch (kind)
+        {
+            case ComponentBuilderKind.IMessageComponentBuilder:
+            case ComponentBuilderKind.IMessageComponent:
+                return (state, context, property, renderers, nodes) =>
+                    renderers.Count switch
+                    {
+                        0 => property.IsOptional
+                            ? "default"
+                            : new DiagnosticInfo(
+                                Diagnostics.MissingRequiredProperty(state.MethodReference, property.Name),
+                                state.Source
+                            ),
+                        1 => renderers[0](context, new(new(
+                            CanSplat: false,
+                            kind
+                        ))),
+                        _ => new DiagnosticInfo(
+                            Diagnostics.InvalidChildComponentCardinality(state.Identifier),
+                            TextSpan.FromBounds(nodes[0].Span.Start, nodes[nodes.Count - 1].Span.End)
+                        )
+                    };
+            case ComponentBuilderKind.CXMessageComponent:
+            case ComponentBuilderKind.MessageComponent:
+                return (state, context, property, renderers, nodes) =>
+                    renderers.Count switch
+                    {
+                        0 => property.IsOptional
+                            ? "global::Discord.CXMessageComponent.Empty"
+                            : new DiagnosticInfo(
+                                Diagnostics.MissingRequiredProperty(state.MethodReference, property.Name),
+                                state.Source
+                            ),
+                        _ => renderers
+                            .Select(x => x(context, new(new(
+                                CanSplat: true,
+                                ComponentBuilderKind.CollectionOfIMessageComponentBuilders
+                            ))))
+                            .FlattenAll()
+                            .Map(x =>
+                                $"""
+                                 new global::Discord.CXMessageComponent([
+                                     {string.Join($",{Environment.NewLine}", x).WithNewlinePadding(4)}
+                                 ])
+                                 """
+                            )
+                    };
+            case ComponentBuilderKind.CollectionOfIMessageComponentBuilders:
+            case ComponentBuilderKind.CollectionOfIMessageComponents:
+            case ComponentBuilderKind.CollectionOfCXComponents:
+            case ComponentBuilderKind.CollectionOfMessageComponents:
+                return (state, context, property, renderers, nodes) =>
+                    renderers.Count switch
+                    {
+                        0 => property.IsOptional
+                            ? "[]"
+                            : new DiagnosticInfo(
+                                Diagnostics.MissingRequiredProperty(state.MethodReference, property.Name),
+                                state.Source
+                            ),
+                        _ => renderers
+                            .Select(x => x(context, new(new(
+                                CanSplat: true,
+                                kind
+                            ))))
+                            .FlattenAll()
+                            .Map(x =>
+                                $"""
+                                 [
+                                    {string.Join($",{Environment.NewLine}", x).WithNewlinePadding(4)}
+                                 ]
+                                 """
+                            )
+                    };
+            default:
+                return (state, context, property, renderers, nodes) => new DiagnosticInfo(
+                    Diagnostics.TypeMismatch(kind.ToString(), "unknown component"),
+                    nodes.Count is 0
+                        ? state.Source.Span
+                        : TextSpan.FromBounds(nodes[0].Span.Start, nodes[nodes.Count - 1].Span.End)
                 );
-            }
         }
     }
 
-    public override void Validate(FunctionalComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
+    public override void Validate(
+        FunctionalComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics
+    )
     {
-        ValidateProperties(state, state.Properties, context, diagnostics);
-        ValidateChildren(state, context, diagnostics);
+        ValidateProperties(
+            state,
+            state.Properties,
+            context,
+            diagnostics,
+            ignorePredicate: state.HasComponentChildren
+                ? prop => prop == state.ChildrenParameter
+                : null
+        );
+        ValidateChildren(
+            state,
+            context,
+            diagnostics,
+            allowsChildrenInCX: state.ChildrenParameter is not null,
+            hasChildren: state.HasComponentChildren
+        );
     }
 
     public override Result<string> Render(
@@ -512,15 +627,38 @@ public sealed class FunctionalComponentNode :
         IComponentContext context,
         ComponentRenderingOptions options
     ) => state
-        .RenderProperties(state.Properties, context)
-        .Map(props =>
-            ComponentBuilderKindUtils.Conform(
+        .RenderProperties(
+            state.Properties,
+            context,
+            ignorePredicate: state.ChildrenParameter is not null && state.ChildrenComponentKind is not null
+                ? x => x.Equals(state.ChildrenParameter)
+                : null
+        )
+        .Combine(
+            state.HasComponentChildren
+                ? RenderElementChildren(state, context, options.ToPropertyOptions())
+                    .Map(x => $"{state.ChildrenParameter.Name}: {x}")
+                : string.Empty
+        )
+        .Map(tuple =>
+        {
+            var props = tuple.Left;
+
+            if (!string.IsNullOrWhiteSpace(tuple.Right))
+            {
+                if (!string.IsNullOrWhiteSpace(props))
+                    props += $",{Environment.NewLine}";
+
+                props += tuple.Right;
+            }
+
+            return ComponentBuilderKindUtils.Conform(
                 $"{state.MethodReference}({
                     props.WithNewlinePadding(4).PrefixIfSome(4).WrapIfSome(Environment.NewLine)
                 })",
                 state.ReturnKind,
                 options.TypingContext ?? context.RootTypingContext,
                 state.Source
-            )
-        );
+            );
+        });
 }

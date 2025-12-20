@@ -12,29 +12,29 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
     protected CXDocument? Document { get; private set; }
     private IEnumerator<ICXNode>? _enumerator;
     private readonly Stack<CXDiagnostic> _diagnostics = [];
-    
+
 
     protected CXDiagnostic Diagnostic(CXErrorCode code, string? message = null, TextSpan? span = null)
     {
         Assert.NotEmpty(_diagnostics);
-        var diagnostic =  _diagnostics.Pop();
-        
+        var diagnostic = _diagnostics.Pop();
+
         Assert.Equal(code, diagnostic.Code);
-        
-        if(message is not null) Assert.Equal(message, diagnostic.Message);
-        
-        if(span.HasValue) Assert.Equal(span.Value, diagnostic.Span);
+
+        if (message is not null) Assert.Equal(message, diagnostic.Message);
+
+        if (span.HasValue) Assert.Equal(span.Value, diagnostic.Span);
 
         return diagnostic;
     }
-    
+
     [MemberNotNull(nameof(Document))]
     protected void Parses(
         SourceBuilder source,
         Func<CXParser, IEnumerable<CXNode>>? parseFunc = null,
         bool allowErrors = false
     ) => Parses(source.StringBuilder.ToString(), parseFunc, source.Interpolations.ToArray(), allowErrors);
-    
+
     [MemberNotNull(nameof(Document))]
     protected void Parses(
         string cx,
@@ -44,24 +44,30 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
     )
     {
         parseFunc ??= (parser) => parser.ParseTopLevelNodes();
-        
+
         output.WriteLine($"Parsing:\n{cx}");
+
+        var token = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+
+        var parser = new CXParser(
+            CXSourceText.From(cx).CreateReader(interpolations: interpolations),
+            token
+        );
         
-        var parser = new CXParser(CXSourceText.From(cx).CreateReader(interpolations: interpolations));
         var nodes = parseFunc(parser).ToList();
 
         Document = new CXDocument(parser, nodes);
-        
+
         output.WriteLine($"AST:\n{Document.ToStructuralFormat()}");
         output.WriteLine($"DOT:\n{Document.ToDOTFormat()}");
-        
-        if(!allowErrors) Assert.False(Document.HasErrors);
 
-        foreach (var diagnostic in Document.Diagnostics)
+        if (!allowErrors) Assert.False(Document.HasErrors);
+
+        foreach (var diagnostic in Document.AllDiagnostics)
         {
             _diagnostics.Push(diagnostic);
         }
-        
+
         _enumerator = nodes
             .SelectMany(Enumerate)
             .GetEnumerator();
@@ -113,14 +119,14 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
     protected CXValue.Interpolation Interpolation(string? content = null, int? index = null)
     {
         var interpolation = Node<CXValue.Interpolation>(content);
-        
-        if(index is not null) Assert.Equal(index.Value, interpolation.InterpolationIndex);
+
+        if (index is not null) Assert.Equal(index.Value, interpolation.InterpolationIndex);
 
         return interpolation;
     }
-    
+
     protected CXValue.Scalar Scalar(string? content = null) => Node<CXValue.Scalar>(content);
-    
+
     protected CXValue.Multipart Multipart(string? content = null) => Node<CXValue.Multipart>(content);
 
     protected T Node<T>(string? content = null) where T : ICXNode
@@ -140,11 +146,11 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
     protected CXToken InterpolationToken(string? content = null, int? index = null)
     {
         Assert.NotNull(Document);
-        
+
         var token = Token(CXTokenKind.Interpolation, content);
-        
-        if(index.HasValue) Assert.Equal(index.Value, Document.GetInterpolationIndex(token));
-        
+
+        if (index.HasValue) Assert.Equal(index.Value, Document.GetInterpolationIndex(token));
+
         return token;
     }
 
@@ -160,8 +166,8 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
 
         if (content is not null)
             Assert.Equal(content, token.ToString());
-        
-        if(flags is not null)  Assert.Equal(flags.Value, token.Flags);
+
+        if (flags is not null) Assert.Equal(flags.Value, token.Flags);
 
         return token;
     }

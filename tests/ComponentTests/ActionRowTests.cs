@@ -280,9 +280,9 @@ public sealed class ActionRowTests(ITestOutputHelper output) : BaseComponentTest
                 Node<ButtonComponentNode>();
             }
 
-            var abcAttr = ((CXElement)rowNode.State.Source).Attributes.First(x => x.Identifier.Value == "abc");
+            var abcAttr = ((CXElement)rowNode.State!.Source).Attributes.First(x => x.Identifier == "abc");
             var somePropAttr =
-                ((CXElement)rowNode.State.Source).Attributes.First(x => x.Identifier.Value == "someProp");
+                ((CXElement)rowNode.State.Source).Attributes.First(x => x.Identifier == "someProp");
 
             Validate();
 

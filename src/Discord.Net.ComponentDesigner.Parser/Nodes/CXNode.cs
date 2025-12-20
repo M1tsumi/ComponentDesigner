@@ -4,53 +4,53 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
-public abstract partial class CXNode : ICXNode
+/// <summary>
+///     An abstract class representing a non-terminal AST node.
+/// </summary>
+public abstract class CXNode : ICXNode
 {
+    /// <inheritdoc/>
     public CXNode? Parent { get; set; }
 
+    /// <inheritdoc/>
     public int Width { get; private set; }
 
+    /// <inheritdoc/>
     public int GraphWidth
         => _graphWidth ??= (
             _slots.Count > 0
                 ? _slots.Count + _slots.Sum(node => node.GraphWidth)
                 : 0
         );
-
-    public IReadOnlyList<CXDiagnostic> Diagnostics
-    {
-        get =>
-        [
-            .._diagnostics
-                .Concat(Slots.SelectMany(x => x.Diagnostics))
-        ];
-        init
-        {
-            _diagnostics.Clear();
-            _diagnostics.AddRange(value);
-        }
-    }
-
+    
+    /// <inheritdoc/>
     public bool HasErrors
         => _diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error) ||
            Slots.Any(x => x.HasErrors);
 
-    public CXDocument Document
-    {
-        get => TryGetDocument(out var doc) ? doc : throw new InvalidOperationException();
-    }
+    /// <inheritdoc/>
+    public CXDocument? Document
+        => TryGetDocument(out var doc)
+            ? doc
+            : null;
 
-    public virtual CXParser Parser => Document.Parser;
-
+    /// <inheritdoc/>
     public LexedCXTrivia LeadingTrivia => FirstTerminal?.LeadingTrivia ?? LexedCXTrivia.Empty;
+
+    /// <inheritdoc/>
     public LexedCXTrivia TrailingTrivia => LastTerminal?.TrailingTrivia ?? LexedCXTrivia.Empty;
 
+    /// <summary>
+    ///     Gets the first terminal token within this <see cref="CXNode"/>.
+    /// </summary>
     public CXToken? FirstTerminal
     {
         get
@@ -69,6 +69,9 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
+    /// <summary>
+    ///     Gets the last terminal token within this <see cref="CXNode"/>.
+    /// </summary>
     public CXToken? LastTerminal
     {
         get
@@ -87,17 +90,21 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
-
-    public IReadOnlyList<ICXNode> Descendants
-        => _descendants ??= (
+    /// <summary>
+    ///     Gets all descendant AST nodes within this <see cref="CXNode"/>.
+    /// </summary>
+    public IReadOnlyList<ICXNode> Descendants =>
+    [
+        .._slots.SelectMany(x => (ICXNode[])
         [
-            .._slots.SelectMany(x => (ICXNode[])
-            [
-                x,
-                ..(x as CXNode)?.Descendants ?? []
-            ])
-        ]);
+            x,
+            ..(x as CXNode)?.Descendants ?? []
+        ])
+    ];
 
+    /// <summary>
+    ///     Gets all ancestor AST nodes of this <see cref="CXNode"/>.
+    /// </summary>
     public IEnumerable<CXNode> Ancestors
     {
         get
@@ -112,39 +119,56 @@ public abstract partial class CXNode : ICXNode
         }
     }
 
-    public TextSpan FullSpan => new(Offset, Width);
+    /// <inheritdoc/>
+    public TextSpan FullSpan => new(this.Offset, Width);
 
+    /// <inheritdoc/>
     public TextSpan Span
         => FirstTerminal is { } first && LastTerminal is { } last
             ? TextSpan.FromBounds(first.Span.Start, last.Span.End)
             : FullSpan;
-
-    // TODO:
-    // this could be cached, a caveat though is if we incrementally parse, we need to update the
-    // offset/width of any nodes right of the change
-    public int Offset => ComputeOffset();
-
+    
+    /// <inheritdoc/>
     public IReadOnlyList<ICXNode> Slots => _slots;
 
+    internal IReadOnlyList<CXDiagnosticDescriptor> DiagnosticDescriptors
+    {
+        get => _diagnostics;
+        init => _diagnostics = [..value];
+    }
+
     private readonly List<ICXNode> _slots;
-    private readonly List<CXDiagnostic> _diagnostics;
+    private readonly List<CXDiagnosticDescriptor> _diagnostics;
 
     // cached state
     private CXToken? _firstTerminal;
     private CXToken? _lastTerminal;
     private CXDocument? _doc;
     private int? _graphWidth;
-    private IReadOnlyList<ICXNode>? _descendants;
 
-    public CXNode()
+    /// <summary>
+    ///     Constructs a new <see cref="CXNode"/>.
+    /// </summary>
+    protected CXNode()
     {
         _diagnostics = [];
         _slots = [];
     }
-
-    public void AddDiagnostic(CXDiagnostic diagnostic)
+    
+    /// <summary>
+    ///     Adds a diagnostic to the current <see cref="CXNode"/>.
+    /// </summary>
+    /// <param name="diagnostic">The diagnostic to add.</param>
+    public void AddDiagnostic(CXDiagnosticDescriptor diagnostic)
         => _diagnostics.Add(diagnostic);
 
+    /// <summary>
+    ///     Attempts to get the root <see cref="CXDocument"/> by traversing up the AST tree.
+    /// </summary>
+    /// <param name="result">The root <see cref="CXDocument"/> if found; otherwise <see langword="null"/>.</param>
+    /// <returns>
+    ///     <see langword="true"/> if the root <see cref="CXDocument"/> was found; otherwise <see langword="false"/>.
+    /// </returns>
     private bool TryGetDocument(out CXDocument result)
     {
         if (_doc is not null)
@@ -170,84 +194,13 @@ public abstract partial class CXNode : ICXNode
         return false;
     }
 
-    public bool TryFindToken(int position, out CXToken token)
-    {
-        if (!FullSpan.Contains(position))
-        {
-            token = null!;
-            return false;
-        }
-
-        var current = this;
-
-        while (true)
-        {
-            for (var i = 0; i < current.Slots.Count; i++)
-            {
-                var slot = current.Slots[i];
-
-                if (!slot.FullSpan.Contains(position)) continue;
-
-                switch (slot)
-                {
-                    case CXToken slotToken:
-                        token = slotToken;
-                        return true;
-                    case CXNode node:
-                        current = node;
-                        break;
-                    default:
-                        token = null!;
-                        return false;
-                }
-
-                break;
-            }
-
-            token = null!;
-            return false;
-        }
-    }
-
-    public CXNode FindOwningNode(TextSpan span, out ICXNode slot)
-    {
-        var current = this;
-        slot = null!;
-
-        search:
-        for (var i = 0; i < current.Slots.Count; i++)
-        {
-            slot = current.Slots[i];
-
-            if (
-                // the end is exclusive, since its char-based
-                !(span.Start >= slot.FullSpan.Start && span.End < slot.FullSpan.End)
-            ) continue;
-
-            if (slot is not CXNode node) break;
-
-            current = node;
-            goto search;
-        }
-
-        // we only want the top most container
-        // while (current.Parent is not null && current.FullSpan == current.Parent.FullSpan)
-        //     current = current.Parent;
-
-        return current;
-    }
-
-    public int GetParentSlotIndex()
-    {
-        if (Parent is null) return -1;
-
-        for (var i = 0; i < Parent._slots.Count; i++)
-            if (ReferenceEquals(this, Parent._slots[i]))
-                return i;
-
-        return -1;
-    }
-
+    /// <summary>
+    ///     Gets the index of a node within this nodes' <see cref="Slots"/>.
+    /// </summary>
+    /// <param name="node">The node to find the index of.</param>
+    /// <returns>
+    ///     The index of the node within this nodes' <see cref="Slots"/>; <c>-1</c> if not found.
+    /// </returns>
     public int GetIndexOfSlot(ICXNode node)
     {
         for (var i = 0; i < _slots.Count; i++)
@@ -257,6 +210,11 @@ public abstract partial class CXNode : ICXNode
         return -1;
     }
 
+    /// <summary>
+    ///     Swaps 2 values at the given slot indexes.
+    /// </summary>
+    /// <param name="index1">The first index to swap.</param>
+    /// <param name="index2">The second index to swap.</param>
     protected void SwapSlots(int index1, int index2)
     {
         var a = _slots[index1];
@@ -265,41 +223,15 @@ public abstract partial class CXNode : ICXNode
         _slots[index2] = a;
     }
 
-    private int ComputeOffset()
-    {
-        if (Parent is null)
-            return TryGetDocument(out var doc) ? doc.Parser.Reader.SourceSpan.Start : 0;
-
-        var parentOffset = Parent.Offset;
-        var parentSlotIndex = GetParentSlotIndex();
-
-        return parentSlotIndex switch
-        {
-            -1 => throw new InvalidOperationException(),
-            0 => parentOffset,
-            _ => Parent._slots[parentSlotIndex - 1] switch
-            {
-                CXNode sibling => sibling.Offset + sibling.Width,
-                CXToken token => token.FullSpan.End,
-                _ => throw new InvalidOperationException()
-            }
-        };
-    }
-
-    private int ComputeWidth()
-    {
-        if (Slots.Count is 0) return 0;
-
-        return Slots.Sum(x => x switch
-        {
-            CXToken token => token.FullSpan.Length,
-            CXNode node => node.Width,
-            _ => 0
-        });
-    }
-
-    protected bool IsGraphChild(CXNode node) => IsGraphChild(node, out _);
-
+    /// <summary>
+    ///     Determines if a provided node is a child of this <see cref="CXNode"/>.
+    /// </summary>
+    /// <param name="node">The node to check.</param>
+    /// <param name="index">The index of the child node.</param>
+    /// <returns>
+    ///     <see langword="true"/> if the node is a child of this <see cref="CXNode"/>; otherwise
+    ///     <see langword="false"/>.
+    /// </returns>
     protected bool IsGraphChild(CXNode node, out int index)
     {
         index = -1;
@@ -311,37 +243,46 @@ public abstract partial class CXNode : ICXNode
         return index >= 0 && index < _slots.Count && _slots[index].Equals(node);
     }
 
-    protected void UpdateSlot(CXNode oldNode, CXNode newNode)
+    /// <summary>
+    ///     Adds a node to this nodes' <see cref="Slots"/>.
+    /// </summary>
+    /// <param name="node">The node to add.</param>
+    /// <typeparam name="T">The inner type of the collection node.</typeparam>
+    [return: NotNullIfNotNull(nameof(node))]
+    protected CXCollection<T>? Slot<T>(CXCollection<T>? node) where T : class, ICXNode
     {
-        if (!IsGraphChild(oldNode, out var slotIndex)) return;
-
-        _slots[slotIndex] = newNode;
+        Slot<CXNode>(node);
+        return node;
     }
 
-    protected void RemoveSlot(CXNode node)
+    /// <summary>
+    ///     Adds a node to this nodes' <see cref="Slots"/>.
+    /// </summary>
+    /// <param name="node">The node to add.</param>
+    [return: NotNullIfNotNull(nameof(node))]
+    protected T? Slot<T>(T? node)
+        where T : ICXNode
     {
-        if (!IsGraphChild(node, out var index)) return;
-
-        _slots.RemoveAt(index);
-    }
-
-    protected void Slot<T>(CXCollection<T>? node) where T : class, ICXNode => Slot((CXNode?)node);
-
-    protected void Slot(ICXNode? node)
-    {
-        if (node is null) return;
+        if (node is null) return node;
 
         Width += node.Width;
 
         node.Parent = this;
         _slots.Add(node);
+
+        return node;
     }
 
+    /// <summary>
+    ///     Adds a collection of nodes to this nodes' <see cref="Slots"/>.
+    /// </summary>
+    /// <param name="nodes">The nodes to add.</param>
     protected void Slot(IEnumerable<ICXNode> nodes)
     {
         foreach (var node in nodes) Slot(node);
     }
 
+    /// <inheritdoc/>
     public void ResetCachedState()
     {
         _firstTerminal = null;
@@ -352,45 +293,38 @@ public abstract partial class CXNode : ICXNode
         // reset any descendants
         foreach (var descendant in Descendants.OfType<CXNode>())
             descendant.ResetCachedState();
-
-        _descendants = null;
     }
 
-    public bool Equals(CXNode? other)
-    {
-        if (other is null) return false;
-
-        if (ReferenceEquals(this, other)) return true;
-
-        return _slots.SequenceEqual(other._slots);
-    }
-
+    /// <inheritdoc/>
     public bool Equals(ICXNode? other)
-        => other is CXNode node && Equals(node);
+        => CXNodeEqualityComparer.Default.Equals(this, other);
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj)
         => obj is CXNode node && Equals(node);
 
+    /// <inheritdoc/>
     public override int GetHashCode()
         => _slots.Aggregate(0, Hash.Combine);
 
+    /// <inheritdoc/>
     public override string ToString() => ToString(false, false);
-    public string ToFullString() => ToString(true, true);
-
+    
+    /// <inheritdoc/>
     public string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia)
     {
-        if (TryGetDocument(out var document))
-        {
-            return document.Parser.Reader[
-                (includeLeadingTrivia, includeTrailingTrivia) switch
-                {
-                    (true, true) => FullSpan,
-                    (false, false) => Span,
-                    (true, false) => TextSpan.FromBounds(FullSpan.Start, Span.End),
-                    (false, true) => TextSpan.FromBounds(Span.Start, FullSpan.Start),
-                }
-            ];
-        }
+        // if (TryGetDocument(out var document))
+        // {
+        //     return document.Parser.Reader[
+        //         (includeLeadingTrivia, includeTrailingTrivia) switch
+        //         {
+        //             (true, true) => FullSpan,
+        //             (false, false) => Span,
+        //             (true, false) => TextSpan.FromBounds(FullSpan.Start, Span.End),
+        //             (false, true) => TextSpan.FromBounds(Span.Start, FullSpan.Start),
+        //         }
+        //     ];
+        // }
 
         var tokens = new List<CXToken>();
 
@@ -436,5 +370,11 @@ public abstract partial class CXNode : ICXNode
         }
 
         return sb.ToString();
+    }
+
+    IReadOnlyList<CXDiagnosticDescriptor> ICXNode.DiagnosticDescriptors
+    {
+        get => DiagnosticDescriptors;
+        init => DiagnosticDescriptors = value;
     }
 }

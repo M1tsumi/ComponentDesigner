@@ -26,7 +26,7 @@ using UpdateGraphStateParams =
 [Generator]
 public sealed class SourceGenerator : IIncrementalGenerator
 {
-    internal sealed class Glue(
+    public sealed class Glue(
         string key,
         InterceptableLocation interceptLocation,
         LocationInfo location,
@@ -53,7 +53,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
             => Hash.Combine(Key, InterceptLocation, Location, UsesDesigner);
     }
 
-    internal IncrementalValueProvider<(ImmutableArray<RenderedGraph> Left, ImmutableArray<Glue> Right)> Provider
+    public IncrementalValueProvider<(ImmutableArray<RenderedGraph> Left, ImmutableArray<Glue> Right)> Provider
     {
         get;
         private set;
@@ -117,7 +117,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         );
     }
 
-    internal static IEnumerable<Glue> CreateClue(
+    public static IEnumerable<Glue> CreateClue(
         (ImmutableArray<ComponentDesignerTarget?> Targets, EquatableArray<string> Keys) tuple,
         CancellationToken token
     )
@@ -141,10 +141,10 @@ public sealed class SourceGenerator : IIncrementalGenerator
         }
     }
 
-    internal static RenderedGraph RenderGraph(CXGraph graph, CancellationToken token)
+    public static RenderedGraph RenderGraph(CXGraph graph, CancellationToken token)
         => graph.Render(token: token);
 
-    internal static IEnumerable<CXGraph> UpdateGraphState(
+    public static IEnumerable<CXGraph> UpdateGraphState(
         UpdateGraphStateParams tuple,
         CancellationToken token
     )
@@ -176,13 +176,13 @@ public sealed class SourceGenerator : IIncrementalGenerator
         }
     }
 
-    internal static CXGraph CreateGraph(GraphGeneratorState state, CancellationToken token)
+    public static CXGraph CreateGraph(GraphGeneratorState state, CancellationToken token)
     {
         // TODO: incremental parsing
         return CXGraph.Create(state, old: null, token);
     }
 
-    internal static IEnumerable<GraphGeneratorState> CreateGraphState(
+    public static IEnumerable<GraphGeneratorState> CreateGraphState(
         ((ImmutableArray<ComponentDesignerTarget?> Left, EquatableArray<string> Right) Left, GeneratorOptions Right)
             tuple,
         CancellationToken token)
@@ -200,7 +200,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         }
     }
 
-    internal static GraphGeneratorState CreateGraphState(
+    public static GraphGeneratorState CreateGraphState(
         string key,
         ComponentDesignerTarget target,
         GeneratorOptions options
@@ -210,7 +210,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         target.CX
     );
 
-    internal void Generate(
+    public void Generate(
         SourceProductionContext context,
         (ImmutableArray<RenderedGraph> Renders, ImmutableArray<Glue> Glues) tuple
     )
@@ -232,10 +232,16 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
             foreach (var diagnostic in render.Diagnostics)
             {
+                // adjust the span to match the source
+                var diagnosticSpan = new TextSpan(
+                    glue.Location.TextSpan.Start + diagnostic.Span.Start,
+                    diagnostic.Span.Length
+                );
+                
                 context.ReportDiagnostic(
                     Diagnostic.Create(
                         diagnostic.Descriptor,
-                        glue.SyntaxTree.GetLocation(diagnostic.Span)
+                        glue.SyntaxTree.GetLocation(diagnosticSpan)
                     )
                 );
             }
@@ -288,7 +294,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         );
     }
 
-    private static EquatableArray<string> GetKeys(
+    public static EquatableArray<string> GetKeys(
         ImmutableArray<ComponentDesignerTarget?> target,
         CancellationToken token
     )
@@ -323,7 +329,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         return [..result];
     }
 
-    private static ComponentDesignerTarget? MapPossibleComponentDesignerCall(
+    public static ComponentDesignerTarget? MapPossibleComponentDesignerCall(
         GeneratorSyntaxContext context,
         CancellationToken token
     ) => MapPossibleComponentDesignerCall(context.SemanticModel, context.Node, token);
@@ -515,7 +521,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         }
     }
 
-    private static bool IsComponentDesignerCall(SyntaxNode node, CancellationToken token)
+    public static bool IsComponentDesignerCall(SyntaxNode node, CancellationToken token)
         => node is InvocationExpressionSyntax
         {
             Expression: MemberAccessExpressionSyntax

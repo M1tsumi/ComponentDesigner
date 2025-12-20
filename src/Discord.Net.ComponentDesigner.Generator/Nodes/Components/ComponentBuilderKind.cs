@@ -88,6 +88,27 @@ public static class ComponentBuilderKindUtils
         bool spreadCollections = false
     ) => (result = Convert(source, from, to, spreadCollections)!) is not null;
 
+    public static Result<string> ConvertAsResult(
+        ICXNode node,
+        string source,
+        ComponentBuilderKind from,
+        ComponentBuilderKind to,
+        bool spreadCollections = false
+    )
+    {
+        var converted = Convert(source, from, to, spreadCollections);
+
+        if (converted is not null) return converted;
+
+        return new DiagnosticInfo(
+            Diagnostics.InvalidInterleavedComponentInCurrentContext(
+                from.ToString(),
+                to.ToString()
+            ),
+            node
+        );
+    }
+
     public static string? Convert(
         string source,
         ComponentBuilderKind from,
@@ -236,6 +257,17 @@ public static class ComponentBuilderKindUtils
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
+    }
+
+    public static Func<string, Result<string>> Conform(
+        ICXNode node,
+        ComponentBuilderKind sourceKind,
+        ComponentTypingContext? context
+    )
+    {
+        if (context is null) return x => x;
+
+        return code => Conform(code, sourceKind, context.Value, node);
     }
 
     public static Result<string> Conform(

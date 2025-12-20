@@ -675,9 +675,10 @@ public sealed class MediaGalleryTests(ITestOutputHelper output) : BaseComponentT
                 {urls}
             </gallery>
             """,
-            pretext: """
-                     System.Collections.Generic.IEnumerable<System.Uri> urls = System.Linq.Enumerable.Empty<System.Uri>();
-                     """
+            pretext:
+            """
+            System.Collections.Generic.IEnumerable<System.Uri> urls = System.Linq.Enumerable.Empty<System.Uri>();
+            """
         );
         {
             Node<MediaGalleryComponentNode>();
@@ -711,9 +712,10 @@ public sealed class MediaGalleryTests(ITestOutputHelper output) : BaseComponentT
                 {urls}
             </gallery>
             """,
-            pretext: """
-                     System.Collections.Generic.IEnumerable<string> urls = System.Linq.Enumerable.Empty<string>();
-                     """
+            pretext:
+            """
+            System.Collections.Generic.IEnumerable<string> urls = System.Linq.Enumerable.Empty<string>();
+            """
         );
         {
             Node<MediaGalleryComponentNode>();

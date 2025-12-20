@@ -17,8 +17,13 @@ public delegate Result<string> ComponentNodeRenderer<in TState>(
     ComponentRenderingOptions options = default
 ) where TState : ComponentState;
 
-public delegate string ComponentNodeRenderer(
+public delegate Result<string> ComponentNodeRenderer(
     ComponentState state,
+    IComponentContext context,
+    ComponentRenderingOptions options = default
+);
+
+public delegate Result<string> BoundComponentNodeRenderer(
     IComponentContext context,
     ComponentRenderingOptions options = default
 );
@@ -87,12 +92,15 @@ public abstract class ComponentNode
         ComponentState state,
         ImmutableArray<ComponentProperty> properties,
         IComponentContext context,
-        IList<DiagnosticInfo> diagnostics
+        IList<DiagnosticInfo> diagnostics,
+        Predicate<ComponentProperty>? ignorePredicate = null
     )
     {
         // validate properties
         foreach (var property in properties)
         {
+            if(ignorePredicate?.Invoke(property) is true) continue;
+            
             var propertyValue = state.GetProperty(property);
 
             propertyValue.ReportPropertyConfigurationDiagnostics(context, state, diagnostics);
@@ -108,11 +116,11 @@ public abstract class ComponentNode
             // report any unknown properties
             foreach (var attribute in element.Attributes)
             {
-                if (!TryGetPropertyFromName(properties, attribute.Identifier.Value, out _))
+                if (!TryGetPropertyFromName(properties, attribute.Identifier, out _))
                 {
                     diagnostics.Add(
                         Diagnostics.UnknownProperty(
-                            attribute.Identifier.Value,
+                            attribute.Identifier,
                             Name
                         ),
                         attribute
@@ -125,16 +133,34 @@ public abstract class ComponentNode
     protected void ValidateChildren(
         ComponentState state,
         IComponentContext context,
-        IList<DiagnosticInfo> diagnostics
+        IList<DiagnosticInfo> diagnostics,
+        bool? allowsChildrenInCX = null,
+        bool? hasChildren = null
+    ) => ValidateChildren(
+        Name,
+        state,
+        context,
+        diagnostics,
+        allowsChildrenInCX ?? AllowChildrenInCX,
+        hasChildren ?? HasChildren
+    );
+
+    protected static void ValidateChildren(
+        string name,
+        ComponentState state,
+        IComponentContext context,
+        IList<DiagnosticInfo> diagnostics,
+        bool allowsChildrenInCX,
+        bool hasChildren
     )
     {
         if (state.Source is not CXElement element) return;
-        
+
         // report invalid children
-        if (!AllowChildrenInCX && !HasChildren && element.Children.Count > 0)
+        if (!allowsChildrenInCX && !hasChildren && element.Children.Count > 0)
         {
             diagnostics.Add(
-                Diagnostics.ComponentDoesntAllowChildren(Name),
+                Diagnostics.ComponentDoesntAllowChildren(name),
                 element.Children
             );
         }

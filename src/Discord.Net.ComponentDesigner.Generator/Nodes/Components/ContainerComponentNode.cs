@@ -107,5 +107,6 @@ public sealed class ContainerComponentNode : ComponentNode
                         .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
                         .PostfixIfSome($"{Environment.NewLine}}}")
                 }";
-        });
+        })
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

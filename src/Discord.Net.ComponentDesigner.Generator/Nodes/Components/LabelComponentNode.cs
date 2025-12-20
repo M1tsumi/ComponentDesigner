@@ -192,5 +192,6 @@ public sealed class LabelComponentNode : ComponentNode<LabelComponentState>
                     .WrapIfSome(Environment.NewLine)
                     .Map(x => $"({x})")
             }"
-        );
+        )
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

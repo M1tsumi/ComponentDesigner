@@ -310,7 +310,8 @@ public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryCompon
                         .WithNewlinePadding(4)
                         .PrefixIfSome($"{Environment.NewLine}{{{Environment.NewLine}".Postfix(4))
                         .PostfixIfSome($"{Environment.NewLine}}}")}";
-        });
+        })
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 
     private Result<string> RenderChildrenWithUriWrapping(
         MediaGalleryState state,

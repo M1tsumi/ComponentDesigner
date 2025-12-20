@@ -73,7 +73,7 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
         switch (context.CXNode)
         {
             case CXValue.Interpolation interpolation:
-                id = interpolation.Document.GetInterpolationIndex(interpolation.Token);
+                id = interpolation.Document!.GetInterpolationIndex(interpolation.Token);
                 break;
             case CXToken { Kind: CXTokenKind.Interpolation } token:
                 id = token.Document!.GetInterpolationIndex(token);
@@ -89,8 +89,11 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
     }
 
 
-    public override Result<string> Render(InterleavedState state, IComponentContext context,
-        ComponentRenderingOptions options)
+    public override Result<string> Render(
+        InterleavedState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    )
     {
         var designerValue = context.GetDesignerValue(
             state.InterpolationId,
@@ -112,7 +115,7 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
                  * required typing information
                  */
 
-                Debug.Fail("Unknown typing context in dynamic node");
+                Debug.Fail($"Unknown typing context in dynamic node: {state.OwningGraphNode.ToPathString()}");
                 typingContext = context.RootTypingContext;
             }
         }

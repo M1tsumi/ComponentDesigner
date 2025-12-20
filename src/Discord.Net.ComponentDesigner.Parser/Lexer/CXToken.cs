@@ -7,120 +7,140 @@ using System.Linq;
 
 namespace Discord.CX.Parser;
 
+/// <summary>
+///     An AST node representing a terminal token within the CX syntax.
+/// </summary>
+/// <param name="Kind">The kind of the token.</param>
+/// <param name="LeadingTrivia">The leading trivia of the token.</param>
+/// <param name="TrailingTrivia">The trailing trivia of the token.</param>
+/// <param name="Flags">The flags of the token.</param>
+/// <param name="Value">The raw value of the token.</param>
+/// <param name="Diagnostics">The diagnostics for the token.</param>
 public sealed record CXToken(
     CXTokenKind Kind,
     LexedCXTrivia LeadingTrivia,
     LexedCXTrivia TrailingTrivia,
     CXTokenFlags Flags,
     string Value,
-    params IReadOnlyList<CXDiagnostic> Diagnostics
+    params IReadOnlyList<CXDiagnosticDescriptor> Diagnostics
 ) : ICXNode
 {
+    /// <summary>
+    ///     Gets the interpolation index of this token.
+    /// </summary>
+    /// <remarks>
+    ///     If this tokens <see cref="Kind"/> is not an <see cref="CXTokenKind.Interpolation"/>, <see langword="null"/>
+    ///     is returned.
+    /// </remarks>
     public int? InterpolationIndex
-        => Document is null || Kind is not CXTokenKind.Interpolation ? null : Document.GetInterpolationIndex(this); 
-    
+        => Document is null || Kind is not CXTokenKind.Interpolation ? null : Document.GetInterpolationIndex(this);
+
+    /// <summary>
+    ///     Gets the full character width of this token. 
+    /// </summary>
     public int Width => LeadingTrivia.Length + Value.Length + TrailingTrivia.Length;
-    
-    public int Offset
-    {
-        get
-        {
-            if (Parent is null) return 0;
 
-            var parentOffset = Parent.Offset;
-            var parentSlotIndex = GetParentSlotIndex();
+    public TextSpan Span => new(this.Offset + LeadingTrivia.Length, Value.Length);
+    public TextSpan FullSpan => new(this.Offset, Width);
 
-            return parentSlotIndex switch
-            {
-                -1 => throw new InvalidOperationException(),
-                0 => parentOffset,
-                _ => Parent.Slots[parentSlotIndex - 1] switch
-                {
-                    CXNode sibling => sibling.Offset + sibling.Width,
-                    CXToken token => token.Offset + token.Width,
-                    _ => throw new InvalidOperationException()
-                }
-            };
-
-            int GetParentSlotIndex()
-            {
-                if (Parent is null) return -1;
-
-                for (var i = 0; i < Parent.Slots.Count; i++)
-                    if (Parent.Slots[i] == this)
-                        return i;
-
-                return -1;
-            }
-        }
-    }
-
-    public TextSpan Span => new(Offset + LeadingTrivia.Length, Value.Length);
-    public TextSpan FullSpan => new(Offset, Width);
-
+    /// <inheritdoc/>
     public CXNode? Parent { get; set; }
 
-    public bool HasErrors
-        => _hasErrors ??= (
-            Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error) ||
-            IsInvalid ||
-            IsMissing
-        );
+    /// <inheritdoc/>
+    public CXDocument? Document => Parent?.Document;
 
+    /// <inheritdoc/>
+    public bool HasErrors
+        => IsInvalid ||
+           IsMissing ||
+           Diagnostics.Any(x => x.Severity is DiagnosticSeverity.Error);
+
+    /// <summary>
+    ///     Gets whether this token is missing from the underlying <see cref="CXSourceText"/>.
+    /// </summary>
     public bool IsMissing => (Flags & CXTokenFlags.Missing) != 0;
 
+    /// <summary>
+    ///     Gets whether this token has a zero character width.
+    /// </summary>
     public bool IsZeroWidth => Span.IsEmpty;
 
+    /// <summary>
+    ///     Gets whether this token is an <see cref="CXTokenKind.Invalid"/> kind.
+    /// </summary>
     public bool IsInvalid => Kind is CXTokenKind.Invalid;
 
-    private bool? _hasErrors;
-
+    /// <summary>
+    ///     Creates a new synthetic token.
+    /// </summary>
+    /// <param name="kind">The kind of the synthetic token.</param>
+    /// <param name="span">The <see cref="TextSpan"/> of the synthetic token.</param>
+    /// <param name="flags">The flags of the synthetic token.</param>
+    /// <param name="value">The value of the synthetic token.</param>
+    /// <param name="diagnostics">The diagnostics of the synthetic token.</param>
+    /// <returns>The newly created synthetic token.</returns>
     public static CXToken CreateSynthetic(
         CXTokenKind kind,
         TextSpan? span = null,
         CXTokenFlags? flags = null,
         string? value = null,
-        IEnumerable<CXDiagnostic>? diagnostics = null
+        IEnumerable<CXDiagnosticDescriptor>? diagnostics = null
     )
     {
         return new CXToken(
             kind,
-            LexedCXTrivia.Empty, 
-            LexedCXTrivia.Empty, 
+            LexedCXTrivia.Empty,
+            LexedCXTrivia.Empty,
             CXTokenFlags.Synthetic | (flags ?? CXTokenFlags.None),
             value ?? string.Empty,
             [..diagnostics ?? []]
         );
     }
 
+    /// <summary>
+    ///     Creates a new <see cref="CXToken"/> with the <see cref="CXTokenFlags.Missing"/> flag set.
+    /// </summary>
+    /// <param name="kind">The kind of the token to create.</param>
+    /// <param name="diagnostics">The diagnostics of the token.</param>
+    /// <returns>The newly created token.</returns>
     public static CXToken CreateMissing(
         CXTokenKind kind,
-        params IEnumerable<CXDiagnostic> diagnostics
-    ) => CreateMissing(kind, string.Empty, diagnostics);
+        params IEnumerable<CXDiagnosticDescriptor> diagnostics
+    ) => CreateMissing(kind, string.Empty, diagnostics: diagnostics);
 
+    /// <summary>
+    ///     Creates a new <see cref="CXToken"/> with the <see cref="CXTokenFlags.Missing"/> flag set.
+    /// </summary>
+    /// <param name="kind">The kind of the token to create.</param>
+    /// <param name="value">The value of the token.</param>
+    /// <param name="leadingTrivia">The leading trivia of the token to create.</param>
+    /// <param name="trailingTrivia">The trailing trivia of the token to create.</param>
+    /// <param name="diagnostics">The diagnostics of the token.</param>
+    /// <returns>The newly created token.</returns>
     public static CXToken CreateMissing(
         CXTokenKind kind,
         string value,
-        params IEnumerable<CXDiagnostic> diagnostics
+        LexedCXTrivia? leadingTrivia = null,
+        LexedCXTrivia? trailingTrivia = null,
+        params IEnumerable<CXDiagnosticDescriptor> diagnostics
     ) => new(
         kind,
-        LexedCXTrivia.Empty, 
-        LexedCXTrivia.Empty, 
+        leadingTrivia ?? LexedCXTrivia.Empty,
+        trailingTrivia ?? LexedCXTrivia.Empty,
         Flags: CXTokenFlags.Missing,
         Value: value,
         Diagnostics: [..diagnostics]
     );
 
-    public CXDocument? Document => Parent?.Document;
-
+    /// <inheritdoc/>
     public void ResetCachedState()
     {
-        _hasErrors = null;
     }
 
+    /// <inheritdoc/>
     public override string ToString() => ToString(false, false);
-    public string ToFullString() => ToString(true, true);
 
+    /// <inheritdoc/>
     public string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia)
         => (includeLeadingTrivia, includeTrailingTrivia) switch
         {
@@ -130,33 +150,27 @@ public sealed record CXToken(
             (true, false) => $"{LeadingTrivia}{Value}"
         };
 
+    /// <inheritdoc/>
     public bool Equals(CXToken? other)
-    {
-        if (other is null) return false;
+        => CXNodeEqualityComparer.Default.Equals(this, other);
 
-        if (ReferenceEquals(this, other)) return true;
-
-        return Kind == other.Kind &&
-               Value == other.Value;
-    }
-
+    /// <inheritdoc/>
     public bool Equals(ICXNode? other)
         => other is CXToken token && Equals(token);
-    
-    public override int GetHashCode()
-    {
-        unchecked
-        {
-            var hashCode = Diagnostics.Aggregate(0, (a, b) => (a * 397) ^ b.GetHashCode());
-            hashCode = (hashCode * 397) ^ (int)Kind;
-            hashCode = (hashCode * 397) ^ Span.GetHashCode();
-            hashCode = (hashCode * 397) ^ LeadingTrivia.GetHashCode();
-            hashCode = (hashCode * 397) ^ TrailingTrivia.GetHashCode();
-            hashCode = (hashCode * 397) ^ (int)Flags;
-            return hashCode;
-        }
-    }
 
+    /// <inheritdoc/>
+    public override int GetHashCode()
+        => CXNodeEqualityComparer.Default.GetHashCode(this);
+
+    /// <inheritdoc/>
     int ICXNode.GraphWidth => 0;
+
+    /// <inheritdoc/>
     IReadOnlyList<ICXNode> ICXNode.Slots => [];
+
+    IReadOnlyList<CXDiagnosticDescriptor> ICXNode.DiagnosticDescriptors
+    {
+        get => Diagnostics;
+        init => Diagnostics = value;
+    }
 }

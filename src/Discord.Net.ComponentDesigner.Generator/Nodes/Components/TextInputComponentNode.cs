@@ -112,5 +112,6 @@ public sealed class TextInputComponentNode : ComponentNode
                          .WrapIfSome(Environment.NewLine)
                  })
              """
-        );
+        )
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

@@ -57,5 +57,6 @@ public sealed class TextDisplayComponentNode : ComponentNode
                      .WrapIfSome(Environment.NewLine)
              })
              """
-        );
+        )
+        .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }

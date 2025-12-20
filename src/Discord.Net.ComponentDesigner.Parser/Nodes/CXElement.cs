@@ -4,41 +4,111 @@ using System.Collections.Generic;
 
 namespace Discord.CX.Parser;
 
+/// <summary>
+///     A data type containing the AST nodes related to an opening tag within a <see cref="CXElement"/>.
+/// </summary>
+/// <param name="StartToken">The opening tags starting token.</param>
+/// <param name="IdentifierToken">The opening tags identifier token.</param>
+/// <param name="Attributes">The opening tags' attributes.</param>
+/// <param name="EndToken">The opening tags ending token.</param>
+public readonly record struct CXElementOpeningTag(
+    CXToken StartToken,
+    CXToken? IdentifierToken,
+    CXCollection<CXAttribute> Attributes,
+    CXToken EndToken
+);
+
+/// <summary>
+///     A data type containing the AST nodes related to a closing tag within a <see cref="CXElement"/>.
+/// </summary>
+/// <param name="StartToken">The closing tags starting token.</param>
+/// <param name="IdentifierToken">The closing tags identifier token.</param>
+/// <param name="EndToken">The closing tags ending token.</param>
+public readonly record struct CXElementClosingTag(
+    CXToken? StartToken,
+    CXToken? IdentifierToken,
+    CXToken? EndToken
+)
+{
+    /// <summary>
+    ///     Gets whether the closing tag was specified.
+    /// </summary>
+    public bool IsSpecified => StartToken is not null && EndToken is not null;
+}
+
+/// <summary>
+///     An AST node representing a single element within the CX language.
+/// </summary>
 public sealed class CXElement : CXNode
 {
-    public bool IsFragment => ElementStartNameToken is null && ElementEndNameToken is null;
-    public string Identifier => ElementStartNameToken?.Value ?? string.Empty;
+    /// <summary>
+    ///     Gets whether this node is a fragment (<c>&lt;&gt;</c>) element.
+    /// </summary>
+    public bool IsFragment => OpeningTag.IdentifierToken is null && ClosingTag.IdentifierToken is null;
+    
+    /// <summary>
+    ///     Gets the identifier of this element.
+    /// </summary>
+    /// <remarks>
+    ///     If this element is a fragment, <see cref="string.Empty"/> is returned.
+    /// </remarks>
+    public string Identifier => OpeningTag.IdentifierToken?.Value ?? string.Empty;
 
-    public CXToken ElementStartOpenToken { get; }
-    public CXToken? ElementStartNameToken { get; }
-    public CXCollection<CXAttribute> Attributes { get; }
+    /// <summary>
+    ///     Gets the opening tag of this <see cref="CXElement"/> .
+    /// </summary>
+    public CXElementOpeningTag OpeningTag { get; }
 
-    public CXToken ElementStartCloseToken { get; }
-
+    /// <summary>
+    ///     Gets the opening tags' attributes.
+    /// </summary>
+    public CXCollection<CXAttribute> Attributes => OpeningTag.Attributes;
+    
+    /// <summary>
+    ///     Gets the children of this <see cref="CXElement"/>.
+    /// </summary>
     public CXCollection<CXNode> Children { get; }
-
-    public CXToken? ElementEndOpenToken { get; }
-    public CXToken? ElementEndNameToken { get; }
-    public CXToken? ElementEndCloseToken { get; }
-
+    
+    /// <summary>
+    ///     Gets the closing tag of this <see cref="CXElement"/>.
+    /// </summary>
+    public CXElementClosingTag ClosingTag { get; }
+    
+    /// <summary>
+    ///     Constructs a new <see cref="CXElement"/>
+    /// </summary>
+    /// <param name="openingTagStartToken">The opening tags starting token.</param>
+    /// <param name="openingTagIdentifierToken">The opening tags identifier token.</param>
+    /// <param name="attributes">The attributes found in the opening tag.</param>
+    /// <param name="openingTagEndToken">The opening tags ending token.</param>
+    /// <param name="children">The children of this <see cref="CXElement"/>.</param>
+    /// <param name="closingTagStartToken">The closing tags starting token.</param>
+    /// <param name="closingTagIdentifierToken">The closing tags identifier token.</param>
+    /// <param name="closingTagEndToken">The closing tags ending token.</param>
     public CXElement(
-        CXToken elementStartOpenToken,
-        CXToken? elementStartNameToken,
+        CXToken openingTagStartToken,
+        CXToken? openingTagIdentifierToken,
         CXCollection<CXAttribute> attributes,
-        CXToken elementStartCloseToken,
+        CXToken openingTagEndToken,
         CXCollection<CXNode> children,
-        CXToken? elementEndOpenToken = null,
-        CXToken? elementEndNameToken = null,
-        CXToken? elementEndCloseToken = null
+        CXToken? closingTagStartToken = null,
+        CXToken? closingTagIdentifierToken = null,
+        CXToken? closingTagEndToken = null
     )
     {
-        Slot(ElementStartOpenToken = elementStartOpenToken);
-        Slot(ElementStartNameToken = elementStartNameToken);
-        Slot(Attributes = attributes);
-        Slot(ElementStartCloseToken = elementStartCloseToken);
-        Slot(Children = children);
-        Slot(ElementEndOpenToken = elementEndOpenToken);
-        Slot(ElementEndNameToken = elementEndNameToken);
-        Slot(ElementEndCloseToken = elementEndCloseToken);
+        OpeningTag = new(
+            Slot(openingTagStartToken),
+            Slot(openingTagIdentifierToken),
+            Slot(attributes),
+            Slot(openingTagEndToken)
+        );
+        
+        Children = Slot(children);
+        
+        ClosingTag = new(
+            Slot(closingTagStartToken),
+            Slot(closingTagIdentifierToken),
+            Slot(closingTagEndToken)
+        );
     }
 }

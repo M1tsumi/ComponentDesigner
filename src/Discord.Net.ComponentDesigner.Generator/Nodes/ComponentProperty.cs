@@ -84,4 +84,9 @@ public sealed class ComponentProperty : IEquatable<ComponentProperty>
             Renderer,
             Validators.Aggregate(0, Hash.Combine)
         );
+
+    public static bool operator !=(ComponentProperty a, ComponentProperty? b)
+        => !a.Equals(b);
+    public static bool operator ==(ComponentProperty a, ComponentProperty? b)
+        => a.Equals(b);
 }

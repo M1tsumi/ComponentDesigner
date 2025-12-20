@@ -380,7 +380,7 @@ public static partial class Diagnostics
     public static DiagnosticDescriptor ComponentDoesntAllowChildren(string owner) => new(
         "DC0042",
         "Component doesn't allow children",
-        "'{0}' doesn't allow children",
+        $"'{owner}' doesn't allow children",
         "Components",
         DiagnosticSeverity.Error,
         true

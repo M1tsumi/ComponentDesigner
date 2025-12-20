@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Discord.CX.Utils;
 
-internal static class IncrementalGeneratorDebugUtils
+public static class IncrementalGeneratorDebugUtils
 {
     public static string ToDOTTree<T>(
         this IncrementalValueProvider<T> provider,

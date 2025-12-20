@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Discord.CX;
 using Discord.CX.Nodes;
 using Discord.CX.Parser.DebugUtils;
@@ -23,11 +24,11 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
     private IEnumerator<GraphNode>? _nodeEnumerator;
 
     public void Graph(
-        string cx,
-        string? pretext = null,
+        [StringSyntax("html")] string cx,
+        [StringSyntax("csharp")]string? pretext = null,
         bool allowParsingErrors = false,
         GeneratorOptions? options = null,
-        string? additionalMethods = null,
+        [StringSyntax("csharp")]string? additionalMethods = null,
         string testClassName = "TestClass",
         string testFuncName = "Run",
         bool hasInterpolations = true,
@@ -54,7 +55,6 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
             cxString.AppendLine();
             cxString.Append(pad);
         }
-        
        
         cxString.Append(quoteCount >= 3 ? cx.WithNewlinePadding(pad.Length) : cx);
         
@@ -87,7 +87,9 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
         
         output.WriteLine($"CX:\n{cxString}");
 
-        var target = Targets.FromSource(source);
+        var token = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+        
+        var target = Targets.FromSource(source, token);
 
         var state = SourceGenerator.CreateGraphState(
             "<global>:0",
@@ -98,7 +100,7 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
         var graph = CXGraph.Create(
             state,
             old: null,
-            CancellationToken.None
+            token
         );
         
         output.WriteLine($"AST:\n{graph.Document.ToStructuralFormat()}");
@@ -106,7 +108,7 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
 
         Assert.Equal(allowParsingErrors, graph.Document.HasErrors);
 
-        graph = graph.Update(target, CancellationToken.None);
+        graph = graph.Update(target, token);
         
         _graph = graph;
         _nodeEnumerator = _graph.RootNodes.SelectMany(EnumerateNodes).GetEnumerator();

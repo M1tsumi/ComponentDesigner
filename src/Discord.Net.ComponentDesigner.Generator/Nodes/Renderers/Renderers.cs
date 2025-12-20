@@ -36,7 +36,7 @@ public static class Renderers
 
         if (compilation.GetKnownTypes().ColorType!.Equals(type, SymbolEqualityComparer.Default))
             return Color;
-        
+
         // TODO: more ways to extract renderers
         return (context, propValue, options) =>
         {
@@ -633,34 +633,67 @@ public static class Renderers
             ? new string('}', dollars.Length)
             : string.Empty;
 
-        var isMultiline = literal.Tokens.Any(x =>
-            x.LeadingTrivia.ContainsNewlines ||
-            x.TrailingTrivia.ContainsNewlines ||
-            x.Value.Contains('\n')
-        );
+        var isMultiline = false;
 
-        foreach (var token in literal.Tokens)
+        for (var i = 0; i < literal.Tokens.Count; i++)
         {
+            var token = literal.Tokens[i];
+
+            // first and last token allow one newline before/after as syntax trivia
+            var leadingTrivia = token.LeadingTrivia;
+            var trailingTrivia = token.TrailingTrivia;
+
+            for (var j = 0; j < leadingTrivia.Count; j++)
+            {
+                var trivia = leadingTrivia[j];
+                if (trivia is not CXTrivia.Token { Kind: CXTriviaTokenKind.Newline }) continue;
+
+                if (i != 0) continue;
+
+                // remove all trivia leading up to this newline
+                leadingTrivia = leadingTrivia.RemoveRange(0, j + 1);
+                break;
+            }
+
+            for (var j = trailingTrivia.Count - 1; j >= 0; j--)
+            {
+                var trivia = trailingTrivia[j];
+                if (trivia is not CXTrivia.Token { Kind: CXTriviaTokenKind.Newline }) continue;
+
+                if (i != literal.Tokens.Count - 1) continue;
+
+                // remove all trivia after the newline
+                trailingTrivia = trailingTrivia.RemoveRange(j, trailingTrivia.Count - j);
+                break;
+            }
+
+            isMultiline |=
+            (
+                trailingTrivia.ContainsNewlines ||
+                leadingTrivia.ContainsNewlines ||
+                token.Value.Contains("\n")
+            );
+
             switch (token.Kind)
             {
                 case CXTokenKind.Text:
                     sb
-                        .Append(token.LeadingTrivia)
+                        .Append(leadingTrivia)
                         .Append(EscapeBackslashes(token.Value))
-                        .Append(token.TrailingTrivia);
+                        .Append(trailingTrivia);
                     break;
                 case CXTokenKind.Interpolation:
-                    var index = Array.IndexOf(literal.Document.InterpolationTokens, token);
+                    var index = literal.Document!.InterpolationTokens.IndexOf(token);
 
                     // TODO: handle better
                     if (index is -1) throw new InvalidOperationException();
 
                     sb
-                        .Append(token.LeadingTrivia)
+                        .Append(leadingTrivia)
                         .Append(startInterpolation)
                         .Append($"designer.GetValueAsString({index})")
                         .Append(endInterpolation)
-                        .Append(token.TrailingTrivia);
+                        .Append(trailingTrivia);
                     break;
 
                 default: continue;

@@ -150,8 +150,9 @@ public sealed class SectionComponentNode : ComponentNode
         ).Or("null");
 
         return renderedAccessory
-            .Combine(state.RenderChildren(context, x => x.Inner is not AccessoryComponentNode))
-            .Combine(state.RenderInitializer(this, context, x => x == Accessory))
+            .Combine(
+                state.RenderChildren(context, x => x.Inner is not AccessoryComponentNode, ChildrenRenderingOptions))
+            .Combine(state.RenderInitializer(this, context, x => x.Equals(Accessory)))
             .Map(x =>
                 $"""
                  new {context.KnownTypes.SectionBuilderType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}(
@@ -162,7 +163,8 @@ public sealed class SectionComponentNode : ComponentNode
                      ]
                  ){x.Right.PrefixIfSome(Environment.NewLine)}
                  """
-            );
+            )
+            .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
     }
 }
 
@@ -214,7 +216,9 @@ public sealed class AccessoryComponentNode : ComponentNode
     private static bool IsAllowedChild(ComponentNode node)
         => node is ButtonComponentNode or ThumbnailComponentNode;
 
-    public override Result<string> Render(ComponentState state, IComponentContext context,
-        ComponentRenderingOptions options)
-        => state.RenderChildren(context);
+    public override Result<string> Render(
+        ComponentState state,
+        IComponentContext context,
+        ComponentRenderingOptions options
+    )    => state.RenderChildren(context);
 }

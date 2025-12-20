@@ -7,6 +7,140 @@ namespace UnitTests.ComponentTests;
 public sealed class FunctionalComponentTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
+    public void InterpolatedChildValue()
+    {
+        Graph(
+            """
+            <MyFunc>
+                {a}
+            </MyFunc>
+            """,
+            additionalMethods:
+            """
+            public static CXMessageComponent MyFunc([CXChildren] int children) => null!;
+            """,
+            pretext:
+            """
+            int a = 0;
+            """
+        );
+        {
+            Node<FunctionalComponentNode>();
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                ..global::TestClass.MyFunc(
+                    children: designer.GetValue<int>(0)
+                ).Builders
+                """
+            );
+        }
+    }
+
+    [Fact]
+    public void TextAndInterpolatedChildren()
+    {
+        Graph(
+            """
+            <MyFunc>
+                Text 1 {a} Text 2 {b}
+            </MyFunc>
+            """,
+            additionalMethods:
+            """
+            public static CXMessageComponent MyFunc([CXChildren] string children) => null!;
+            """,
+            pretext:
+            """
+            string a = null!;
+            string b = null!;
+            """
+        );
+        {
+            Node<FunctionalComponentNode>();
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                ..global::TestClass.MyFunc(
+                    children: $"Text 1 {designer.GetValueAsString(0)} Text 2 {designer.GetValueAsString(1)}"
+                ).Builders
+                """
+            );
+        }
+    }
+
+    [Fact]
+    public void WithScalarChildren()
+    {
+        Graph(
+            """
+            <MyFunc>
+                This is some text
+            </MyFunc>
+            """,
+            additionalMethods:
+            """
+            public static CXMessageComponent MyFunc([CXChildren] string children) => null!;
+            """
+        );
+        {
+            Node<FunctionalComponentNode>();
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                ..global::TestClass.MyFunc(
+                    children: "This is some text"
+                ).Builders
+                """
+            );
+        }
+    }
+
+    [Fact]
+    public void WithComponentChildren()
+    {
+        Graph(
+            """
+            <MyFunc>
+                <text>Hello</text>
+            </MyFunc>
+            """,
+            additionalMethods:
+            """
+            public static CXMessageComponent MyFunc([CXChildren] CXMessageComponent children) => null!;
+            """
+        );
+        {
+            Node<FunctionalComponentNode>();
+            {
+                Node<TextDisplayComponentNode>();
+            }
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """
+                ..global::TestClass.MyFunc(
+                    children: new global::Discord.CXMessageComponent([
+                        new global::Discord.TextDisplayBuilder(
+                            content: "Hello"
+                        )
+                    ])
+                ).Builders
+                """
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
     public void ChildOfContainer()
     {
         Graph(

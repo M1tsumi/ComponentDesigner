@@ -1,60 +1,48 @@
 ﻿using System;
 using System.Linq;
+using Discord.CX.Util;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX.Parser;
 
-public readonly record struct CXDiagnostic(
+public readonly record struct CXDiagnosticDescriptor(
     DiagnosticSeverity Severity,
     CXErrorCode Code,
-    string Message,
-    ICXNode Owner
+    string Message
 )
 {
-    public TextSpan Span => Owner.Span;
-    
-    public static CXDiagnostic MissingElementClosingTag(CXToken? identifier, ICXNode owner)
+     public static CXDiagnosticDescriptor MissingElementClosingTag(CXToken? identifier)
         => new(
             DiagnosticSeverity.Error,
             CXErrorCode.MissingElementClosingTag,
             identifier is not null
                 ? $"Missing closing tag for '{identifier.Value}'"
-                : "Missing fragment closing tag",
-            owner
+                : "Missing fragment closing tag"
         );
-    
-    public static CXDiagnostic InvalidRootElement(CXToken token)
-    {
-        return new CXDiagnostic(
-            DiagnosticSeverity.Error,
-            CXErrorCode.InvalidRootElement,
-            $"'{token.Kind}' is not a valid root element",
-            token
-        );
-    }
-    
-    public static CXDiagnostic InvalidElementChildToken(CXToken token)
-    {
-        return new CXDiagnostic(
-            DiagnosticSeverity.Error,
-            CXErrorCode.InvalidElementChildToken,
-            $"'{token.Kind}' is not a valid child of an element",
-            token
-        );
-    }
-    
-    public static CXDiagnostic InvalidStringLiteralToken(CXToken token)
-    {
-        return new(
-            DiagnosticSeverity.Error,
-            CXErrorCode.InvalidStringLiteralToken,
-            $"'{token.Kind}' is not valid within a string literal",
-            token
-        );
-    }
 
-    public static CXDiagnostic InvalidAttributeValue(CXToken token)
+     public static CXDiagnosticDescriptor InvalidRootElement(CXToken token)
+         => new(
+             DiagnosticSeverity.Error,
+             CXErrorCode.InvalidRootElement,
+             $"'{token.Kind}' is not a valid root element"
+         );
+
+     public static CXDiagnosticDescriptor InvalidElementChildToken(CXToken token)
+         => new(
+             DiagnosticSeverity.Error,
+             CXErrorCode.InvalidElementChildToken,
+             $"'{token.Kind}' is not a valid child of an element"
+         );
+
+     public static CXDiagnosticDescriptor InvalidStringLiteralToken(CXToken token)
+         => new(
+             DiagnosticSeverity.Error,
+             CXErrorCode.InvalidStringLiteralToken,
+             $"'{token.Kind}' is not valid within a string literal"
+         );
+
+    public static CXDiagnosticDescriptor InvalidAttributeValue(CXToken token)
     {
         if (
             token.Kind is CXTokenKind.ForwardSlashGreaterThan
@@ -65,27 +53,24 @@ public readonly record struct CXDiagnostic(
             return new(
                 DiagnosticSeverity.Error,
                 CXErrorCode.MissingAttributeValue,
-                "Missing attribute value",
-                token
+                "Missing attribute value"
             );
         }
 
-        return new CXDiagnostic(
+        return new CXDiagnosticDescriptor(
             DiagnosticSeverity.Error,
             CXErrorCode.InvalidAttributeValue,
-            $"'{token.Kind}' is not a valid attribute value token",
-            token
+            $"'{token.Kind}' is not a valid attribute value token"
         );
     }
 
-    public static CXDiagnostic UnexpectedToken(
+    public static CXDiagnosticDescriptor UnexpectedToken(
         CXToken token,
         params CXTokenKind[] expected
     ) => new(
         DiagnosticSeverity.Error,
         CXErrorCode.UnexpectedToken,
-        $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'",
-        token
+        $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'"
     );
 
     private static string FormatExpected(CXTokenKind[] kinds)
@@ -97,4 +82,14 @@ public readonly record struct CXDiagnostic(
         return
             $"one of {string.Join(", ", kinds.Take(kinds.Length - 1).Select(x => $"'{x}'"))} or '{kinds[kinds.Length - 1]}'";
     }
+}
+
+public readonly record struct CXDiagnostic(
+    CXDiagnosticDescriptor Descriptor,
+    TextSpan Span
+)
+{
+    public DiagnosticSeverity Severity => Descriptor.Severity;
+    public CXErrorCode Code => Descriptor.Code;
+    public string Message => Descriptor.Message;
 }

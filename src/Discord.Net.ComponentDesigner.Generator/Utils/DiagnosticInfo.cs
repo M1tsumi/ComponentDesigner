@@ -9,6 +9,10 @@ public sealed record DiagnosticInfo(
     TextSpan Span
 )
 {
+    public DiagnosticInfo(DiagnosticDescriptor descriptor, ICXNode node) : this(descriptor, node.Span)
+    {
+    }
+
     public static DiagnosticInfo Create(DiagnosticDescriptor descriptor, TextSpan span) => new(descriptor, span);
     public static DiagnosticInfo Create(DiagnosticDescriptor descriptor, ICXNode node) => new(descriptor, node.Span);
 }

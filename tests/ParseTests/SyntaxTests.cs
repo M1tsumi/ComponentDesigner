@@ -159,7 +159,7 @@ public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
                             Token(CXTokenKind.ForwardSlashGreaterThan);
                         }
 
-                        Node<CXElement>();
+                        var x = Node<CXElement>();
                         {
                             Token(CXTokenKind.LessThan);
                             Token(CXTokenKind.Identifier, "Depth2");
@@ -538,7 +538,7 @@ public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
 
                 var fragment = Element();
                 {
-                    Assert.Null(fragment.ElementStartNameToken);
+                    Assert.Null(fragment.OpeningTag.IdentifierToken);
                     Assert.True(fragment.IsFragment);
 
                     Token(CXTokenKind.LessThan);

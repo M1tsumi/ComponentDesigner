@@ -10,6 +10,8 @@ namespace Discord.CX;
 public readonly struct Result<T> : IEquatable<Result<T>>
     where T : IEquatable<T>?
 {
+    public static readonly Result<T> Empty = new(diagnostics: []);
+    
     public T Value
     {
         get
