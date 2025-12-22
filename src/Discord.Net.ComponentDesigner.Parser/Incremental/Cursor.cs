@@ -12,11 +12,4 @@ public readonly record struct Cursor(
 {
     public Cursor Finish()
         => this with { NodeIndex = -1 };
-
-    // public static readonly Cursor Invalid = new(
-    //     -1,
-    //     -1,
-    //     -1,
-    //     ImmutableStack<TextChangeRange>.Empty
-    // );
 }
