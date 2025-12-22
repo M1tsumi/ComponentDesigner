@@ -13,8 +13,7 @@ public sealed record GraphInitializationContext(
     IReadOnlyList<ICXNode> ReusedNodes,
     CXGraph? OldGraph,
     Dictionary<ICXNode, GraphNode> Map,
-    IList<DiagnosticInfo> Diagnostics,
-    IncrementalParseResult? IncrementalParseResult
+    IList<DiagnosticInfo> Diagnostics
 ) : IComponentContext
 {
     public GeneratorOptions Options => State.GeneratorOptions;
@@ -28,7 +27,7 @@ public sealed record GraphInitializationContext(
     public EquatableArray<DesignerInterpolationInfo> Interpolations => State.CX.InterpolationInfos;
     public CXDesignerGeneratorState CX => State.CX;
     
-    public bool IsIncremental => OldGraph is not null && IncrementalParseResult is not null;
+    public bool IsIncremental => OldGraph is not null;
 
     public bool TryReuse(ICXNode node, GraphNode? parent, out GraphNode graphGraphNode)
     {

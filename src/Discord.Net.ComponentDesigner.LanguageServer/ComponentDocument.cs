@@ -41,7 +41,6 @@ public sealed class ComponentDocument
         
         var reader = new CXSourceReader(
             _source,
-            new(0, _source.Length),
             [],
             3
         );

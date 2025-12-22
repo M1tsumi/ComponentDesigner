@@ -6,11 +6,6 @@ using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
-using RelativeIndex = int;
-using NormalizedIndex = int;
-using RelativeTextSpan = TextSpan;
-using NormalizedTextSpan = TextSpan;
-
 /// <summary>
 ///     Represents a class used to read from a <see cref="CXSourceText"/> and understand additional language features
 ///     like interpolations and source location offsetting. 
@@ -21,12 +16,9 @@ public sealed class CXSourceReader
     ///     Gets a single <see cref="char"/> at the specified <paramref name="index"/>.
     /// </summary>
     /// <param name="index">
-    ///     The relative index of the <see cref="char"/> to get.
+    ///     The index of the <see cref="char"/> to get.
     /// </param>
-    public char this[RelativeIndex index]
-        => SourceSpan.Contains(index)
-            ? Source[Normalize(index)]
-            : CXLexer.NULL_CHAR;
+    public char this[int index] => index < 0 || index >= Source.Length ? CXLexer.NULL_CHAR : Source[index];
 
     /// <summary>
     ///     Gets a string at the specified <paramref name="span"/>.
@@ -34,8 +26,8 @@ public sealed class CXSourceReader
     /// <param name="span">
     ///     A relative <see cref="TextSpan"/> representing the region of the source to get.
     /// </param>
-    public string this[RelativeTextSpan span]
-        => Source[Normalize(span)];
+    public string this[TextSpan span]
+        => Source[span];
 
     /// <summary>
     ///     Gets a string at the specified <paramref name="index"/> and <paramref name="length"/>
@@ -46,13 +38,13 @@ public sealed class CXSourceReader
     /// <param name="length">
     ///     The number of characters to read from the source.
     /// </param>
-    public string this[RelativeIndex index, int length]
+    public string this[int index, int length]
         => this[new TextSpan(index, length)];
 
     /// <summary>
     ///     Gets whether the reader is at the end of the source.
     /// </summary>
-    public bool IsEOF => Position >= SourceSpan.End;
+    public bool IsEOF => Position >= Source.Length;
 
     /// <summary>
     ///     Gets the current character the reader is at.
@@ -87,20 +79,12 @@ public sealed class CXSourceReader
     /// <summary>
     ///     Gets the current position of the reader.
     /// </summary>
-    public NormalizedIndex Position { get; set; }
-    
+    public int Position { get; set; }
+
     /// <summary>
     ///     Gets the underlying <see cref="CXSourceText"/> that this reader is reading from.
     /// </summary>
     public CXSourceText Source { get; }
-
-    /// <summary>
-    ///     Gets the span that encapsulates the <see cref="Source"/> that this reader is reading from.
-    /// </summary>
-    /// <remarks>
-    ///     All positions are normalized to be within this span.
-    /// </remarks>
-    public TextSpan SourceSpan { get; }
 
     /// <summary>
     ///     Gets a read-only array of <see cref="TextSpan"/>s representing the interpolations found within the
@@ -136,14 +120,12 @@ public sealed class CXSourceReader
     /// </param>
     public CXSourceReader(
         CXSourceText source,
-        TextSpan sourceSpan,
         TextSpan[] interpolations,
         int wrappingQuoteCount
     )
     {
         Source = source;
-        Position = sourceSpan.Start;
-        SourceSpan = sourceSpan;
+        Position = 0;
         Interpolations = [..interpolations];
         WrappingQuoteCount = wrappingQuoteCount;
 
@@ -158,7 +140,7 @@ public sealed class CXSourceReader
     ///     <see langword="true"/> if the provided <paramref name="index"/> falls within an interpolation; otherwise
     ///     <see langword="false"/>.
     /// </returns>
-    public bool IsAtInterpolation(NormalizedIndex index)
+    public bool IsAtInterpolation(int index)
     {
         // nit: a binary search could be faster, but generally there are not that many
         // interpolations to warrant it
@@ -168,30 +150,6 @@ public sealed class CXSourceReader
 
         return false;
     }
-
-    /// <summary>
-    ///     Normalizes an index to the <see cref="Source"/>.
-    /// </summary>
-    /// <param name="index">
-    ///     The index to normalize.
-    /// </param>
-    /// <returns>
-    ///     The normalized form of the provided <paramref name="index"/> to the <see cref="Source"/>
-    /// </returns>
-    public NormalizedIndex Normalize(RelativeIndex index)
-        => index - SourceSpan.Start;
-
-    /// <summary>
-    ///     Normalizes a <see cref="TextSpan"/> to the <see cref="Source"/>.
-    /// </summary>
-    /// <param name="span">
-    ///     The <see cref="TextSpan"/> to normalize.
-    /// </param>
-    /// <returns>
-    ///     The normalized form of the provided <paramref name="span"/> to the <see cref="Source"/>.
-    /// </returns>
-    public NormalizedTextSpan Normalize(RelativeTextSpan span)
-        => new(Normalize(span.Start), span.Length);
 
     /// <summary>
     ///     Advances the reader by <paramref name="count"/> characters
@@ -222,12 +180,12 @@ public sealed class CXSourceReader
     /// </remarks>
     public string Peek(int length = 1)
     {
-        var upper = Math.Min(SourceSpan.End, Position + length);
+        var upper = Math.Min(Source.Length, Position + length);
 
         return Source[TextSpan.FromBounds(
-            Normalize(Position),
-            Normalize(upper))
-        ];
+            Position,
+            upper
+        )];
     }
 
     /// <summary>
@@ -272,7 +230,7 @@ public sealed class CXSourceReader
     ///     An interned string representing the text at the current <see cref="Position"/> with the provided
     ///     <paramref name="length"/>.
     /// </returns>
-    public string GetInternedText(NormalizedIndex start, int length)
+    public string GetInternedText(int start, int length)
         => Intern(this[start, length]);
 
     /// <summary>

@@ -12,8 +12,29 @@ public abstract class BaseIncrementalTests(ITestOutputHelper output) : IDisposab
 {
     private CXDocument? _document;
     private IEnumerator<ICXNode>? _enumerator;
-    private IncrementalParseResult? _incrementalParseResult;
     private readonly Stack<CXDiagnostic> _diagnostics = [];
+
+    protected CXDocument ParseWithoutTreeAssert(
+        [StringSyntax("html")] string cx,
+        [StringSyntax("csharp")] string? pretext = null,
+        bool allowParsingErrors = false,
+        GeneratorOptions? options = null,
+        [StringSyntax("csharp")] string? additionalMethods = null,
+        string testClassName = "TestClass",
+        string testFuncName = "Run",
+        bool hasInterpolations = true,
+        int quoteCount = 3
+    )
+    {
+        var doc = Parse(
+            cx, pretext, allowParsingErrors, options, additionalMethods, testClassName, testFuncName,
+            hasInterpolations, quoteCount
+        );
+
+        _enumerator = null;
+
+        return doc;
+    }
 
     protected CXDocument Parse(
         [StringSyntax("html")] string cx,
@@ -90,9 +111,14 @@ public abstract class BaseIncrementalTests(ITestOutputHelper output) : IDisposab
 
         var reader = source
             .CreateReader(
-                target.CX.Location.TextSpan,
                 target.CX.InterpolationInfos
-                    .Select(x => x.Span)
+                    .Select(x =>
+                    {
+                        return new TextSpan(
+                            x.Span.Start - target.CX.Location.TextSpan.Start,
+                            x.Span.Length
+                        );
+                    })
                     .ToArray()
             );
 
@@ -149,8 +175,7 @@ public abstract class BaseIncrementalTests(ITestOutputHelper output) : IDisposab
                 }
             }
 
-            _document = _document.IncrementalParse(reader, changes, out var result, token);
-            _incrementalParseResult = result;
+            _document = _document.IncrementalParse(reader, changes, token);
         }
 
         foreach (var diagnostic in _document.AllDiagnostics)
@@ -190,24 +215,27 @@ public abstract class BaseIncrementalTests(ITestOutputHelper output) : IDisposab
         }
     }
 
+    protected CXValue.StringLiteral StrLiteral(string? value = null, bool? reused = null)
+        => N<CXValue.StringLiteral>(value, reused);
+
     protected CXElement Element(string? value = null, bool? reused = null)
         => N<CXElement>(value, reused);
-    
+
     protected CXAttribute Attribute(string? value = null, bool? reused = null)
         => N<CXAttribute>(value, reused);
-    
+
     protected CXToken Ident(string value, bool? reused = null)
         => T(CXTokenKind.Identifier, value, reused);
-    
+
     protected CXToken T(CXTokenKind kind, string? value = null, bool? reused = null)
     {
         var token = N<CXToken>(value, reused);
-        
+
         Assert.Equal(kind, token.Kind);
 
         return token;
     }
-    
+
     protected T N<T>(string? value = null, bool? reused = null) where T : ICXNode
     {
         var current = GetNextNode();
@@ -218,13 +246,13 @@ public abstract class BaseIncrementalTests(ITestOutputHelper output) : IDisposab
 
         if (reused is true)
         {
-            Assert.NotNull(_incrementalParseResult);
-            Assert.Contains(current, _incrementalParseResult.Value.ReusedNodes);
+            Assert.Contains(current, _document!.ReusedNodes);
+            Assert.DoesNotContain(current, _document!.NewNodes);
         }
         else if (reused is false)
         {
-            Assert.NotNull(_incrementalParseResult);
-            Assert.DoesNotContain(current, _incrementalParseResult.Value.ReusedNodes);
+            Assert.DoesNotContain(current, _document!.ReusedNodes);
+            Assert.Contains(current, _document!.NewNodes);
         }
 
         return (T)current;

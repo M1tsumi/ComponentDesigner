@@ -11,6 +11,7 @@ using Discord.CX.Nodes.Components.Custom;
 using Discord.CX.Parser;
 using Discord.CX.Util;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Discord.CX;
 
@@ -64,8 +65,14 @@ public sealed class CXGraph : IEquatable<CXGraph>
         // TODO: support inc. parsing
         var reader = new CXSourceReader(
             new CXSourceText.StringSource(state.CX.Designer),
-            state.CX.Location.TextSpan,
-            state.CX.InterpolationInfos.Select(x => x.Span).ToArray(),
+            state.CX.InterpolationInfos.Select(x =>
+            {
+                // normalize to source
+                return new TextSpan(
+                    x.Span.Start - state.CX.Location.TextSpan.Start,
+                    x.Span.Length
+                );
+            }).ToArray(),
             state.CX.QuoteCount
         );
 
@@ -101,8 +108,7 @@ public sealed class CXGraph : IEquatable<CXGraph>
             [],
             old,
             map,
-            diagnostics,
-            null
+            diagnostics
         );
 
         return new CXGraph(

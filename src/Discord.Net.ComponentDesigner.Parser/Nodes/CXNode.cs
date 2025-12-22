@@ -136,7 +136,7 @@ public abstract class CXNode : ICXNode
         get => _diagnostics;
         init => _diagnostics = [..value];
     }
-
+    
     private readonly List<ICXNode> _slots;
     private readonly List<CXDiagnosticDescriptor> _diagnostics;
 
@@ -372,9 +372,31 @@ public abstract class CXNode : ICXNode
         return sb.ToString();
     }
 
+    public CXNode Clone()
+    {
+        var shallow = (CXNode)MemberwiseClone();
+
+        for (var i = 0; i < shallow._slots.Count; i++)
+        { 
+            var slot = shallow._slots[i];
+
+            slot = (ICXNode)slot.Clone();
+
+            slot.Parent = shallow;
+            
+            shallow._slots[i] = slot;
+        }
+
+        shallow.ResetCachedState();
+        
+        return shallow;
+    }
+    
     IReadOnlyList<CXDiagnosticDescriptor> ICXNode.DiagnosticDescriptors
     {
         get => DiagnosticDescriptors;
         init => DiagnosticDescriptors = value;
     }
+
+    object ICloneable.Clone() => Clone();
 }

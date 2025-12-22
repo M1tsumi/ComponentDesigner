@@ -21,5 +21,5 @@ public enum CXTokenFlags : byte
     /// <summary>
     ///     The token was created synthetically and does not exist within the <see cref="CXSourceText"/>.
     /// </summary>
-    Synthetic = 1 << 1
+    Synthetic = 1 << 1,
 }

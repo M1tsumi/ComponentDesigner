@@ -68,12 +68,10 @@ public abstract partial class CXSourceText
     ///     A <see cref="CXSourceReader"/> that can read from this <see cref="CXSourceText"/>.
     /// </returns>
     public CXSourceReader CreateReader(
-        TextSpan? span = null,
         TextSpan[]? interpolations = null,
         int? wrappingQuoteCount = null
     ) => new(
         this,
-        span ?? new(0, Length),
         interpolations ?? [],
         wrappingQuoteCount ?? 3
     );

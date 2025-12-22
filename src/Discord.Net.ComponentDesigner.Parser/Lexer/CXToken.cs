@@ -162,6 +162,7 @@ public sealed record CXToken(
     public override int GetHashCode()
         => CXNodeEqualityComparer.Default.GetHashCode(this);
 
+
     /// <inheritdoc/>
     int ICXNode.GraphWidth => 0;
 
@@ -173,4 +174,6 @@ public sealed record CXToken(
         get => Diagnostics;
         init => Diagnostics = value;
     }
+
+    object ICloneable.Clone() => this with {};
 }

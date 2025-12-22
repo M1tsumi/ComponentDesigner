@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 
@@ -11,45 +12,12 @@ namespace Discord.CX.Parser;
 /// <summary>
 ///     Represents a parser that can parse the CX language into a <see cref="CXDocument"/>.
 /// </summary>
-public sealed class CXParser
+public sealed partial class CXParser
 {
-    /// <summary>
-    ///     Gets the currently lexed token.
-    /// </summary>
-    public CXToken CurrentToken => Lex(_tokenIndex);
-
-    /// <summary>
-    ///     Gets the lexed token that semantically follows the <see cref="CurrentToken"/>.
-    /// </summary>
-    public CXToken NextToken => Lex(_tokenIndex + 1);
-
-    /// <summary>
-    ///     Gets the current <see cref="ICXNode"/> that the <see cref="CXBlender"/> has read.
-    /// </summary>
-    public ICXNode? CurrentBlendedASTNode
-        => (_currentBlendedNode ??= GetCurrentBlendedNode())?.Value;
-
     /// <summary>
     ///     Gets the lexer used to lex the underlying <see cref="CXSourceText"/>.
     /// </summary>
     public CXLexer Lexer { get; }
-
-    /// <summary>
-    ///     Gets a collection of <see cref="ICXNode"/>s that were served by the <see cref="CXBlender"/> if the parser is
-    ///     operating in an incremental mode. 
-    /// </summary>
-    public IReadOnlyList<ICXNode> BlendedNodes =>
-    [
-        .._blendedNodes
-            .Select(x => x.Value)
-            .Where(x => x is not null)!
-    ];
-
-    /// <summary>
-    ///     Gets the collection of tokens the parser has lexed.
-    /// </summary>
-    public IReadOnlyList<CXToken> Tokens
-        => IsIncremental ? [..BlendedNodes.OfType<CXToken>()] : [.._tokens];
 
     /// <summary>
     ///     Gets the underlying <see cref="CXSourceReader"/> used by the parser.
@@ -59,7 +27,8 @@ public sealed class CXParser
     /// <summary>
     ///     Gets whether this parser is operating in an incremental mode.
     /// </summary>
-    public bool IsIncremental => Blender is not null;
+    [MemberNotNullWhen(true, nameof(Blender), nameof(_blendedNodes))]
+    public bool IsIncremental => Blender is not null && _blendedNodes is not null;
 
     /// <summary>
     ///     Gets the incremental blender used to blend an old <see cref="CXDocument"/> with new <see cref="ICXNode"/>s.
@@ -74,12 +43,6 @@ public sealed class CXParser
     /// </summary>
     public CancellationToken CancellationToken { get; }
 
-    private int _tokenIndex;
-    private BlendedNode? _currentBlendedNode;
-
-    private readonly List<CXToken> _tokens;
-    private readonly List<BlendedNode> _blendedNodes;
-
     /// <summary>
     ///     Constructs a new <see cref="CXParser"/>.
     /// </summary>
@@ -93,7 +56,6 @@ public sealed class CXParser
         Reader = reader;
         Lexer = new CXLexer(Reader, token);
         _tokens = [];
-        _blendedNodes = [];
     }
 
     /// <summary>
@@ -115,6 +77,7 @@ public sealed class CXParser
     ) : this(reader, token)
     {
         Blender = new CXBlender(Lexer, document, change);
+        _blendedNodes = new BlendedNode[document.GraphWidth];
     }
 
     /// <summary>
@@ -157,9 +120,9 @@ public sealed class CXParser
     /// </returns>
     internal CXNode ParseTopLevelNode()
     {
-        if (IsIncremental && CurrentBlendedASTNode is CXNode && EatASTNode() is { } node) return node;
-
         using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
+
+        if (TryEatASTNode<CXNode>(out var node)) return node;
 
         switch (CurrentToken.Kind)
         {
@@ -176,7 +139,7 @@ public sealed class CXParser
 
         return new CXValue.Invalid()
         {
-            DiagnosticDescriptors = 
+            DiagnosticDescriptors =
             [
                 CXDiagnosticDescriptor.InvalidRootElement(CurrentToken)
             ]
@@ -188,22 +151,18 @@ public sealed class CXParser
     /// </summary>
     /// <remarks>
     ///     Recoverable methods are used to parse the <see cref="CXElement"/> and always returns an instance. Any
-    ///     parsing errors will be propagated to the <see cref="CXElement.Diagnostics"/> property.
+    ///     parsing errors will be propagated to the <see cref="CXNode.DiagnosticDescriptors"/> property.
     /// </remarks>
     /// <returns>
     ///     The <see cref="CXElement"/> that was parsed.
     /// </returns>
     internal CXElement ParseElement()
     {
-        // check for incremental node.
-        if (IsIncremental && CurrentBlendedASTNode is CXElement incElement)
-        {
-            EatASTNode();
-            return incElement;
-        }
-
         // reset the lexer mode to default.
         using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
+
+        // check for incremental node
+        if (TryEatASTNode<CXElement>(out var node)) return node;
 
         var diagnostics = new List<CXDiagnosticDescriptor>();
 
@@ -290,7 +249,7 @@ public sealed class CXParser
              * store a sentinel to roll back to if the element closing tag is semantically incorrect. We'll roll back
              * in that case and assume that the tokens consumed were not meant for us.
              */
-            var sentinel = _tokenIndex;
+            var sentinel = _position;
 
             // we should see a '</' token
             elementEndStart = Expect(CXTokenKind.LessThanForwardSlash);
@@ -341,7 +300,7 @@ public sealed class CXParser
                 elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan);
 
                 // rollback
-                _tokenIndex = sentinel;
+                _position = sentinel;
             }
         }
     }
@@ -358,11 +317,7 @@ public sealed class CXParser
     internal CXCollection<CXNode> ParseElementChildren()
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXCollection<CXNode> incrementalChildren)
-        {
-            EatASTNode();
-            return incrementalChildren;
-        }
+        if (TryEatASTNode<CXCollection<CXNode>>(out var node)) return node;
 
         var children = new List<CXNode>();
         var diagnostics = new List<CXDiagnosticDescriptor>();
@@ -398,9 +353,9 @@ public sealed class CXParser
     internal bool TryParseElementChild(List<CXDiagnosticDescriptor> diagnostics, out CXNode node)
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXValue or CXElement)
+        if (IsIncremental && CurrentNode is CXValue or CXElement)
         {
-            node = EatASTNode()!;
+            node = EatNode();
             return true;
         }
 
@@ -488,11 +443,7 @@ public sealed class CXParser
     internal CXCollection<CXAttribute> ParseAttributes()
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXCollection<CXAttribute> incrementalNode)
-        {
-            EatASTNode();
-            return incrementalNode;
-        }
+        if (TryEatASTNode<CXCollection<CXAttribute>>(out var node)) return node;
 
         var attributes = new List<CXAttribute>();
 
@@ -519,7 +470,7 @@ public sealed class CXParser
     /// </summary>
     /// <remarks>
     ///     Recoverable methods are used to parse the <see cref="CXAttribute"/> and will always return an instance.
-    ///     Any parsing errors will be propagated to the <see cref="CXAttribute.Diagnostics"/> property.
+    ///     Any parsing errors will be propagated to the <see cref="CXNode.DiagnosticDescriptors"/> property.
     /// </remarks>
     /// <returns>
     ///     The parsed <see cref="CXAttribute"/>
@@ -527,11 +478,7 @@ public sealed class CXParser
     internal CXAttribute ParseAttribute()
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXAttribute attribute)
-        {
-            EatASTNode();
-            return attribute;
-        }
+        if (TryEatASTNode<CXAttribute>(out var node)) return node;
 
         // set the lexing mode attributes
         using (Lexer.SetMode(CXLexer.LexMode.Attribute))
@@ -571,11 +518,7 @@ public sealed class CXParser
     internal CXValue ParseAttributeValue()
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXValue value)
-        {
-            EatASTNode();
-            return value;
-        }
+        if (TryEatASTNode<CXValue>(out var node)) return node;
 
         // ensure were lexing in the attribute mode
         using (Lexer.SetMode(CXLexer.LexMode.Attribute))
@@ -619,7 +562,7 @@ public sealed class CXParser
     /// </summary>
     /// <remarks>
     ///     Recoverable methods are used to parse the <see cref="CXValue.StringLiteral"/> and will always return an
-    ///     instance. Any parsing errors will be propagated to the <see cref="CXValue.StringLiteral.Diagnostics"/>
+    ///     instance. Any parsing errors will be propagated to the <see cref="CXNode.DiagnosticDescriptors"/>
     ///     property.
     /// </remarks>
     /// <returns>
@@ -628,11 +571,7 @@ public sealed class CXParser
     internal CXValue.StringLiteral ParseStringLiteral()
     {
         // check for incremental node
-        if (IsIncremental && CurrentBlendedASTNode is CXValue.StringLiteral value)
-        {
-            EatASTNode();
-            return value;
-        }
+        if (TryEatASTNode<CXValue.StringLiteral>(out var node)) return node;
 
         var diagnostics = new List<CXDiagnosticDescriptor>();
         var tokens = new List<CXToken>();
@@ -708,7 +647,7 @@ public sealed class CXParser
     internal CXToken Eat()
     {
         var token = CurrentToken;
-        _tokenIndex++;
+        MoveToNextToken();
         return token;
     }
 
@@ -728,7 +667,7 @@ public sealed class CXParser
 
         if (token.Kind == kind)
         {
-            _tokenIndex++;
+            MoveToNextToken();
             return true;
         }
 
@@ -789,96 +728,7 @@ public sealed class CXParser
             );
         }
 
-        _tokenIndex++;
+        MoveToNextToken();
         return token;
-    }
-
-    /// <summary>
-    ///     Gets or computes the currently blended node. 
-    /// </summary>
-    /// <returns>
-    ///     The current <see cref="BlendedNode"/> if any, otherwise <see langword="null"/>.
-    /// </returns>
-    private BlendedNode? GetCurrentBlendedNode()
-        => Blender?.NextNode(
-            _tokenIndex is 0
-                ? Blender.StartingCursor
-                : _blendedNodes[Math.Min(_tokenIndex - 1, _blendedNodes.Count - 1)].Cursor
-        );
-
-    /// <summary>
-    ///     Returns the current <see cref="BlendedNode"/> if it's an AST node, and advances the blender
-    /// </summary>
-    private CXNode? EatASTNode()
-    {
-        if (_currentBlendedNode?.Value is not CXNode node) return null;
-
-        _blendedNodes.Add(_currentBlendedNode!.Value);
-        _tokenIndex++;
-
-        _currentBlendedNode = null;
-
-        node.ResetCachedState();
-        return node;
-    }
-
-    /// <summary>
-    ///     Gets or lexes a token at the provided index.
-    /// </summary>
-    /// <param name="index">
-    ///     The index of the token to get or lex.
-    /// </param>
-    /// <returns>
-    ///     The token at the given index.
-    /// </returns>
-    internal CXToken Lex(int index)
-    {
-        // use the blender if were operating in an incremental mode
-        if (Blender is not null) return FetchBlended();
-
-        // lex up to the index
-        while (_tokens.Count <= index)
-        {
-            CancellationToken.ThrowIfCancellationRequested();
-
-            var token = Lexer.Next();
-
-            _tokens.Add(token);
-
-            // break out if we've hit the EOF token
-            if (token.Kind is CXTokenKind.EOF) return token;
-        }
-
-        return _tokens[index];
-
-        CXToken FetchBlended()
-        {
-            // remove any non-token nodes
-            while (_blendedNodes.Count > 0 && _blendedNodes[_blendedNodes.Count - 1].Value is CXNode)
-            {
-                _blendedNodes.RemoveAt(_blendedNodes.Count - 1);
-                index--;
-            }
-
-            // blend up to the index
-            while (_blendedNodes.Count <= index)
-            {
-                CancellationToken.ThrowIfCancellationRequested();
-
-                var cursor = _blendedNodes.Count is 0
-                    ? Blender.StartingCursor
-                    : _blendedNodes[_blendedNodes.Count - 1].Cursor;
-
-                var node = Blender.NextToken(cursor);
-
-                _blendedNodes.Add(node);
-                _currentBlendedNode = null;
-
-                // break out early if its an EOF token
-                if (node.Value is CXToken { Kind: CXTokenKind.EOF } eof) return eof;
-            }
-
-            return (CXToken)_blendedNodes[index].Value;
-        }
     }
 }

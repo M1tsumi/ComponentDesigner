@@ -35,6 +35,22 @@ public sealed class CXDocument : CXNode
     public ImmutableArray<CXToken> InterpolationTokens { get; }
 
     /// <summary>
+    ///     Gets a read-only list of AST nodes that were reused if this document was incrementally parsed.
+    /// </summary>
+    internal IReadOnlyList<ICXNode> ReusedNodes
+        => Parser
+            .BlendedNodes
+            .Where(x => x.Reused)
+            .SelectMany(x => x.ASTNode.Walk())
+            .ToArray();
+
+    /// <summary>
+    ///     Gets a read-only list of AST nodes that were newly parsed if this document was incrementally parsed.
+    /// </summary>
+    internal IReadOnlyList<ICXNode> NewNodes
+        => [..GetFlatGraph().Except(ReusedNodes)];
+
+    /// <summary>
     ///     Gets the <see cref="StringInternTable"/> used for interning strings in this <see cref="CXDocument"/>.
     /// </summary>
     internal StringInternTable StringTable => Parser.Reader.StringTable;
@@ -98,16 +114,12 @@ public sealed class CXDocument : CXNode
     /// </summary>
     /// <param name="reader">The reader to incrementally parse from.</param>
     /// <param name="changes">A read-only collection of changes that differ between the reader and the document.</param>
-    /// <param name="result">
-    ///     The <see cref="IncrementalParseResult"/> describing the result of incrementally parsing.
-    /// </param>
     /// <param name="token">A cancellation token used to cancel incremental parsing.</param>
     /// <returns>A new <see cref="CXDocument"/> containing the new AST tree.</returns>
     [Obsolete("This is untested and most likely doesn't work anymore")]
     public CXDocument IncrementalParse(
         CXSourceReader reader,
         IReadOnlyList<TextChange> changes,
-        out IncrementalParseResult result,
         CancellationToken token = default
     )
     {
@@ -115,38 +127,11 @@ public sealed class CXDocument : CXNode
 
         var parser = new CXParser(reader, this, affectedRange, token);
 
-        var children = new List<CXElement>();
+        var rootNodes = parser
+            .ParseTopLevelNodes()
+            .ToImmutableList();
 
-        while (parser.CurrentToken.Kind is not CXTokenKind.EOF and not CXTokenKind.Invalid)
-        {
-            var element = parser.ParseElement();
-
-            children.Add(element);
-
-            if (element.Width is 0) break;
-        }
-
-        var reusedNodes = new List<ICXNode>();
-        var flatGraph = GetFlatGraph();
-
-        foreach (var reusedNode in Parser.BlendedNodes)
-        {
-            reusedNodes.Add(reusedNode);
-
-            if(reusedNode is not CXNode concreteNode) continue;
-
-            // add descendants to reused collection
-            reusedNodes.AddRange(concreteNode.Descendants);
-        }
-
-        result = new(
-            reusedNodes,
-            [..GetFlatGraph().Except(Parser.BlendedNodes)],
-            changes,
-            affectedRange
-        );
-
-        return new CXDocument(parser, children);
+        return new CXDocument(parser, rootNodes);
     }
 
     /// <summary>

@@ -256,7 +256,7 @@ public sealed class CXLexer
     private int InterpolationBoundary
         => CurrentInterpolationSpan?.Start ??
            NextInterpolationSpan?.Start ??
-           Reader.SourceSpan.End;
+           Reader.Source.Length;
 
     /// <summary>
     ///     Gets whether the lexer forces <see cref="DOUBLE_QUOTE_CHAR"/>s to be escaped inside string literals.

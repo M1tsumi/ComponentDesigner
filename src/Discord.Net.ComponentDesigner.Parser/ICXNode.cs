@@ -7,7 +7,7 @@ namespace Discord.CX.Parser;
 /// <summary>
 ///     Represents any AST node within a syntax tree, including terminal nodes.
 /// </summary>
-public interface ICXNode : IEquatable<ICXNode>
+public interface ICXNode : IEquatable<ICXNode>, ICloneable
 {
     /// <summary>
     ///     Gets the full span, including trivia, that this node was parsed from in the source.
@@ -23,7 +23,6 @@ public interface ICXNode : IEquatable<ICXNode>
     ///     Gets the full width in characters of this node.
     /// </summary>
     int Width { get; }
-    
 
     /// <summary>
     ///     Gets the width of this node in the AST.

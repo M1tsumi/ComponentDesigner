@@ -12,6 +12,19 @@ public static class CXNodeExtensions
     extension(ICXNode node)
     {
         /// <summary>
+        ///     Gets whether this node or any descending nodes contains diagnostics.
+        /// </summary>
+        public bool HasDiagnostics
+        {
+            get
+            {
+                if (node.DiagnosticDescriptors.Count is not 0) return true;
+
+                return node.Slots.Any(x => x.HasDiagnostics);
+            }
+        }
+        
+        /// <summary>
         ///     Gets the diagnostics reported for this node.
         /// </summary>
         public IReadOnlyList<CXDiagnostic> Diagnostics
