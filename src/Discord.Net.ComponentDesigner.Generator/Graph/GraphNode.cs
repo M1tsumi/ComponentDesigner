@@ -17,28 +17,34 @@ public sealed class GraphNode : IEquatable<GraphNode>
         set => _state = value;
     }
 
-    public List<GraphNode> Children { get; }
+    public List<GraphNode> Children => _children ??= [];
 
-    public List<GraphNode> AttributeNodes { get; }
+    public List<GraphNode> AttributeNodes => _attributeNodes ??= [];
 
     public GraphNode? Parent { get; private set; }
+
+    public bool HasChildren
+        => _children?.Count > 0;
 
     private ComponentState? _state;
     private Result<string>? _render;
 
+    private List<GraphNode>? _children;
+    private List<GraphNode>? _attributeNodes;
+
     public GraphNode(
         ComponentNode inner,
         ComponentState? state,
-        List<GraphNode> children,
-        List<GraphNode> attributeNodes,
+        List<GraphNode>? children,
+        List<GraphNode>? attributeNodes,
         GraphNode? parent = null,
         Result<string>? render = null
     )
     {
         Inner = inner;
         _state = state;
-        Children = children;
-        AttributeNodes = attributeNodes;
+        _children = children;
+        _attributeNodes = attributeNodes;
         Parent = parent;
         _render = render;
     }
@@ -55,58 +61,73 @@ public sealed class GraphNode : IEquatable<GraphNode>
     )
     {
         var recreate = false;
-        var children = new GraphNode[Children.Count];
-        var attrNodes = new GraphNode[AttributeNodes.Count];
+        List<GraphNode>? children = null;
+        List<GraphNode>? attrNodes = null;
 
-        for (var i = 0; i < Children.Count; i++)
+        if (_children?.Count > 0)
         {
-            var child = Children[i];
-            children[i] = child.UpdateState(context, diagnostics);
-            recreate |= !ReferenceEquals(child, children[i]);
+            children = new(_children.Count);
+
+            for (var i = 0; i < Children.Count; i++)
+            {
+                var child = Children[i];
+                children[i] = child.UpdateState(context, diagnostics);
+                recreate |= !ReferenceEquals(child, children[i]);
+            }
         }
 
-        for (var i = 0; i < AttributeNodes.Count; i++)
+        if (_attributeNodes?.Count > 0)
         {
-            var child = AttributeNodes[i];
-            attrNodes[i] = child.UpdateState(context, diagnostics);
-            recreate |= !ReferenceEquals(child, attrNodes[i]);
+            attrNodes = new(_attributeNodes.Count);
+
+            for (var i = 0; i < AttributeNodes.Count; i++)
+            {
+                var child = AttributeNodes[i];
+                attrNodes[i] = child.UpdateState(context, diagnostics);
+                recreate |= !ReferenceEquals(child, attrNodes[i]);
+            }
         }
-        
+
         var newState = _state is null ? _state : Inner.UpdateState(_state, context, diagnostics);
         recreate |= (!newState?.Equals(_state) ?? _state is not null);
-        
+
         if (recreate)
         {
             return new(
                 Inner,
                 newState,
-                [..children],
-                [..attrNodes],
+                children,
+                attrNodes,
                 Parent
             );
         }
 
         return this;
     }
-    
+
     public Result<string> Render(IComponentContext context, ComponentRenderingOptions options = default)
     {
         // state is late-bound
         Debug.Assert(_state is not null, "State should not be null by render time");
 
-        return _render ??= Inner.Render(State!, context, options);
+        return _render ??= Inner.Render(State, context, options);
     }
 
     public void Validate(IComponentContext context, IList<DiagnosticInfo> diagnostics)
     {
         // state is late-bound
         Debug.Assert(_state is not null, "State should not be null by validation time");
-        
+
         if (_state is not null)
             Inner.Validate(State, context, diagnostics);
 
-        foreach (var attributeNode in AttributeNodes) attributeNode.Validate(context, diagnostics);
-        foreach (var child in Children) child.Validate(context, diagnostics);
+        if (_attributeNodes?.Count > 0)
+            foreach (var attributeNode in AttributeNodes)
+                attributeNode.Validate(context, diagnostics);
+
+        if (_children?.Count > 0)
+            foreach (var child in Children)
+                child.Validate(context, diagnostics);
     }
 
     public string ToPathString()
@@ -125,16 +146,31 @@ public sealed class GraphNode : IEquatable<GraphNode>
 
         return string.Join(" -> ", nodes.Select(x => x.Inner.Name));
     }
-    
+
     public bool Equals(GraphNode other)
-        => (_state?.Equals(other.State) ?? other._state is null) &&
+        => (_state?.Equals(other._state) ?? other._state is null) &&
            Inner.Equals(other.Inner) &&
-           Children.SequenceEqual(other.Children) &&
-           AttributeNodes.SequenceEqual(other.AttributeNodes);
+           (_children, other._children) switch
+           {
+               (not null, not null) => _children.SequenceEqual(other._children),
+               (null, null) => true,
+               _ => false
+           } &&
+           (_attributeNodes, other._attributeNodes) switch
+           {
+               (not null, not null) => _attributeNodes.SequenceEqual(other._attributeNodes),
+               (null, null) => true,
+               _ => false
+           };
 
     public override bool Equals(object? obj)
         => obj is GraphNode other && Equals(other);
 
     public override int GetHashCode()
-        => Hash.Combine(Inner, _state, Children.Aggregate(0, Hash.Combine), AttributeNodes.Aggregate(0, Hash.Combine));
+        => Hash.Combine(
+            Inner,
+            _state,
+            _children?.Aggregate(0, Hash.Combine),
+            _attributeNodes?.Aggregate(0, Hash.Combine)
+        );
 }

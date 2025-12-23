@@ -258,8 +258,8 @@ public sealed class CXGraph : IEquatable<CXGraph>
                 var graphNode = new GraphNode(
                     AutoTextDisplayComponentNode.Instance,
                     state: null,
-                    [],
-                    [],
+                    children: null,
+                    attributeNodes: null,
                     parent
                 );
 
@@ -394,9 +394,9 @@ public sealed class CXGraph : IEquatable<CXGraph>
             {
                 var node = new GraphNode(
                     inner,
-                    null,
-                    [],
-                    [],
+                    state: null,
+                    children: null,
+                    attributeNodes: null,
                     parent
                 );
 
@@ -443,8 +443,6 @@ public sealed class CXGraph : IEquatable<CXGraph>
         GraphNode? parent
     )
     {
-        // var state = init.State;
-
         var nodeChildren = new List<GraphNode>();
         var attributeNodes = new List<GraphNode>();
 

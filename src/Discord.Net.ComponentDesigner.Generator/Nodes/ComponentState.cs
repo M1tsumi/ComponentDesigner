@@ -14,10 +14,10 @@ public record ComponentState(
     ICXNode Source
 )
 {
-    public bool HasChildren => GraphNode?.Children.Count > 0;
+    public bool HasChildren => GraphNode.HasChildren;
 
     public IReadOnlyList<GraphNode> Children
-        => GraphNode?.Children ?? [];
+        => GraphNode.HasChildren ? GraphNode.Children : [];
 
     public bool IsElement => Source is CXElement;
 
