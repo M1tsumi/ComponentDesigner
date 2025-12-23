@@ -7,6 +7,42 @@ namespace UnitTests.ComponentTests;
 public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
+    public void AutoText()
+    {
+        Graph(
+            """
+            <container>
+                This should <i>automatically</i> be placed in an <b>auto text display</b>
+            </container>
+            """
+        );
+        {
+            Node<ContainerComponentNode>();
+            {
+                Node<AutoTextDisplayComponentNode>();
+            }
+
+            Validate(hasErrors: false);
+
+            Renders(
+                """"
+                new global::Discord.ContainerBuilder()
+                {
+                    Components =
+                    [
+                        new global::Discord.TextDisplayBuilder(
+                            content: "This should _automatically_ be placed in an **auto text display**"
+                        )
+                    ]
+                }
+                """"
+            );
+
+            EOF();
+        }
+    }
+
+    [Fact]
     public void WithTextControls()
     {
         Graph(
@@ -18,7 +54,7 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
         );
         {
             Node<TextDisplayComponentNode>();
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -28,11 +64,11 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
                 )
                 """"
             );
-            
+
             EOF();
         }
     }
-    
+
     [Fact]
     public void MultipartInterpolatedText()
     {
@@ -52,7 +88,7 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
         );
         {
             Node<TextDisplayComponentNode>();
-            
+
             Validate(hasErrors: false);
 
             Renders(
@@ -66,7 +102,7 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
                 )
                 """"
             );
-            
+
             EOF();
         }
     }

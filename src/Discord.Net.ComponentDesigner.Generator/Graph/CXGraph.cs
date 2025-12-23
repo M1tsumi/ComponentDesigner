@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -114,14 +115,11 @@ public sealed class CXGraph : IEquatable<CXGraph>
         return new CXGraph(
             state.Key,
             [
-                ..doc.RootNodes
-                    .SelectMany(x =>
-                        CreateNodes(
-                            x,
-                            parent: null,
-                            context
-                        )
-                    )
+                ..CreateNodes(
+                    doc.RootNodes,
+                    parent: null,
+                    context
+                )
             ],
             diagnostics.ToImmutable(),
             map,
@@ -231,6 +229,62 @@ public sealed class CXGraph : IEquatable<CXGraph>
         );
     }
 
+    private static IEnumerable<GraphNode> CreateNodes(
+        IReadOnlyList<CXNode> nodes,
+        GraphNode? parent,
+        GraphInitializationContext context
+    )
+    {
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            var current = nodes[i];
+
+            var diagnostics = new List<DiagnosticInfo>();
+            if (
+                TextControlElement.TryCreate(
+                    context,
+                    nodes,
+                    diagnostics,
+                    out var element,
+                    out var nodesUsed,
+                    startingIndex: i
+                )
+            )
+            {
+                foreach (var diagnostic in diagnostics)
+                    context.Diagnostics.Add(diagnostic);
+                
+                // use the first cx node as the node for the auto text
+                var graphNode = new GraphNode(
+                    AutoTextDisplayComponentNode.Instance,
+                    state: null,
+                    [],
+                    [],
+                    parent
+                );
+
+                var state = new TextDisplayState(
+                    graphNode,
+                    current,
+                    element
+                );
+
+                graphNode.State = state;
+                yield return graphNode;
+
+                // advance to the next non text control node, minus one here because the for loop increments by one
+                i += nodesUsed - 1;
+            }
+            else
+            {
+                // use standard create nodes function
+                foreach (var node in CreateNodes(current, parent, context))
+                {
+                    yield return node;
+                }
+            }
+        }
+    }
 
     private static IEnumerable<GraphNode> CreateNodes(
         CXNode cxNode,
@@ -298,8 +352,10 @@ public sealed class CXGraph : IEquatable<CXGraph>
         {
             if (element.IsFragment)
             {
-                return element.Children.SelectMany(x =>
-                    CreateNodes(x, parent, context)
+                return CreateNodes(
+                    (IReadOnlyList<CXNode>)element.Children,
+                    parent,
+                    context
                 );
             }
 
@@ -438,13 +494,11 @@ public sealed class CXGraph : IEquatable<CXGraph>
         }
 
         nodeChildren.AddRange(
-            children
-                .SelectMany(x => CreateNodes(
-                        x,
-                        node,
-                        context
-                    )
-                )
+            CreateNodes(
+                children,
+                node,
+                context
+            )
         );
 
         return node;

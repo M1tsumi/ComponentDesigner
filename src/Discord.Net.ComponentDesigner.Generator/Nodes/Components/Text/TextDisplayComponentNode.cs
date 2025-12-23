@@ -2,6 +2,7 @@
 using Discord.CX.Parser;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Discord.CX.Nodes.Components;
@@ -12,7 +13,7 @@ public sealed record TextDisplayState(
     TextControlElement? Content
 ) : ComponentState(GraphNode, Source);
 
-public sealed class TextDisplayComponentNode : ComponentNode<TextDisplayState>
+public class TextDisplayComponentNode : ComponentNode<TextDisplayState>
 {
     public override string Name => "text-display";
 
@@ -55,13 +56,14 @@ public sealed class TextDisplayComponentNode : ComponentNode<TextDisplayState>
         if (context.CXNode is CXElement element)
         {
             TextControlElement.TryCreate(
+                context.GraphContext,
                 element.Children,
                 diagnostics,
-                out var remainingChildren,
-                out content
+                out content,
+                out var nodesUsed
             );
 
-            context.AddChildren(remainingChildren);
+            context.AddChildren(element.Children.Skip(nodesUsed));
         }
 
         return new TextDisplayState(

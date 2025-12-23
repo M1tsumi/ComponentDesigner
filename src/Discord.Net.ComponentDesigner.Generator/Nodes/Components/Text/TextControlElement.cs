@@ -36,23 +36,24 @@ public abstract class TextControlElement(TextSpan span)
 
     public virtual IReadOnlyList<TextControlElement> Children => [];
 
-    public virtual IReadOnlyList<Type>? AllowedChildren { get; }
+    public virtual IReadOnlyList<Type>? AllowedChildren => null;
 
     public TextControlElement(ICXNode node) : this(node.Span)
     {
     }
 
-
     public static bool TryCreate(
+        IComponentContext context,
         IReadOnlyList<CXNode> nodes,
         IList<DiagnosticInfo> diagnostics,
-        out IReadOnlyList<CXNode> remainder,
-        [MaybeNullWhen(false)] out TextControlElement textControlElement
+        [MaybeNullWhen(false)] out TextControlElement textControlElement,
+        out int nodesUsed,
+        int? startingIndex = null
     )
     {
-        if (nodes.Count is 0)
+        if (nodes.Count is 0 || startingIndex >= nodes.Count)
         {
-            remainder = nodes;
+            nodesUsed = 0;
             textControlElement = null;
             return false;
         }
@@ -60,38 +61,70 @@ public abstract class TextControlElement(TextSpan span)
         var elements = new List<TextControlElement>();
         var tokens = new List<CXToken>();
 
-        var index = 0;
+        var index = startingIndex ?? 0;
+        var nodeStartingIndex = index;
         for (; index < nodes.Count; index++)
         {
-            if (Create(nodes[index], tokens, diagnostics) is not { } element)
+            if (Create(context, nodes[index], tokens, diagnostics, isRoot: true) is not { } element)
                 break;
 
             elements.AddRange(element);
         }
 
-        if (index < nodes.Count)
+        nodesUsed = index - nodeStartingIndex;
+
+        if (elements.Count is 0)
         {
-            remainder = [..nodes.Skip(index)];
             textControlElement = null;
             return false;
         }
 
-        remainder = [];
         textControlElement = new Root(tokens, elements);
         return true;
 
         static IEnumerable<TextControlElement>? Create(
+            IComponentContext context,
             CXNode node,
             List<CXToken> tokens,
-            IList<DiagnosticInfo> diagnostics
+            IList<DiagnosticInfo> diagnostics,
+            bool isRoot = false
         )
         {
             switch (node)
             {
                 case CXValue.Multipart multipart:
-                    tokens.AddRange(multipart.Tokens);
-                    return multipart.Tokens.Select(x => new Scalar(x));
+                    if (!isRoot)
+                    {
+                        tokens.AddRange(multipart.Tokens);
+                        return multipart.Tokens.Select(x => new Scalar(x));
+                    }
+
+                    List<TextControlElement>? result = null;
+
+                    foreach (var token in multipart.Tokens)
+                    {
+                        if (
+                            token.InterpolationIndex is { } index &&
+                            ComponentBuilderKindUtils.IsValidComponentBuilderType(
+                                context.GetInterpolationInfo(index).Symbol,
+                                context.Compilation
+                            )
+                        ) break;
+                        
+                        tokens.AddRange(multipart.Tokens);
+                        (result ??= []).Add(new Scalar(token));
+                    }
+
+                    return result;
                 case CXValue.Interpolation interpolation:
+                    if (
+                        isRoot &&
+                        ComponentBuilderKindUtils.IsValidComponentBuilderType(
+                            context.GetInterpolationInfo(interpolation).Symbol,
+                            context.Compilation
+                        )
+                    ) return null;
+
                     tokens.Add(interpolation.Token);
                     return [new Scalar(interpolation.Token)];
                 case CXValue.Scalar scalar:
@@ -102,8 +135,8 @@ public abstract class TextControlElement(TextSpan span)
 
                     foreach (var child in element.Children)
                     {
-                        if (Create(child, tokens, diagnostics) is not { } childTextControl)
-                            return null;
+                        if (Create(context, child, tokens, diagnostics) is not { } childTextControl)
+                            break;
 
                         children.AddRange(childTextControl);
                     }
@@ -395,7 +428,7 @@ public abstract class TextControlElement(TextSpan span)
                     1,
                     literalParts.Select(x => Renderers.GetInterpolationDollarRequirement(x.Value)).Max()
                 );
-            
+
 
             var startInterpolation = hasInterpolations
                 ? new string('{', interpolationInjectionCount)
@@ -430,10 +463,10 @@ public abstract class TextControlElement(TextSpan span)
 
                         var isMultiline = x.HasNewlines;
                         var isMultilineInterpolation = isMultiline && hasInterpolations;
-                        
+
                         if (isMultiline)
                             quoteCount = Math.Max(3, quoteCount);
-                        
+
                         var dollars = hasInterpolations
                             ? new string(
                                 '$',
@@ -446,7 +479,7 @@ public abstract class TextControlElement(TextSpan span)
                         var pad = isMultilineInterpolation
                             ? new string(' ', interpolationInjectionCount)
                             : string.Empty;
-                        
+
                         var sb = new StringBuilder();
 
                         // start on newline if its a multi-line string

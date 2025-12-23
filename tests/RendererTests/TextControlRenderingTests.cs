@@ -14,7 +14,7 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
     {
         Renders("<spoiler>foo</spoiler>", "||foo||");
     }
-    
+
     [Fact]
     public void MultilineSpoiler()
     {
@@ -29,7 +29,7 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
             """
         );
     }
-    
+
     [Fact]
     public void SyntaxIndentedSpoiler()
     {
@@ -44,7 +44,7 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
             """
         );
     }
-    
+
     [Fact]
     public void Quote()
     {
@@ -65,7 +65,7 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
             """
         );
     }
-    
+
     [Fact]
     public void SyntaxIndentedQuote()
     {
@@ -589,33 +589,36 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
         var diagnostics = new List<DiagnosticInfo>();
         TextControlElement? element = null;
 
+        var context = new MockComponentContext(
+            Compilations.Create(),
+            new CXDesignerGeneratorState(
+                cx ?? string.Empty,
+                default,
+                wrappingQuoteCount ?? 1,
+                true,
+                [..interpolations ?? []],
+                null!,
+                null!
+            )
+        );
+        
         if (
             !TextControlElement.TryCreate(
+                context,
                 parsed,
                 diagnostics,
-                out var remainder,
-                out element
+                out element,
+                out var nodesUsed
             )
         )
         {
             if (!allowFail) Assert.Fail("Failed to create text control elements");
         }
 
+        Assert.Equal(parsed.Count, nodesUsed);
+
         if (element is not null)
         {
-            var context = new MockComponentContext(
-                Compilations.Create(),
-                new CXDesignerGeneratorState(
-                    cx ?? string.Empty,
-                    default,
-                    wrappingQuoteCount ?? 1,
-                    true,
-                    [..interpolations ?? []],
-                    null!,
-                    null!
-                )
-            );
-
             element.Validate(context, diagnostics);
 
             PushDiagnostics(diagnostics);
