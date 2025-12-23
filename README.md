@@ -1,5 +1,27 @@
 # Discord.Net Component Designer
 
+An elegant way to design and write [Discord Message Components](https://discord.com/developers/docs/components/reference) with compile-time validation
+
+### How does it work?
+
+The Component Designer uses a [source generator](https://devblogs.microsoft.com/dotnet/introducing-c-source-generators/) to find any calls to `Discord.ComponentDesigner.cx`, using a [custom parser](./src/Discord.Net.ComponentDesigner.Parser/) to parse the syntax, validates the structure against Discord's component contraints, and if everything looks good then an [interceptor](https://github.com/dotnet/roslyn/blob/main/docs/features/interceptors.md) is emitted, replacing the `cx` call with the Discord.Net component builder strucutre.
+
+### Getting started
+
+Install the `Discord.Net.ComponentDesigner` package from one of the following feeds:
+- [Discord.Net Baget](https://baget.discordnet.dev/)
+- [Github Packages](https://github.com/discord-net/ComponentDesigner/pkgs/nuget/Discord.Net.ComponentDesigner)
+
+Thats it! You can now use the [Discord.ComponentDesigner.cx](#component-designer) method:
+
+```cs
+var myComponent = ComponentDesigner.cx(
+    """
+    <text>Hello, World!</text>
+    """
+);
+```
+
 ### Features
 
 - [Component Syntax (CX)](#component-syntax)
@@ -32,26 +54,6 @@
     - [Functional Components](#functional-components)
     - [Functional Components with children](#functional-components-with-children)
   - [Multi-Cardinality Components](#component-cardinality)
-
-### How does it work?
-
-The Component Designer uses a [source generator](https://devblogs.microsoft.com/dotnet/introducing-c-source-generators/) to find any calls to `Discord.ComponentDesigner.cx`, using a [custom parser](./src/Discord.Net.ComponentDesigner.Parser/) to parse the syntax, validates the structure against Discord's component contraints, and if everything looks good then an [interceptor](https://github.com/dotnet/roslyn/blob/main/docs/features/interceptors.md) is emitted, replacing the `cx` call with the Discord.Net component builder strucutre.
-
-### Getting started
-
-Install the `Discord.Net.ComponentDesigner` package from one of the following feeds:
-- [Discord.Net Baget](https://baget.discordnet.dev/)
-- [Github Packages](https://github.com/discord-net/ComponentDesigner/pkgs/nuget/Discord.Net.ComponentDesigner)
-
-Thats it! You can now use the [Discord.ComponentDesigner.cx](#component-designer) method:
-
-```cs
-var myComponent = ComponentDesigner.cx(
-    """
-    <text>Hello, World!</text>
-    """
-);
-```
 
 ## Component Syntax
 
