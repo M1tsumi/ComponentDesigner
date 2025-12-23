@@ -575,9 +575,15 @@ public static class Renderers
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
+    ) => String(context, propertyValue.Value, options);
+    
+    public static RenderResult String(
+        IComponentContext context,
+        CXValue? value,
+        PropertyRenderingOptions options
     )
     {
-        switch (propertyValue.Value)
+        switch (value)
         {
             default: return "string.Empty";
 

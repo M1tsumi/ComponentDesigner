@@ -206,7 +206,7 @@ public static partial class Diagnostics
         true
     );
 
-    public static  DiagnosticDescriptor InvalidSectionChildComponentType(string child) => new(
+    public static DiagnosticDescriptor InvalidSectionChildComponentType(string child) => new(
         "DC0022",
         "Invalid section child component type",
         $"'{child}' is not a valid child component of a section; only text displays are allowed",
@@ -494,7 +494,8 @@ public static partial class Diagnostics
         true
     );
 
-    public static DiagnosticDescriptor InvalidInterleavedComponentInCurrentContext(string interleaved, string context) => new(
+    public static DiagnosticDescriptor
+        InvalidInterleavedComponentInCurrentContext(string interleaved, string context) => new(
         "DC0055",
         "Invalid interpolated component",
         $"'{interleaved}' cannot be used in an expected context of '{context}'",
@@ -502,7 +503,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static DiagnosticDescriptor DuplicateChildParameter(string method) => new(
         "DC0056",
         "Duplicate child parameter",
@@ -511,7 +512,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static DiagnosticDescriptor InvalidFunctionalComponentReturnType(string method, string type) => new(
         "DC0056",
         "Invalid functional component return type",
@@ -520,7 +521,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static DiagnosticDescriptor InvalidFunctionalComponentKind(string symbol, string reason) => new(
         "DC0057",
         "Invalid functional component",
@@ -529,7 +530,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static DiagnosticDescriptor AmbiguousFunctionalComponent(params IEnumerable<string> symbols) => new(
         "DC0058",
         "Invalid functional component",
@@ -538,11 +539,38 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor ExpectedScalarFunctionalComponentChildValue = new(
         "DC0059",
         "Invalid functional component child",
         $"expected scalar values (text or interpolations)",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+
+    public static DiagnosticDescriptor DuplicateProperty(string a, string b) => new(
+        "DC0060",
+        "Duplicate property",
+        $"You can only specify either '{a}' or '{b}', not both",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor ExpectedAConstantValue = new(
+        "DC0061",
+        "Expected a constant value",
+        $"A constant value is expected here",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static DiagnosticDescriptor InvalidChild(string parent, string child) => new(
+        "DC0062",
+        $"'{parent}' doesn't allow '{child}' as children",
+        $"'{parent}' doesn't allow '{child}' as children",
         "Components",
         DiagnosticSeverity.Error,
         true

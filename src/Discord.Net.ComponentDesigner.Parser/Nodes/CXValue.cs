@@ -114,7 +114,7 @@ public abstract class CXValue : CXNode
     }
 
     /// <summary>
-    ///     Represents an interapolated value.
+    ///     Represents an interpolated value.
     /// </summary>
     public sealed class Interpolation : CXValue
     {

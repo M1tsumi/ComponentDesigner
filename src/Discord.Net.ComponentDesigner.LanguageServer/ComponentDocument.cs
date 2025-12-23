@@ -46,13 +46,6 @@ public sealed class ComponentDocument
         );
 
         return _cxDoc = CXParser.Parse(reader, cancellationToken);
-        // if (_cxDoc is null || FORCE_NO_INCREMENTAL)
-        // {
-        //     return _cxDoc = CXParser.Parse(reader, cancellationToken);
-        // }
-        //
-        // var changes = _source.GetTextChanges(_cxDoc.Source);
-        // return _cxDoc = _cxDoc.IncrementalParse(reader, changes, out _, cancellationToken);
     }
 
     public static ComponentDocument Create(

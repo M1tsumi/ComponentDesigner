@@ -511,21 +511,34 @@ public sealed class CXLexer
         // make sure we scan up to the interpolation boundary
         var interpolationUpperBounds = InterpolationBoundary;
         var start = Reader.Position;
-
+        var lastWordChar = start;
+        
         for (; Reader.Position < interpolationUpperBounds; Reader.Advance())
         {
             CancellationToken.ThrowIfCancellationRequested();
 
+            var current = Reader.Current;
+            
             // break out if we hit either a null char or the start of a tag 
-            if (Reader.Current is NULL_CHAR or LESS_THAN_CHAR)
+            if (current is NULL_CHAR or LESS_THAN_CHAR)
                 break;
+
+            if (!char.IsWhiteSpace(current) && !char.IsControl(current))
+                lastWordChar = Reader.Position;
         }
 
         // did we actually read anything?
-        if (Reader.Position != start)
+        if (lastWordChar != start)
         {
             // we've read some raw text
             info.Kind = CXTokenKind.Text;
+
+            if (lastWordChar != Reader.Position)
+            {
+                // go back to the character after the last word character
+                Reader.Position = lastWordChar + 1;
+            }
+            
             return true;
         }
 
@@ -898,9 +911,9 @@ public sealed class CXLexer
     /// <summary>
     ///     Checks if the provided character is a recognized whitespace character
     /// </summary>
-    /// <param name="ch">The character to chec.</param>
+    /// <param name="ch">The character to check.</param>
     /// <returns>
-    ///     <see langword="true"/> if the given character is a recognized whitespace chracter; otherwise
+    ///     <see langword="true"/> if the given character is a recognized whitespace character; otherwise
     ///     <see langword="false"/>.
     /// </returns>
     public static bool IsWhitespace(char ch)

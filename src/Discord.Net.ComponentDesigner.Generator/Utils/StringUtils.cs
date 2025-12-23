@@ -7,6 +7,52 @@ namespace Discord.CX;
 
 public static class StringUtils
 {
+    public static string CollapseAndTrimNewlines(this string str)
+    {
+        var parts = str.Split('\n');
+
+        if (parts.Length is 1) return str;
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            var partEnd = part.Length - 1;
+            var partStart = 0;
+            
+            if(string.IsNullOrEmpty(part)) continue;
+            
+            // check for '\r'
+            if (part[part.Length - 1] is '\r')
+                partEnd--;
+            
+            // trim start
+            for (; partStart < partEnd; partStart++)
+            {
+                var ch = part[partStart];
+                if(!char.IsWhiteSpace(ch))
+                    break;
+            }
+            
+            // trim end
+            for (; partEnd > partStart; partEnd--)
+            {
+                var ch = part[partEnd];
+                if(!char.IsWhiteSpace(ch))
+                    break;
+            }
+            
+            if(partStart > partEnd) continue;
+
+            if (sb.Length is not 0)
+                sb.Append(' ');
+            
+            sb.Append(part, partStart, (partEnd + 1) - partStart);
+        }
+
+        return sb.ToString();
+    }
+    
     public static string Indent(this string value, int size)
     {
         if (size is 0) return value;
@@ -79,6 +125,8 @@ public static class StringUtils
             }
             else break;
         }
+
+        if (lines.Count is 0) return str;
         
         var minSpacing = lines.Min(x =>
             x.TakeWhile(char.IsWhiteSpace).Count()

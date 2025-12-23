@@ -7,6 +7,33 @@ namespace UnitTests.ComponentTests;
 public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTest(output)
 {
     [Fact]
+    public void WithTextControls()
+    {
+        Graph(
+            """
+            <text>
+                with <b>bold</b> controls, and others like <u>underline</u>
+            </text>
+            """
+        );
+        {
+            Node<TextDisplayComponentNode>();
+            
+            Validate(hasErrors: false);
+
+            Renders(
+                """"
+                new global::Discord.TextDisplayBuilder(
+                    content: "with **bold** controls, and others like __underline__"
+                )
+                """"
+            );
+            
+            EOF();
+        }
+    }
+    
+    [Fact]
     public void MultipartInterpolatedText()
     {
         Graph(

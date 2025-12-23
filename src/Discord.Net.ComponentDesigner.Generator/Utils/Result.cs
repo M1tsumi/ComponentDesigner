@@ -86,6 +86,29 @@ public readonly struct Result<T> : IEquatable<Result<T>>
             ? new Result<(T Left, U Right)>((Value, other.Value), [..Diagnostics, ..other.Diagnostics])
             : new([..Diagnostics, ..other.Diagnostics]);
     
+    public Result<V> Combine<U, V>(Result<U> other, Func<T, U, V> mapper) 
+        where U : IEquatable<U>
+        where V : IEquatable<V>
+        => HasResult && other.HasResult
+            ? new Result<V>(mapper(Value, other.Value), [..Diagnostics, ..other.Diagnostics])
+            : new([..Diagnostics, ..other.Diagnostics]);
+
+    public Result<V> Combine<U, V>(Result<U> other, Func<T, U, Result<V>> mapper)
+        where U : IEquatable<U>
+        where V : IEquatable<V>
+    {
+        if (!HasResult || !other.HasResult)
+            return new([..Diagnostics, ..other.Diagnostics]);
+
+        var mapResult = mapper(Value, other.Value);
+
+        return new(
+            mapResult._result,
+            mapResult.HasResult,
+            [..Diagnostics, ..other.Diagnostics, ..mapResult.Diagnostics]
+        );
+    }
+    
     public static Result<T> FromValue(
         T value,
         params IEnumerable<DiagnosticInfo> diagnostic
@@ -106,6 +129,10 @@ public readonly struct Result<T> : IEquatable<Result<T>>
     public static Result<T> FromDiagnostics(
         params IEnumerable<DiagnosticInfo> diagnostic
     ) => new(diagnostic);
+    
+    public static Result<T> FromDiagnostics(
+        params EquatableArray<DiagnosticInfo> diagnostic
+    ) => new(diagnostic);
 
     public static Result<T> FromDiagnostic(
         DiagnosticDescriptor descriptor,
@@ -119,6 +146,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
 
     public static implicit operator Result<T>(T value) => new(value);
     public static implicit operator Result<T>(DiagnosticInfo info) => FromDiagnostics(info);
+    public static implicit operator Result<T>(EquatableArray<DiagnosticInfo> infos) => FromDiagnostics(infos);
 
     public static implicit operator Result<T>((T, IEnumerable<DiagnosticInfo>) value)
         => new(value.Item1, value.Item2);

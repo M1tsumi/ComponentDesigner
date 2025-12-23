@@ -38,9 +38,9 @@ public sealed record CXToken(
     /// <summary>
     ///     Gets the full character width of this token. 
     /// </summary>
-    public int Width => LeadingTrivia.Length + Value.Length + TrailingTrivia.Length;
+    public int Width => LeadingTrivia.CharacterLength + Value.Length + TrailingTrivia.CharacterLength;
 
-    public TextSpan Span => new(this.Offset + LeadingTrivia.Length, Value.Length);
+    public TextSpan Span => new(this.Offset + LeadingTrivia.CharacterLength, Value.Length);
     public TextSpan FullSpan => new(this.Offset, Width);
 
     /// <inheritdoc/>

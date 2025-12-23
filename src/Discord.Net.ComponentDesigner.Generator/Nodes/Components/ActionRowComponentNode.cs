@@ -113,7 +113,8 @@ public class ActionRowComponentNode : ComponentNode
         ComponentState state,
         IComponentContext context,
         ComponentRenderingOptions options
-    ) => state.RenderProperties(this, context, asInitializers: true)
+    ) => state
+        .RenderProperties(this, context, asInitializers: true)
         .Combine(state.RenderChildren(context, options: ChildRenderingOptions))
         .Map(x =>
         {

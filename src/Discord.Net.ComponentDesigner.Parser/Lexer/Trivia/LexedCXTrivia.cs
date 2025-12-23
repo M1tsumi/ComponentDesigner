@@ -3,10 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Discord.CX.Util;
 
 namespace Discord.CX.Parser;
 
+[CollectionBuilder(typeof(LexedCXTrivia), nameof(Create))]
 public sealed class LexedCXTrivia(
     ImmutableArray<CXTrivia> trivia
 ) : IImmutableList<CXTrivia>, IEquatable<LexedCXTrivia>
@@ -20,10 +22,13 @@ public sealed class LexedCXTrivia(
     public bool ContainsComments
         => trivia.Any(x => x is CXTrivia.XmlComment);
 
-    public int Length { get; } = trivia.Length is 0 ? 0 : trivia.Sum(x => x.Length);
+    public int CharacterLength { get; } = trivia.Length is 0 ? 0 : trivia.Sum(x => x.Length);
 
     public static readonly LexedCXTrivia Empty = new([]);
 
+    public static LexedCXTrivia Create(ReadOnlySpan<CXTrivia> trivia)
+        => new([..trivia]);
+    
     public ImmutableArray<CXTrivia>.Enumerator GetEnumerator() => trivia.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)trivia).GetEnumerator();
@@ -86,7 +91,7 @@ public sealed class LexedCXTrivia(
         if (ReferenceEquals(this, other)) return true;
 
         return
-            Length == other.Length &&
+            CharacterLength == other.CharacterLength &&
             this.SequenceEqual(other);
     }
 
@@ -95,7 +100,7 @@ public sealed class LexedCXTrivia(
 
     public override int GetHashCode()
         => trivia.Aggregate(
-            Length,
+            CharacterLength,
             Hash.Combine
         );
 
