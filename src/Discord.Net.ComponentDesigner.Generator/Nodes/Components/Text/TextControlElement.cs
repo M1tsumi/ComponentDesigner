@@ -240,12 +240,18 @@ public abstract class TextControlElement(TextSpan span)
             var render = target.Value[i];
 
             if (i is not 0)
+            {
                 sb.Append(render.LeadingTrivia);
+                hasNewlines |= render.LeadingTrivia.ContainsNewlines;
+            }
 
             sb.Append(render.Value);
 
             if (i < target.Value.Count - 1)
+            {
                 sb.Append(render.TrailingTrivia);
+                hasNewlines |= render.TrailingTrivia.ContainsNewlines;
+            }
 
             hasNewlines |= render.ValueHasNewLines;
         }
@@ -396,7 +402,7 @@ public abstract class TextControlElement(TextSpan span)
                 : string.Empty;
 
             var endInterpolation = hasInterpolations
-                ? new string('{', interpolationInjectionCount)
+                ? new string('}', interpolationInjectionCount)
                 : string.Empty;
 
             options = new TextControlRenderingOptions(

@@ -308,7 +308,7 @@ public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
                 {
                     Token(
                         CXTokenKind.Text,
-                        $"Some text here,{Environment.NewLine}    Across multiple lines{Environment.NewLine}"
+                        $"Some text here,{Environment.NewLine}    Across multiple lines"
                     );
                 }
 
@@ -464,7 +464,7 @@ public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
 
                 Multipart();
                 {
-                    Token(CXTokenKind.Text, "Some body text ");
+                    Token(CXTokenKind.Text, "Some body text");
                     InterpolationToken("{Interpolated 1}", 0);
                     Token(CXTokenKind.Text, "And some other text");
                     InterpolationToken("{Interpolated 2}", 1);

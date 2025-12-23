@@ -136,7 +136,8 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
 
             var content = textNode.State.GetProperty(text.Content);
 
-            Assert.True(content is { IsSpecified: true, HasValue: true });
+            Assert.True(content is { IsSpecified: false, HasValue: false });
+            Assert.NotNull(((TextDisplayState)textNode.State).Content);
 
             Validate(hasErrors: false);
 
