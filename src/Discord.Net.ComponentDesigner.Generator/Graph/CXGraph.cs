@@ -235,6 +235,16 @@ public sealed class CXGraph : IEquatable<CXGraph>
         GraphInitializationContext context
     )
     {
+        if (!context.Options.EnableAutoTextDisplay)
+        {
+            foreach (var node in nodes.SelectMany(x => CreateNodes(x, parent, context)))
+            {
+                yield return node;
+            }
+            
+            yield break;
+        }
+        
         for (var i = 0; i < nodes.Count; i++)
         {
             var current = nodes[i];

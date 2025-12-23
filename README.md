@@ -22,6 +22,9 @@
     - [Text Display](#text-display)
     - [Text Input](#text-input)
     - [Thumbnail](#thumbnail)
+  - [Text Formatting Elements](#text-formatting-elements)
+  - [Auto Text Display](#auto-text-display)
+  - [Auto Rows](#auto-rows)
   - [String Interpolation](#string-interpolation)
   - [Interpolated Components](#interpolated-components)
   - [Compile-time Diagnostics](#compile-time-diagnostics)
@@ -542,6 +545,57 @@ A Thumbnail displays media in a compact form-factor.
 <thumbnail url="attachment://image.png" spoiler />
 ```
 
+## Text Formatting Elements
+
+You can use html-like text formatting elements to render as markdown within a [text-display](#text-display) component
+
+```html
+<text>
+    <h1>Hello World!</h1>
+    This renders to <b>markdown!</b>
+</text>
+```
+
+| Tag                            | Attributes                                                                                                                  | Preview                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `b` `bold` `strong`            | N/A                                                                                                                         | **bold**                                                 |
+| `i` `italic` `italics` `em`    | N/A                                                                                                                         | *italics*                                                |
+| `u` `mark` `underline` `ins`   | N/A                                                                                                                         | <ins>underline</ins>                                     |
+| `del` `strike` `strikethrough` | N/A                                                                                                                         | <del>strikethrough</del>                                 |
+| `sub` `subtext` `small`        | N/A                                                                                                                         | <sub>subtext</sub>                                       |
+| `a` `link`                     | `href` or `url`                                                                                                             | [click me](https://www.example.com/)                     |
+| `ul` `list`                    | N/A                                                                                                                         | - first item<br/>- second item                           |
+| `ol`                           | N/A                                                                                                                         | 1. first item<br/>  2. second item                       |
+| `li`                           | N/A                                                                                                                         | used in `ul` or `ol` to denote a list item               |
+| `c` `code` `block` `codeblock` | `inline`: whether to force as an inline codeblock<br/>`lang` `language`: the syntax highlighting language for the codeblock | `inline`<br/><pre><code>This is a<br/>block</code></pre> |
+| `q` `quote` `blockquote`       | N/A                                                                                                                         | <blockquote>quote</blockquote>                           |
+| `spoiler` `obfuscated`         | N/A                                                                                                                         | \|\|spoiler\|\|                                          |
+| `br` `break`                   | N/A                                                                                                                         | line<br/>break                                           |
+| `h1`                           | N/A                                                                                                                         | <h1>heading 1</h1>                                       |
+| `h2`                           | N/A                                                                                                                         | <h2>heading 2</h2>                                       |
+| `h3`                           | N/A                                                                                                                         | <h3>heading 3</h3>                                       |
+
+## Auto Text Display
+
+By enabling the [generator option](#generator-options) `EnableAutoTextDisplay`, text, non-component interpolations, and [text formatting elements](#text-formatting-elements) will automatically be placed in a [text-display](#text-display) component:
+
+```html
+<container>
+    This is some <b>cool</b> text!
+</container>
+```
+
+## Auto Rows
+
+By enabling the [generator option](#generator-options) `EnableAutoRows`, [buttons](#button) and [select menus](#select-menu) will automatically be placed in an [action row](#action-row):
+
+```html
+<container>
+    <button customId="foo" label="bar" />
+</container>
+```
+
+
 ## String Interpolation
 
 You can use string interpolations to inject values almost anywhere
@@ -628,6 +682,14 @@ These are provided as roslyn analyzer diagnostics and can be enabled/disabled us
     <button customId="abc" /> // Error: A button must have a 'label' or 'emoji' 
 </row>
 ```
+
+## Generator Options
+
+You can control some of the generators behaviour with the following generator options
+| Name                  | Type              | Description                                                                                                                  |
+| --------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| EnableAutoRows        | `true` or `false` | Whether to allow the [automatic creation](#auto-rows) of [action rows](#action-row)                                          |
+| EnableAutoTextDisplay | `true` or `false` | Whether to [automatically wrap](#auto-text-display) text/interpolation/text controls in a [text display](#text-display) node |
 
 
 ## Reusable Custom Components

@@ -7,12 +7,14 @@ namespace Discord.CX;
 
 public sealed record GeneratorOptions(
     bool EnableAutoRows = false,
+    bool EnableAutoTextDisplay = false,
     LanguageVersion? CSharpLangVersion = null
 )
 {
     public static readonly GeneratorOptions Default = new();
     
     private const string ENABLE_AUTO_ROWS_KEY = "build_property.EnableAutoRows";
+    private const string ENABLE_AUTO_TEXT_DISPLAY = "build_property.EnableAutoTextDisplay";
 
     public static IncrementalValueProvider<GeneratorOptions> CreateProvider(
         IncrementalGeneratorInitializationContext context
@@ -40,9 +42,16 @@ public sealed record GeneratorOptions(
                       .GlobalOptions
                       .TryGetValue(ENABLE_AUTO_ROWS_KEY, out var val) &&
                   bool.TryParse(val.ToLowerInvariant(), out var bl) && bl;
+            
+            var autoTextDisplay
+                = analyzerConfig
+                      .GlobalOptions
+                      .TryGetValue(ENABLE_AUTO_TEXT_DISPLAY, out val) &&
+                  bool.TryParse(val.ToLowerInvariant(), out bl) && bl;
 
             return new GeneratorOptions(
                 EnableAutoRows: autoRows,
+                EnableAutoTextDisplay: autoTextDisplay,
                 CSharpLangVersion: langVersion
             );
         }

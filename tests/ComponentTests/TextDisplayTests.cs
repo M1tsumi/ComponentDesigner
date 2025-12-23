@@ -14,7 +14,10 @@ public sealed class TextDisplayTests(ITestOutputHelper output) : BaseComponentTe
             <container>
                 This should <i>automatically</i> be placed in an <b>auto text display</b>
             </container>
-            """
+            """,
+            options: new GeneratorOptions(
+                EnableAutoTextDisplay: true
+            )
         );
         {
             Node<ContainerComponentNode>();
