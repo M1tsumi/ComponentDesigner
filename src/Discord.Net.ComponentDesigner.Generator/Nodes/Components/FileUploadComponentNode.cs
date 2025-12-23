@@ -60,7 +60,7 @@ public sealed class FileUploadComponentNode : ComponentNode
         }
 
         // file uploads must be placed in labels, but we allow them as the root element.
-        if (state.OwningGraphNode?.Parent is not null && state.OwningGraphNode.Parent.Inner is not LabelComponentNode)
+        if (state.GraphNode?.Parent is not null && state.GraphNode.Parent.Inner is not LabelComponentNode)
         {
             diagnostics.Add(
                 Diagnostics.FileUploadNotInLabel,

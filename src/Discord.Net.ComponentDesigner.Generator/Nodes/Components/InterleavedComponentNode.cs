@@ -12,10 +12,10 @@ namespace Discord.CX.Nodes.Components;
 using static ComponentBuilderKindUtils;
 
 public sealed record InterleavedState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     ICXNode Source,
     int InterpolationId
-) : ComponentState(OwningGraphNode, Source)
+) : ComponentState(GraphNode, Source)
 {
     public bool Equals(InterleavedState? other)
     {
@@ -115,7 +115,7 @@ public sealed class InterleavedComponentNode : ComponentNode<InterleavedState>, 
                  * required typing information
                  */
 
-                Debug.Fail($"Unknown typing context in dynamic node: {state.OwningGraphNode.ToPathString()}");
+                Debug.Fail($"Unknown typing context in dynamic node: {state.GraphNode.ToPathString()}");
                 typingContext = context.RootTypingContext;
             }
         }

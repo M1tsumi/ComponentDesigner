@@ -7,10 +7,10 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 namespace Discord.CX.Nodes.Components;
 
 public sealed record TextDisplayState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     ICXNode Source,
     TextControlElement? Content
-) : ComponentState(OwningGraphNode, Source);
+) : ComponentState(GraphNode, Source);
 
 public sealed class TextDisplayComponentNode : ComponentNode<TextDisplayState>
 {

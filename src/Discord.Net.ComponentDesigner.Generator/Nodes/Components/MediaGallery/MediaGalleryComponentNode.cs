@@ -16,10 +16,10 @@ using InterpolationIndex = int;
 public sealed class MediaGalleryComponentNode : ComponentNode<MediaGalleryComponentNode.MediaGalleryState>
 {
     public sealed record MediaGalleryState(
-        GraphNode OwningGraphNode,
+        GraphNode GraphNode,
         ICXNode Source,
         EquatableArray<InterpolationIndex> Interpolations
-    ) : ComponentState(OwningGraphNode, Source)
+    ) : ComponentState(GraphNode, Source)
     {
         public bool Equals(MediaGalleryState? other)
         {

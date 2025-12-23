@@ -10,10 +10,10 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 namespace Discord.CX.Nodes.Components;
 
 public sealed record ButtonComponentState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     ICXNode Source,
     ButtonKind? InferredKind = null
-) : ComponentState(OwningGraphNode, Source)
+) : ComponentState(GraphNode, Source)
 {
     public bool Equals(ButtonComponentState? other)
     {

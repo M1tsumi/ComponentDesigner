@@ -10,18 +10,18 @@ using Discord.CX.Util;
 namespace Discord.CX.Nodes;
 
 public record ComponentState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     ICXNode Source
 )
 {
-    public bool HasChildren => OwningGraphNode?.Children.Count > 0;
+    public bool HasChildren => GraphNode?.Children.Count > 0;
 
     public IReadOnlyList<GraphNode> Children
-        => OwningGraphNode?.Children ?? [];
+        => GraphNode?.Children ?? [];
 
     public bool IsElement => Source is CXElement;
 
-    public bool IsRootNode => OwningGraphNode?.Parent is null;
+    public bool IsRootNode => GraphNode?.Parent is null;
 
     private readonly Dictionary<ComponentProperty, ComponentPropertyValue> _properties = [];
 
@@ -41,7 +41,7 @@ public record ComponentState(
 
         if (attribute?.Value is CXValue.Element element)
         {
-            node = OwningGraphNode?.AttributeNodes
+            node = GraphNode?.AttributeNodes
                 .FirstOrDefault(x => ReferenceEquals(x.State.Source, element.Value));
         }
 
@@ -59,7 +59,7 @@ public record ComponentState(
         {
             diagnostics.Add(
                 Diagnostics.PropertyNotAllowed(
-                    OwningGraphNode?.Inner.Name ?? "Unknown",
+                    GraphNode?.Inner.Name ?? "Unknown",
                     propertyValue.Attribute!.IdentifierToken.Value
                 ),
                 propertyValue.Attribute
@@ -105,7 +105,7 @@ public record ComponentState(
         }
 
         diagnostics.Add(
-            Diagnostics.MissingRequiredProperty(OwningGraphNode?.Inner.Name, sb.ToString()),
+            Diagnostics.MissingRequiredProperty(GraphNode?.Inner.Name, sb.ToString()),
             Source
         );
     }
@@ -206,7 +206,7 @@ public record ComponentState(
     {
         if (!HasChildren) return string.Empty;
 
-        IEnumerable<GraphNode> children = OwningGraphNode.Children;
+        IEnumerable<GraphNode> children = GraphNode.Children;
 
         if (predicate is not null) children = children.Where(predicate);
 

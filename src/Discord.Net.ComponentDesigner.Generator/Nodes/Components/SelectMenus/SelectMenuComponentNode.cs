@@ -21,14 +21,14 @@ public enum SelectKind
 
 public sealed class SelectMenuComponentNode : ComponentNode
 {
-    public sealed record MissingTypeState(GraphNode OwningGraphNode, ICXNode Source)
-        : ComponentState(OwningGraphNode, Source);
+    public sealed record MissingTypeState(GraphNode GraphNode, ICXNode Source)
+        : ComponentState(GraphNode, Source);
 
     public sealed record InvalidTypeState(
-        GraphNode OwningGraphNode,
+        GraphNode GraphNode,
         ICXNode Source,
         string? Kind = null
-    ) : ComponentState(OwningGraphNode, Source)
+    ) : ComponentState(GraphNode, Source)
     {
         public bool Equals(InvalidTypeState? other)
         {
@@ -44,12 +44,12 @@ public sealed class SelectMenuComponentNode : ComponentNode
     }
 
     public sealed record SelectState(
-        GraphNode OwningGraphNode,
+        GraphNode GraphNode,
         ICXNode Source,
         SelectKind Kind,
         EquatableArray<SelectMenuDefaultValue> Defaults,
         EquatableArray<SelectMenuInterpolatedOption> InterpolatedOptions
-    ) : ComponentState(OwningGraphNode, Source)
+    ) : ComponentState(GraphNode, Source)
     {
         public bool Equals(SelectState? other)
         {

@@ -11,11 +11,11 @@ using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 namespace Discord.CX.Nodes.Components;
 
 public sealed record LabelComponentState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     ICXNode Source,
     CXValue? ChildValue,
     CXElement? ChildElement
-) : ComponentState(OwningGraphNode, Source)
+) : ComponentState(GraphNode, Source)
 {
     public bool Equals(LabelComponentState? other)
     {

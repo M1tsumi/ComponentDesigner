@@ -75,7 +75,7 @@ public sealed record ComponentPropertyValue(
         if (!isOptional && !IsSpecified)
         {
             diagnostics.Add(
-                Diagnostics.MissingRequiredProperty(state.OwningGraphNode?.Inner.Name, Property.Name),
+                Diagnostics.MissingRequiredProperty(state.GraphNode?.Inner.Name, Property.Name),
                 state.Source
             );
         }
@@ -84,7 +84,7 @@ public sealed record ComponentPropertyValue(
         {
             diagnostics.Add(
                 Diagnostics.MissingRequiredProperty(
-                    state.OwningGraphNode?.Inner.Name,
+                    state.GraphNode?.Inner.Name,
                     Property.Name
                 ),
                 Attribute ?? state.Source

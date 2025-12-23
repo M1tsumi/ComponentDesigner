@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.Text;
 namespace Discord.CX.Nodes.Components.Custom;
 
 public sealed record FunctionalComponentState(
-    GraphNode OwningGraphNode,
+    GraphNode GraphNode,
     CXElement Source,
     string Identifier,
     string MethodReference,
@@ -19,7 +19,7 @@ public sealed record FunctionalComponentState(
     ComponentBuilderKind ReturnKind,
     ComponentProperty? ChildrenParameter,
     ComponentBuilderKind? ChildrenComponentKind
-) : ComponentState(OwningGraphNode, Source)
+) : ComponentState(GraphNode, Source)
 {
     [MemberNotNullWhen(true, nameof(ChildrenParameter), nameof(ChildrenComponentKind))]
     public bool HasComponentChildren
@@ -110,7 +110,7 @@ public sealed class FunctionalComponentNode :
         return CreateFromSymbol(
             context.Compilation,
             method,
-            state.OwningGraphNode,
+            state.GraphNode,
             state.Source,
             diagnostics
         ) ?? state;
@@ -414,7 +414,7 @@ public sealed class FunctionalComponentNode :
                 case CXElement element:
                 {
                     var index = graphIndex++;
-                    var graphNode = state.OwningGraphNode.Children.ElementAtOrDefault(index);
+                    var graphNode = state.GraphNode.Children.ElementAtOrDefault(index);
 
                     if (graphNode is null)
                     {
