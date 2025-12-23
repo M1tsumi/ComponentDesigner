@@ -25,6 +25,7 @@ public sealed class SpoilerTextControlElement(
         typeof(SubtextTextControlElement),
         typeof(UnderlineTextControlElement),
         typeof(QuoteTextControlElement),
+        typeof(LineBreakTextControlElement),
     ];
 
     protected override Result<RenderedTextControlElement> Render(

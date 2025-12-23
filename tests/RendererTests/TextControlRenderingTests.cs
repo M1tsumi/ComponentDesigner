@@ -10,6 +10,18 @@ namespace UnitTests.RendererTests;
 public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTestWithDiagnostics(output)
 {
     [Fact]
+    public void LineBreak()
+    {
+        Renders(
+            "this is<br/>on a newline",
+            """
+            this is
+            on a newline
+            """
+        );
+    }
+    
+    [Fact]
     public void Spoiler()
     {
         Renders("<spoiler>foo</spoiler>", "||foo||");

@@ -22,7 +22,8 @@ public sealed class LinkTextControlElement(
         typeof(StrikethroughTextControlElement),
         typeof(SubtextTextControlElement),
         typeof(UnderlineTextControlElement),
-        typeof(SpoilerTextControlElement)
+        typeof(SpoilerTextControlElement),
+        typeof(LineBreakTextControlElement),
     ];
     
     protected override Result<RenderedTextControlElement> Render(

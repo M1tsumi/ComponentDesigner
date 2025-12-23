@@ -178,6 +178,9 @@ public abstract class TextControlElement(TextSpan span)
 
                         case "spoiler" or "obfuscated":
                             return [new SpoilerTextControlElement(element, children)];
+                        
+                        case "br" or "break":
+                            return [new LineBreakTextControlElement(element, children)];
 
                         case var identifier when Enum.TryParse<HeadingTextControlElementVariant>(
                             identifier,
