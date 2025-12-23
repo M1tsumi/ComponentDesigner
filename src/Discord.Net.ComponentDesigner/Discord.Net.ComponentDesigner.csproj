@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <VersionPrefix>0.0.1</VersionPrefix>
+    <VersionPrefix>1.0.0</VersionPrefix>
     <LangVersion>latest</LangVersion>
     <Authors>Discord.Net Contributors</Authors>
     <PackageId>Discord.Net.ComponentDesigner</PackageId>
