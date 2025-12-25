@@ -7,8 +7,14 @@
         <Nullable>enable</Nullable>
         <InterceptorsNamespaces>$(InterceptorsNamespaces);InlineComponent</InterceptorsNamespaces>
         <EnableAutoRows>true</EnableAutoRows>
+        <EnableAutoTextDisplay>true</EnableAutoTextDisplay>
     </PropertyGroup>
 
+    <ItemGroup>
+        <CompilerVisibleProperty Include="EnableAutoRows" />
+        <CompilerVisibleProperty Include="EnableAutoTextDisplay" />
+    </ItemGroup>
+    
     <ItemGroup>
         <ProjectReference Include="..\src\Discord.Net.ComponentDesigner.Generator\Discord.Net.ComponentDesigner.Generator.csproj" OutputItemType="Analyzer" />
         <ProjectReference Include="..\src\Discord.Net.ComponentDesigner.Parser\Discord.Net.ComponentDesigner.Parser.csproj" OutputItemType="Analyzer"/>
