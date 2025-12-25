@@ -109,6 +109,8 @@ public abstract class BaseComponentTest(ITestOutputHelper output) : BaseTestWith
         Assert.Equal(allowParsingErrors, graph.Document.HasErrors);
 
         graph = graph.Update(target, token);
+
+        PushDiagnostics(graph.Diagnostics);
         
         _graph = graph;
         _nodeEnumerator = _graph.RootNodes.SelectMany(EnumerateNodes).GetEnumerator();

@@ -6,7 +6,7 @@ using DiagnosticInfo = Discord.CX.DiagnosticInfo;
 
 namespace UnitTests;
 
-public abstract class BaseTestWithDiagnostics(ITestOutputHelper output)
+public abstract class BaseTestWithDiagnostics(ITestOutputHelper output) : IDisposable
 {
     private readonly Queue<DiagnosticInfo> _diagnostics = [];
     private readonly HashSet<DiagnosticInfo> _expectedDiagnostics = [];
@@ -111,5 +111,10 @@ public abstract class BaseTestWithDiagnostics(ITestOutputHelper output)
     {
         Assert.Empty(_diagnostics);
         _expectedDiagnostics.Clear();
+    }
+
+    public virtual void Dispose()
+    {
+        EOF();
     }
 }

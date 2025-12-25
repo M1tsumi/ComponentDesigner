@@ -32,6 +32,7 @@ public readonly record struct RenderedTextControlElement(
 
 public abstract class TextControlElement(TextSpan span)
 {
+    public TextSpan Span => span;
     public abstract string FriendlyName { get; }
 
     public virtual IReadOnlyList<TextControlElement> Children => [];
@@ -131,62 +132,52 @@ public abstract class TextControlElement(TextSpan span)
                     tokens.Add(scalar.Token);
                     return [new Scalar(scalar.Token)];
                 case CXElement element:
-                    var children = new List<TextControlElement>();
-
-                    foreach (var child in element.Children)
-                    {
-                        if (Create(context, child, tokens, diagnostics) is not { } childTextControl)
-                            break;
-
-                        children.AddRange(childTextControl);
-                    }
-
                     switch (element.Identifier.ToLowerInvariant())
                     {
                         case "b" or "bold" or "strong":
-                            return [new BoldTextControlElement(element, children)];
+                            return [new BoldTextControlElement(element, CreateChildren(element))];
                         case "i" or "italic" or "italics" or "em":
-                            return [new ItalicTextControlElement(element, children)];
+                            return [new ItalicTextControlElement(element, CreateChildren(element))];
 
                         case "u" or "mark" or "underline" or "ins":
-                            return [new UnderlineTextControlElement(element, children)];
+                            return [new UnderlineTextControlElement(element, CreateChildren(element))];
 
                         case "del" or "strike" or "strikethrough":
-                            return [new StrikethroughTextControlElement(element, children)];
+                            return [new StrikethroughTextControlElement(element, CreateChildren(element))];
                         case "sub" or "subtext" or "small":
-                            return [new SubtextTextControlElement(element, children)];
+                            return [new SubtextTextControlElement(element, CreateChildren(element))];
                         case "link" or "a":
-                            return [new LinkTextControlElement(element, children)];
+                            return [new LinkTextControlElement(element, CreateChildren(element))];
                         case "ul" or "list":
                             return
                             [
-                                new ListTextControlElement(element, ListTextControlElementKind.Unordered, children)
+                                new ListTextControlElement(element, ListTextControlElementKind.Unordered, CreateChildren(element))
                             ];
                         case "ol":
                             return
                             [
-                                new ListTextControlElement(element, ListTextControlElementKind.Ordered, children)
+                                new ListTextControlElement(element, ListTextControlElementKind.Ordered, CreateChildren(element))
                             ];
                         case "li":
-                            return [new ListItemTextControlElement(element, children)];
+                            return [new ListItemTextControlElement(element, CreateChildren(element))];
 
                         case "c" or "code" or "block" or "codeblock":
-                            return [new CodeTextControlElement(element, children)];
+                            return [new CodeTextControlElement(element, CreateChildren(element))];
 
                         case "blockquote" or "quote" or "q":
-                            return [new QuoteTextControlElement(element, children)];
+                            return [new QuoteTextControlElement(element, CreateChildren(element))];
 
                         case "spoiler" or "obfuscated":
-                            return [new SpoilerTextControlElement(element, children)];
+                            return [new SpoilerTextControlElement(element, CreateChildren(element))];
                         
                         case "br" or "break":
-                            return [new LineBreakTextControlElement(element, children)];
+                            return [new LineBreakTextControlElement(element, CreateChildren(element))];
 
                         case var identifier when Enum.TryParse<HeadingTextControlElementVariant>(
                             identifier,
                             ignoreCase: true,
                             out var headerVariant
-                        ): return [new HeadingTextControlElement(element, headerVariant, children)];
+                        ): return [new HeadingTextControlElement(element, headerVariant, CreateChildren(element))];
 
                         default:
                             if (!isRoot)
@@ -207,6 +198,21 @@ public abstract class TextControlElement(TextSpan span)
                         );
                     }
                     return null;
+            }
+
+            IReadOnlyList<TextControlElement> CreateChildren(CXElement element)
+            {
+                var children = new List<TextControlElement>();
+
+                foreach (var child in element.Children)
+                {
+                    if (Create(context, child, tokens, diagnostics) is not { } childTextControl)
+                        break;
+
+                    children.AddRange(childTextControl);
+                }
+
+                return children;
             }
         }
     }

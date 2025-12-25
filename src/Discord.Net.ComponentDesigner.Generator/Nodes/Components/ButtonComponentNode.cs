@@ -116,47 +116,8 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
 
     public override void AddGraphNode(ComponentGraphInitializationContext context)
     {
-        /*
-         * Auto row semantics:
-         * We only want to insert rows when:
-         *   - Auto rows is enabled
-         *   - A non-row parent exists
-         *   - A left-hand sibling is not a part of an auto row
-         */
-        if (
-            !context.Options.EnableAutoRows ||
-            context.ParentGraphNode is null ||
-            context.ParentGraphNode.Inner is ActionRowComponentNode
-        )
-        {
+        if(!AutoActionRowComponentNode.AddPossibleAutoRowNode(this, context))
             base.AddGraphNode(context);
-            return;
-        }
-
-        // check the adjacent sibling
-        var sibling = context.ParentGraphNode.Children.LastOrDefault();
-
-        if (sibling is not null && CanAddToAutoRow(sibling))
-        {
-            // add this node to the auto row
-            context.Push(this, parent: sibling);
-            return;
-        }
-
-        // we can create an auto row
-        context.Push(AutoActionRowComponentNode.Instance, children: [(CXNode)context.CXNode]);
-
-        /*
-         * we can add to an adjacent auto row if:
-         *  - the adjacent node is an auto row
-         *  - the auto row has less than 5 children
-         *  - the children of the auto row is either buttons or dynamic nodes
-         */
-        static bool CanAddToAutoRow(GraphNode graphNode)
-            => graphNode is { Inner: AutoActionRowComponentNode, Children.Count: < 5 } &&
-               graphNode
-                   .Children
-                   .All(x => x.Inner is ButtonComponentNode or IDynamicComponentNode);
     }
 
     public override ButtonComponentState? CreateState(

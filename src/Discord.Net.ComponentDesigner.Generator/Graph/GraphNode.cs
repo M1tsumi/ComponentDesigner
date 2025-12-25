@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Discord.CX.Nodes;
+using Discord.CX.Parser;
 using Discord.CX.Util;
 
 namespace Discord.CX;
@@ -25,6 +26,8 @@ public sealed class GraphNode : IEquatable<GraphNode>
 
     public bool HasChildren
         => _children?.Count > 0;
+
+    public ICXNode SourceCXNode => State.Source;
 
     private ComponentState? _state;
     private Result<string>? _render;

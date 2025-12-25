@@ -356,7 +356,6 @@ public sealed class ContainerTests(ITestOutputHelper output) : BaseComponentTest
             """
             <container>
                 <container />
-                <button customId="abc" label="label"/>
             </container>
             """
         );
@@ -364,7 +363,6 @@ public sealed class ContainerTests(ITestOutputHelper output) : BaseComponentTest
             Node<ContainerComponentNode>();
             {
                 Node<ContainerComponentNode>();
-                Node<ButtonComponentNode>();
             }
 
             Validate();
@@ -372,10 +370,6 @@ public sealed class ContainerTests(ITestOutputHelper output) : BaseComponentTest
             Diagnostic(
                 Diagnostics.InvalidContainerChild("container")
             );
-            Diagnostic(
-                Diagnostics.InvalidContainerChild("button")
-            );
-
             EOF();
         }
     }

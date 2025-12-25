@@ -557,7 +557,7 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static readonly DiagnosticDescriptor ExpectedAConstantValue = new(
         "DC0061",
         "Expected a constant value",
@@ -566,11 +566,29 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
-    
+
     public static DiagnosticDescriptor InvalidChild(string parent, string child) => new(
         "DC0062",
         $"'{parent}' doesn't allow '{child}' as children",
         $"'{parent}' doesn't allow '{child}' as children",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+
+    public static readonly DiagnosticDescriptor AutoTextDisplayDisabled = new(
+        "DC0063",
+        $"Text must be wrapped in a 'text-display' node",
+        $"Text related components must be wrapped in a 'text-display' node, you can enable auto text displays to automatically wrap text in a text-display",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
+    
+    public static readonly DiagnosticDescriptor AutoRowsDisabled = new(
+        "DC0064",
+        $"Input elements must be wrapped in an 'action-row' node",
+        $"Input elements must be wrapped in an 'action-row', you can enable auto rows to automatically wrap inputs in rows",
         "Components",
         DiagnosticSeverity.Error,
         true

@@ -145,20 +145,13 @@ public sealed class SelectMenuComponentNode : ComponentNode
 
     public override void AddGraphNode(ComponentGraphInitializationContext context)
     {
-        if (
-            !context.Options.EnableAutoRows ||
-            context.ParentGraphNode is null ||
-            context.ParentGraphNode.Inner is AutoActionRowComponentNode
-        )
+        if (!AutoActionRowComponentNode.AddPossibleAutoRowNode(this, context))
         {
             context.Push(
                 this,
                 cxNode: context.CXNode
             );
-            return;
         }
-
-        context.Push(AutoActionRowComponentNode.Instance, children: [(CXNode)context.CXNode]);
     }
 
     public override ComponentState? Create(

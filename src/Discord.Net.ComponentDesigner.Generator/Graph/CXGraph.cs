@@ -237,21 +237,12 @@ public sealed class CXGraph : IEquatable<CXGraph>
         GraphInitializationContext context
     )
     {
-        if (!context.Options.EnableAutoTextDisplay)
-        {
-            foreach (var node in nodes.SelectMany(x => CreateNodes(x, parent, context)))
-            {
-                yield return node;
-            }
-            
-            yield break;
-        }
+        var diagnostics = new List<DiagnosticInfo>();
         
         for (var i = 0; i < nodes.Count; i++)
         {
             var current = nodes[i];
-
-            var diagnostics = new List<DiagnosticInfo>();
+            
             if (
                 TextControlElement.TryCreate(
                     context,
@@ -263,39 +254,48 @@ public sealed class CXGraph : IEquatable<CXGraph>
                 )
             )
             {
-                foreach (var diagnostic in diagnostics)
-                    context.Diagnostics.Add(diagnostic);
+                if (!context.Options.EnableAutoTextDisplay)
+                {
+                    diagnostics.Add(
+                        Discord.CX.Diagnostics.AutoTextDisplayDisabled,
+                        element.Span
+                    );
+                }
+                else
+                {
+                    // use the first cx node as the node for the auto text
+                    var graphNode = new GraphNode(
+                        AutoTextDisplayComponentNode.Instance,
+                        state: null,
+                        children: null,
+                        attributeNodes: null,
+                        parent
+                    );
+
+                    var state = new TextDisplayState(
+                        graphNode,
+                        current,
+                        element
+                    );
+
+                    graphNode.State = state;
+                    yield return graphNode;
+                }
                 
-                // use the first cx node as the node for the auto text
-                var graphNode = new GraphNode(
-                    AutoTextDisplayComponentNode.Instance,
-                    state: null,
-                    children: null,
-                    attributeNodes: null,
-                    parent
-                );
-
-                var state = new TextDisplayState(
-                    graphNode,
-                    current,
-                    element
-                );
-
-                graphNode.State = state;
-                yield return graphNode;
-
                 // advance to the next non text control node, minus one here because the for loop increments by one
                 i += nodesUsed - 1;
+                continue;
             }
-            else
+            
+            // use standard create nodes function
+            standardNodeCreation: foreach (var node in CreateNodes(current, parent, context))
             {
-                // use standard create nodes function
-                foreach (var node in CreateNodes(current, parent, context))
-                {
-                    yield return node;
-                }
+                yield return node;
             }
         }
+        
+        foreach (var diagnostic in diagnostics)
+            context.Diagnostics.Add(diagnostic);
     }
 
     private static IEnumerable<GraphNode> CreateNodes(

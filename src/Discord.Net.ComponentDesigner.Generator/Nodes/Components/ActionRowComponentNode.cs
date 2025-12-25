@@ -146,19 +146,3 @@ public class ActionRowComponentNode : ComponentNode
         })
         .Map(state.ConformResult(ComponentBuilderKind.IMessageComponentBuilder, options.TypingContext));
 }
-
-public sealed class AutoActionRowComponentNode : ActionRowComponentNode
-{
-    public static readonly AutoActionRowComponentNode Instance = new();
-    protected override bool IsUserAccessible => false;
-
-    public override ComponentState? Create(
-        ComponentStateInitializationContext context,
-        IList<DiagnosticInfo> diagnostics
-    ) => new(context.GraphNode, context.CXNode);
-
-    public override void Validate(ComponentState state, IComponentContext context, IList<DiagnosticInfo> diagnostics)
-    {
-        // no validation occurs for auto rows
-    }
-}
