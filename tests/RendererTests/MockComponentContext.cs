@@ -12,6 +12,7 @@ public sealed class MockComponentContext : IComponentContext
     public KnownTypes KnownTypes => Compilation.GetKnownTypes();
     public Compilation Compilation { get; }
     public CXDesignerGeneratorState CX { get; }
+    public GeneratorOptions Options { get; }
 
     public ComponentTypingContext RootTypingContext => ComponentTypingContext.Default;
 
@@ -29,11 +30,13 @@ public sealed class MockComponentContext : IComponentContext
 
     public MockComponentContext(
         Compilation compilation,
-        CXDesignerGeneratorState cx
+        CXDesignerGeneratorState cx,
+        GeneratorOptions options
     )
     {
         Compilation = compilation;
         CX = cx;
+        Options = options;
     }
 
 

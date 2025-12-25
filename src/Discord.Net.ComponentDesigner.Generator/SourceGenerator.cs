@@ -31,7 +31,8 @@ public sealed class SourceGenerator : IIncrementalGenerator
         InterceptableLocation interceptLocation,
         LocationInfo location,
         bool usesDesigner,
-        SyntaxTree syntaxTree
+        SyntaxTree syntaxTree,
+        ComponentDesignerOptionOverloads overloads
     ) : IEquatable<Glue>
     {
         public string Key { get; init; } = key;
@@ -39,6 +40,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         public LocationInfo Location { get; init; } = location;
         public bool UsesDesigner { get; init; } = usesDesigner;
         public SyntaxTree SyntaxTree { get; init; } = syntaxTree;
+        public ComponentDesignerOptionOverloads Overloads { get; } = overloads;
 
         public bool Equals(Glue other)
             => Key == other.Key &&
@@ -136,7 +138,8 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 target.InterceptLocation,
                 target.CX.Location,
                 target.CX.UsesDesignerParameter,
-                target.SyntaxTree
+                target.SyntaxTree,
+                target.Overloads
             );
         }
     }
@@ -206,7 +209,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         GeneratorOptions options
     ) => new(
         key,
-        options,
+        options.WithOverloads(target.Overloads),
         target.CX
     );
 
@@ -230,6 +233,16 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
             Debug.Assert(render.Key == glue.Key);
 
+            foreach (var diagnosticInfo in glue.Overloads.Diagnostics)
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        diagnosticInfo.Descriptor,
+                        glue.SyntaxTree.GetLocation(diagnosticInfo.Span)
+                    )
+                );
+            }
+            
             foreach (var diagnostic in render.Diagnostics)
             {
                 // adjust the span to match the source
@@ -264,7 +277,9 @@ public sealed class SourceGenerator : IIncrementalGenerator
                   */
                   [global::System.Runtime.CompilerServices.InterceptsLocation(version: {{glue.InterceptLocation.Version}}, data: "{{glue.InterceptLocation.Data}}")]
                   public static global::Discord.CXMessageComponent _{{Math.Abs(glue.InterceptLocation.GetHashCode())}}(
-                      {{parameter}}
+                      {{parameter}},
+                      bool? autoRows = null,
+                      bool? autoTextDisplays = null
                   ) => new global::Discord.CXMessageComponent([
                       {{render.EmittedSource!.WithNewlinePadding(4)}}
                   ]);
@@ -374,9 +389,54 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 [..interpolationInfos],
                 semanticModel,
                 invocationSyntax.SyntaxTree
-            )
+            ),
+            GetOptionOverloads(operation, semanticModel, token)
         );
 
+        static ComponentDesignerOptionOverloads GetOptionOverloads(
+            IInvocationOperation operation,
+            SemanticModel semanticModel,
+            CancellationToken token
+        )
+        {
+            var enableAutoRows = Result<bool>.Empty;
+            var enableAutoTextDisplays = Result<bool>.Empty;
+            
+            foreach (var argument in operation.Arguments)
+            {
+                switch (argument.Parameter?.Name)
+                {
+                    case "autoRows" when argument.Syntax is ArgumentSyntax{Expression: {} expression}:
+                        enableAutoRows = GetConstantValue(expression);
+                        break;
+                    case "autoTextDisplays"when argument.Syntax is ArgumentSyntax{Expression: {} expression}:
+                        enableAutoTextDisplays = GetConstantValue(expression);
+                        break;
+                }
+            }
+
+            return new(enableAutoRows, enableAutoTextDisplays);
+
+            Result<bool> GetConstantValue(ExpressionSyntax expression)
+            {
+                var value = semanticModel.GetConstantValue(expression, token);
+
+                if (!value.HasValue)
+                {
+                    return new DiagnosticInfo(
+                        Diagnostics.ExpectedAConstantValue,
+                        expression.Span
+                    );
+                }
+
+                return value.Value switch
+                {
+                    true or false => new((bool)value.Value),
+                    _ => Result<bool>.Empty
+                };
+            }
+        }
+        
         static bool TryGetCXDesigner(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -513,7 +573,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
 
             interceptLocation = location;
 
-            if (invocationSyntax.ArgumentList.Arguments.Count is not 1) return false;
+            if (invocationSyntax.ArgumentList.Arguments.Count < 1) return false;
 
             argumentExpressionSyntax = invocationSyntax.ArgumentList.Arguments[0].Expression;
 

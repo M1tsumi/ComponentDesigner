@@ -611,7 +611,8 @@ public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTe
                 [..interpolations ?? []],
                 null!,
                 null!
-            )
+            ),
+            GeneratorOptions.Default
         );
         
         if (

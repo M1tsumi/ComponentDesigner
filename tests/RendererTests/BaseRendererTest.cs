@@ -85,7 +85,8 @@ public abstract class BaseRendererTest(ITestOutputHelper output) : BaseTestWithD
                 [..interpolations ?? []],
                 null!,
                 null!
-            )
+            ),
+            GeneratorOptions.Default
         );
 
         var propValue = new MockPropertyValue(

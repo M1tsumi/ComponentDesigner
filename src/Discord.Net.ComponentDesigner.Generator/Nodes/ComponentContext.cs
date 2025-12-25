@@ -14,6 +14,8 @@ public class ComponentContext : IComponentContext
     public virtual Compilation Compilation => _graph.Compilation;
     public virtual CXDesignerGeneratorState CX => _graph.CX;
 
+    public GeneratorOptions Options => _graph.Options;
+    
     public ComponentTypingContext RootTypingContext { get; }
 
     private readonly CXGraph _graph;

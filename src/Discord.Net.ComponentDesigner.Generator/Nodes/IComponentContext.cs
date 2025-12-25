@@ -10,8 +10,12 @@ namespace Discord.CX.Nodes;
 public interface IComponentContext
 {
     KnownTypes KnownTypes { get; }
+    
     Compilation Compilation { get; }
+    
     CXDesignerGeneratorState CX { get; }
+    
+    GeneratorOptions Options { get; }
     
     string GetDesignerValue(int index, string? type = null);
 

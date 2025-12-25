@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Discord.CX;
 
-public sealed record GeneratorOptions(
+public readonly record struct GeneratorOptions(
     bool EnableAutoRows = false,
     bool EnableAutoTextDisplay = false,
     LanguageVersion? CSharpLangVersion = null
@@ -16,6 +16,17 @@ public sealed record GeneratorOptions(
     private const string ENABLE_AUTO_ROWS_KEY = "build_property.EnableAutoRows";
     private const string ENABLE_AUTO_TEXT_DISPLAY = "build_property.EnableAutoTextDisplay";
 
+    public GeneratorOptions WithOverloads(ComponentDesignerOptionOverloads overloads)
+    {
+        if (overloads.IsEmpty) return this;
+
+        return this with
+        {
+            EnableAutoRows = overloads.EnableAutoRows.GetValueOrDefault(EnableAutoRows),
+            EnableAutoTextDisplay = overloads.EnableAutoTextDisplays.GetValueOrDefault(EnableAutoTextDisplay)
+        };
+    }
+    
     public static IncrementalValueProvider<GeneratorOptions> CreateProvider(
         IncrementalGeneratorInitializationContext context
     )

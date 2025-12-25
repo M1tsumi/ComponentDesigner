@@ -29,6 +29,8 @@ public sealed class CXGraph : IEquatable<CXGraph>
     public Compilation Compilation => _state.Compilation;
     public CXDesignerGeneratorState CX => _state.CX;
 
+    public GeneratorOptions Options => _state.GeneratorOptions;
+    
     private readonly GraphGeneratorState _state;
 
     private readonly EquatableArray<DiagnosticInfo> _diagnostics;
