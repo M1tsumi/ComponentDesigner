@@ -189,17 +189,23 @@ public abstract class TextControlElement(TextSpan span)
                         ): return [new HeadingTextControlElement(element, headerVariant, children)];
 
                         default:
-                            diagnostics.Add(
-                                Diagnostics.UnknownComponent(element.Identifier),
-                                element
-                            );
+                            if (!isRoot)
+                            {
+                                diagnostics.Add(
+                                    Diagnostics.UnknownComponent(element.Identifier),
+                                    element
+                                );
+                            }
                             return null;
                     }
                 default:
-                    diagnostics.Add(
-                        Diagnostics.UnknownComponent(node.GetType().Name),
-                        node
-                    );
+                    if (!isRoot)
+                    {
+                        diagnostics.Add(
+                            Diagnostics.UnknownComponent(node.GetType().Name),
+                            node
+                        );
+                    }
                     return null;
             }
         }
