@@ -19,6 +19,11 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    public INamedTypeSymbol? TimestampTagStylesEnum
+        => GetOrResolveType("Discord.TimestampTagStyles", ref _TimestampTagStyles);
+    
+    public Optional<INamedTypeSymbol?> _TimestampTagStyles;
+    
     public INamedTypeSymbol? IUserType
         => GetOrResolveType("Discord.IUser", ref _IUserType);
     

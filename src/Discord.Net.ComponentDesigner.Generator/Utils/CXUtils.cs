@@ -1,9 +1,10 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Discord.CX;
 using Discord.CX.Nodes;
 using Discord.CX.Parser;
 
-namespace Discord.Net.ComponentDesignerGenerator.Utils;
+namespace Discord.CX;
 
 public static class CXUtils
 {
@@ -65,5 +66,23 @@ public static class CXUtils
             value = null;
             return false;
         }
+    }
+    
+    public static bool IsLoneInterpolatedLiteral(
+        this CXValue.Multipart literal,
+        IComponentContext context,
+        out DesignerInterpolationInfo info)
+    {
+        if (
+            literal is { HasInterpolations: true, Tokens.Count: 1 } &&
+            literal.Document!.TryGetInterpolationIndex(literal.Tokens[0], out var index)
+        )
+        {
+            info = context.GetInterpolationInfo(index);
+            return true;
+        }
+
+        info = null!;
+        return false;
     }
 }

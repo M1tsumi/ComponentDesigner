@@ -111,7 +111,7 @@ public abstract class TextControlElement(TextSpan span)
                                 context.Compilation
                             )
                         ) break;
-                        
+
                         tokens.AddRange(multipart.Tokens);
                         (result ??= []).Add(new Scalar(token));
                     }
@@ -151,12 +151,14 @@ public abstract class TextControlElement(TextSpan span)
                         case "ul" or "list":
                             return
                             [
-                                new ListTextControlElement(element, ListTextControlElementKind.Unordered, CreateChildren(element))
+                                new ListTextControlElement(element, ListTextControlElementKind.Unordered,
+                                    CreateChildren(element))
                             ];
                         case "ol":
                             return
                             [
-                                new ListTextControlElement(element, ListTextControlElementKind.Ordered, CreateChildren(element))
+                                new ListTextControlElement(element, ListTextControlElementKind.Ordered,
+                                    CreateChildren(element))
                             ];
                         case "li":
                             return [new ListItemTextControlElement(element, CreateChildren(element))];
@@ -169,9 +171,17 @@ public abstract class TextControlElement(TextSpan span)
 
                         case "spoiler" or "obfuscated":
                             return [new SpoilerTextControlElement(element, CreateChildren(element))];
-                        
+
                         case "br" or "break":
                             return [new LineBreakTextControlElement(element, CreateChildren(element))];
+
+                        case "time" or "timestamp" when TimeTagTextControlElement.TryCreate(
+                            context,
+                            element,
+                            diagnostics,
+                            tokens,
+                            out var tag
+                        ):  return [tag];
 
                         case var identifier when Enum.TryParse<HeadingTextControlElementVariant>(
                             identifier,
@@ -187,6 +197,7 @@ public abstract class TextControlElement(TextSpan span)
                                     element
                                 );
                             }
+
                             return null;
                     }
                 default:
@@ -197,6 +208,7 @@ public abstract class TextControlElement(TextSpan span)
                             node
                         );
                     }
+
                     return null;
             }
 
@@ -217,6 +229,18 @@ public abstract class TextControlElement(TextSpan span)
         }
     }
 
+    protected static void AddTokensFromValue(List<CXToken> tokens, CXValue? value)
+    {
+        if (value is null) return;
+
+        switch (value)
+        {
+            case CXValue.Scalar scalar: tokens.Add(scalar.Token); break;
+            case CXValue.Interpolation interpolation: tokens.Add(interpolation.Token); break;
+            case CXValue.Multipart multipart: tokens.AddRange(multipart.Tokens); break;
+        }
+    }
+    
     public Result<string> RenderToCSharpString(IComponentContext context)
         => Render(context, TextControlRenderingOptions.Default with
             {

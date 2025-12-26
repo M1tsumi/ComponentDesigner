@@ -74,24 +74,6 @@ public static class Renderers
         };
     }
 
-    public static bool IsLoneInterpolatedLiteral(
-        IComponentContext context,
-        CXValue.Multipart literal,
-        out DesignerInterpolationInfo info)
-    {
-        if (
-            literal is { HasInterpolations: true, Tokens.Count: 1 } &&
-            literal.Document!.TryGetInterpolationIndex(literal.Tokens[0], out var index)
-        )
-        {
-            info = context.GetInterpolationInfo(index);
-            return true;
-        }
-
-        info = null!;
-        return false;
-    }
-
     public static Result<string> ComponentAsProperty(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
@@ -219,17 +201,17 @@ public static class Renderers
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
 
-            case CXValue.Multipart literal:
-                if (!literal.HasInterpolations)
-                    return FromText(literal, literal.Tokens.ToValueString().Trim());
+            case CXValue.Multipart multipart:
+                if (!multipart.HasInterpolations)
+                    return FromText(multipart, multipart.Tokens.ToValueString().Trim());
 
-                if (IsLoneInterpolatedLiteral(context, literal, out var info))
-                    return FromInterpolation(literal, info);
+                if (multipart.IsLoneInterpolatedLiteral(context, out var info))
+                    return FromInterpolation(multipart, info);
 
                 return FromValue(
-                    $"int.Parse({RenderStringLiteral(literal)})",
+                    $"int.Parse({RenderStringLiteral(multipart)})",
                     Diagnostics.FallbackToRuntimeValueParsing("int.Parse"),
-                    literal
+                    multipart
                 );
             default: return "default";
         }
@@ -282,17 +264,17 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return FromText(scalar, scalar.Value.Trim().ToLowerInvariant());
 
-            case CXValue.Multipart stringLiteral:
-                if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString().Trim().ToLowerInvariant());
+            case CXValue.Multipart multipart:
+                if (!multipart.HasInterpolations)
+                    return FromText(multipart, multipart.Tokens.ToValueString().Trim().ToLowerInvariant());
 
-                if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
-                    return FromInterpolation(stringLiteral, info);
+                if (multipart.IsLoneInterpolatedLiteral(context, out var info))
+                    return FromInterpolation(multipart, info);
 
                 return FromValue(
                     $"bool.Parse({context.GetDesignerValue(info)})",
                     Diagnostics.FallbackToRuntimeValueParsing("bool.Parse"),
-                    stringLiteral
+                    multipart
                 );
 
             case null when !propertyValue.RequiresValue:
@@ -390,18 +372,18 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return FromText(scalar, scalar.Value);
 
-            case CXValue.Multipart stringLiteral:
+            case CXValue.Multipart multipart:
 
-                if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString());
+                if (!multipart.HasInterpolations)
+                    return FromText(multipart, multipart.Tokens.ToValueString());
 
-                if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
-                    return FromInterpolation(stringLiteral, info);
+                if (multipart.IsLoneInterpolatedLiteral(context, out var info))
+                    return FromInterpolation(multipart, info);
 
                 return FromValue(
-                    UseLibraryParser(RenderStringLiteral(stringLiteral)),
+                    UseLibraryParser(RenderStringLiteral(multipart)),
                     Diagnostics.FallbackToRuntimeValueParsing("Discord.Color.Parse"),
-                    stringLiteral
+                    multipart
                 );
             default: return "default";
         }
@@ -519,17 +501,17 @@ public static class Renderers
             case CXValue.Scalar scalar:
                 return FromText(scalar, scalar.Value.Trim());
 
-            case CXValue.Multipart stringLiteral:
-                if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString().Trim());
+            case CXValue.Multipart multipart:
+                if (!multipart.HasInterpolations)
+                    return FromText(multipart, multipart.Tokens.ToValueString().Trim());
 
-                if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
-                    return FromInterpolation(stringLiteral, info);
+                if (multipart.IsLoneInterpolatedLiteral(context, out var info))
+                    return FromInterpolation(multipart, info);
 
                 return FromValue(
-                    UseParseMethod(RenderStringLiteral(stringLiteral)),
+                    UseParseMethod(RenderStringLiteral(multipart)),
                     Diagnostics.FallbackToRuntimeValueParsing("ulong.Parse"),
-                    stringLiteral
+                    multipart
                 );
 
             default: return "default";
@@ -840,10 +822,17 @@ public static class Renderers
 
     public static PropertyRenderer RenderEnum(string fullyQualifiedName)
     {
+        var renderer = CreateEnumRenderer(fullyQualifiedName);
+
+        return (context, propertyValue, options) => renderer(context, propertyValue.Value);
+    }
+    
+    public static Func<IComponentContext, CXValue?, Result<string>> CreateEnumRenderer(string fullyQualifiedName)
+    {
         ITypeSymbol? symbol = null;
         Dictionary<string, string> variants = [];
 
-        return (context, propertyValue, options) =>
+        return (context, value) =>
         {
             if (symbol is null || variants.Count is 0)
             {
@@ -861,21 +850,21 @@ public static class Renderers
                     .ToDictionary(x => x.Name.ToLowerInvariant(), x => x.Name);
             }
 
-            switch (propertyValue.Value)
+            switch (value)
             {
                 case CXValue.Scalar scalar:
                     return FromText(scalar.Value.Trim(), scalar);
                 case CXValue.Interpolation interpolation:
                     return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
-                case CXValue.Multipart literal:
-                    if (!literal.HasInterpolations)
-                        return FromText(literal.Tokens.ToValueString().Trim().ToLowerInvariant(), literal);
+                case CXValue.Multipart multipart:
+                    if (!multipart.HasInterpolations)
+                        return FromText(multipart.Tokens.ToValueString().Trim().ToLowerInvariant(), multipart);
 
-                    if (IsLoneInterpolatedLiteral(context, literal, out var info))
-                        return FromInterpolation(literal, info);
+                    if (multipart.IsLoneInterpolatedLiteral(context, out var info))
+                        return FromInterpolation(multipart, info);
 
                     return
-                        $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({RenderStringLiteral(literal)})";
+                        $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({RenderStringLiteral(multipart)})";
                 default: return "default";
             }
 

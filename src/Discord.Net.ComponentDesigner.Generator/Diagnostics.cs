@@ -593,4 +593,13 @@ public static partial class Diagnostics
         DiagnosticSeverity.Error,
         true
     );
+    
+    public static DiagnosticDescriptor TooManyChildren(string owner) => new(
+        "DC0065",
+        $"Too many children in '{owner}'",
+        $"'{owner}' can only have at most one child",
+        "Components",
+        DiagnosticSeverity.Error,
+        true
+    );
 }

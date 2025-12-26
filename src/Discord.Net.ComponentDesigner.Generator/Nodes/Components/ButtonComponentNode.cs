@@ -170,7 +170,7 @@ public sealed class ButtonComponentNode : ComponentNode<ButtonComponentState>
         switch (styleProperty.Value)
         {
             case CXValue.Multipart multipart
-                when Renderers.IsLoneInterpolatedLiteral(context, multipart, out var info):
+                when multipart.IsLoneInterpolatedLiteral(context, out var info):
                 return FromInterpolation(info);
             case CXValue.Interpolation interpolation:
                 return FromInterpolation(context.GetInterpolationInfo(interpolation));
