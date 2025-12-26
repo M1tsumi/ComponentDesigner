@@ -63,7 +63,7 @@ public sealed class CXNodeEqualityComparer(
         {
             (CXToken t1, CXToken t2) =>
                 t1.Kind == t2.Kind &&
-                t1.Value == t2.Value,
+                t1.RawValue == t2.RawValue,
             (CXNode n1, CXNode n2) =>
                 n1.Slots.SequenceEqual(n2.Slots, this),
             
@@ -94,7 +94,7 @@ public sealed class CXNodeEqualityComparer(
             hash,
             obj switch
             {
-                CXToken token => Hash.Combine(token.Kind, token.Value),
+                CXToken token => Hash.Combine(token.Kind, token.RawValue),
                 CXNode node => node.Slots.Aggregate(0, Hash.Combine),
                 ICXCollection col => col.ToList().Aggregate(0, Hash.Combine),
                 _ => 0

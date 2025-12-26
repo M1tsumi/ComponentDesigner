@@ -10,6 +10,15 @@ namespace UnitTests.RendererTests;
 public sealed class TextControlRenderingTests(ITestOutputHelper output) : BaseTestWithDiagnostics(output)
 {
     [Fact]
+    public void EscapesPreserved()
+    {
+        Renders(
+            "Some <br/> text&copy; and &pi;",
+            $"Some {Environment.NewLine} text© and π"
+        );
+    }
+    
+    [Fact]
     public void LineBreak()
     {
         Renders(

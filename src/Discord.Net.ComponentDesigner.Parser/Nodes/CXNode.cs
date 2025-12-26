@@ -313,60 +313,17 @@ public abstract class CXNode : ICXNode
     /// <inheritdoc/>
     public string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia)
     {
-        // if (TryGetDocument(out var document))
-        // {
-        //     return document.Parser.Reader[
-        //         (includeLeadingTrivia, includeTrailingTrivia) switch
-        //         {
-        //             (true, true) => FullSpan,
-        //             (false, false) => Span,
-        //             (true, false) => TextSpan.FromBounds(FullSpan.Start, Span.End),
-        //             (false, true) => TextSpan.FromBounds(Span.Start, FullSpan.Start),
-        //         }
-        //     ];
-        // }
-
-        var tokens = new List<CXToken>();
-
-        var stack = new Stack<(CXNode Node, int Index)>([(this, 0)]);
-
-        while (stack.Count > 0)
-        {
-            var (node, index) = stack.Pop();
-
-            if (node.Slots.Count <= index) continue;
-
-            var child = node.Slots[index];
-
-            if (node.Slots.Count - 1 > index)
-                stack.Push((node, index + 1));
-
-            switch (child)
-            {
-                case CXToken token:
-                    tokens.Add(token);
-                    continue;
-                case CXNode childNode:
-                    stack.Push((childNode, 0));
-                    continue;
-            }
-        }
-
         var sb = new StringBuilder();
 
-        for (var i = 0; i < tokens.Count; i++)
+        var tokens = this.Walk().OfType<CXToken>().ToArray();
+
+        for (var i = 0; i < tokens.Length; i++)
         {
             var token = tokens[i];
-
-            var isFirst = i == 0;
-            var isLast = i == tokens.Count - 1;
-
-            sb.Append(
-                token.ToString(
-                    !isFirst || includeLeadingTrivia,
-                    !isLast || includeTrailingTrivia
-                )
-            );
+            sb.Append(token.ToString(
+                includeLeadingTrivia: includeLeadingTrivia || i > 0,
+                includeTrailingTrivia: includeTrailingTrivia || i < tokens.Length - 1
+            ));
         }
 
         return sb.ToString();

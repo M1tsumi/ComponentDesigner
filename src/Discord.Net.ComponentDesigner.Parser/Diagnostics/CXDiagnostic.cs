@@ -27,7 +27,7 @@ public readonly record struct CXDiagnosticDescriptor(
             DiagnosticSeverity.Error,
             CXErrorCode.MissingElementClosingTag,
             identifier is not null
-                ? $"Missing closing tag for '{identifier.Value}'"
+                ? $"Missing closing tag for '{identifier.RawValue}'"
                 : "Missing fragment closing tag"
         );
 

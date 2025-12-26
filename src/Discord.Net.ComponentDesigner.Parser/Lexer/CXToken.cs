@@ -14,17 +14,28 @@ namespace Discord.CX.Parser;
 /// <param name="LeadingTrivia">The leading trivia of the token.</param>
 /// <param name="TrailingTrivia">The trailing trivia of the token.</param>
 /// <param name="Flags">The flags of the token.</param>
-/// <param name="Value">The raw value of the token.</param>
+/// <param name="RawValue">The raw value of the token.</param>
 /// <param name="Diagnostics">The diagnostics for the token.</param>
 public sealed record CXToken(
     CXTokenKind Kind,
     LexedCXTrivia LeadingTrivia,
     LexedCXTrivia TrailingTrivia,
     CXTokenFlags Flags,
-    string Value,
+    string RawValue,
+    string? Value = null,
     params IReadOnlyList<CXDiagnosticDescriptor> Diagnostics
 ) : ICXNode
 {
+    /// <summary>
+    ///     Gets the value representing this <see cref="CXToken"/>.
+    /// </summary>
+    /// <remarks>
+    ///     This value may not line up with the value within the source, for example if the token contains
+    ///     escape sequences, those sequences will be parsed into their respective codes in this value. Use
+    ///     <see cref="RawValue"/> to access the raw, unaltered value from the source.
+    /// </remarks>
+    public string Value { get; init; } = Value ?? RawValue;
+    
     /// <summary>
     ///     Gets the interpolation index of this token.
     /// </summary>
@@ -38,9 +49,9 @@ public sealed record CXToken(
     /// <summary>
     ///     Gets the full character width of this token. 
     /// </summary>
-    public int Width => LeadingTrivia.CharacterLength + Value.Length + TrailingTrivia.CharacterLength;
+    public int Width => LeadingTrivia.CharacterLength + RawValue.Length + TrailingTrivia.CharacterLength;
 
-    public TextSpan Span => new(this.Offset + LeadingTrivia.CharacterLength, Value.Length);
+    public TextSpan Span => new(this.Offset + LeadingTrivia.CharacterLength, RawValue.Length);
     public TextSpan FullSpan => new(this.Offset, Width);
 
     /// <inheritdoc/>
@@ -76,6 +87,7 @@ public sealed record CXToken(
     /// <param name="kind">The kind of the synthetic token.</param>
     /// <param name="span">The <see cref="TextSpan"/> of the synthetic token.</param>
     /// <param name="flags">The flags of the synthetic token.</param>
+    /// <param name="rawValue">The raw value of the synthetic token.</param>
     /// <param name="value">The value of the synthetic token.</param>
     /// <param name="diagnostics">The diagnostics of the synthetic token.</param>
     /// <returns>The newly created synthetic token.</returns>
@@ -83,6 +95,7 @@ public sealed record CXToken(
         CXTokenKind kind,
         TextSpan? span = null,
         CXTokenFlags? flags = null,
+        string? rawValue = null,
         string? value = null,
         IEnumerable<CXDiagnosticDescriptor>? diagnostics = null
     )
@@ -92,7 +105,8 @@ public sealed record CXToken(
             LexedCXTrivia.Empty,
             LexedCXTrivia.Empty,
             CXTokenFlags.Synthetic | (flags ?? CXTokenFlags.None),
-            value ?? string.Empty,
+            rawValue ?? string.Empty,
+            value,
             [..diagnostics ?? []]
         );
     }
@@ -112,14 +126,14 @@ public sealed record CXToken(
     ///     Creates a new <see cref="CXToken"/> with the <see cref="CXTokenFlags.Missing"/> flag set.
     /// </summary>
     /// <param name="kind">The kind of the token to create.</param>
-    /// <param name="value">The value of the token.</param>
+    /// <param name="rawValue">The value of the token.</param>
     /// <param name="leadingTrivia">The leading trivia of the token to create.</param>
     /// <param name="trailingTrivia">The trailing trivia of the token to create.</param>
     /// <param name="diagnostics">The diagnostics of the token.</param>
     /// <returns>The newly created token.</returns>
     public static CXToken CreateMissing(
         CXTokenKind kind,
-        string value,
+        string rawValue,
         LexedCXTrivia? leadingTrivia = null,
         LexedCXTrivia? trailingTrivia = null,
         params IEnumerable<CXDiagnosticDescriptor> diagnostics
@@ -128,7 +142,7 @@ public sealed record CXToken(
         leadingTrivia ?? LexedCXTrivia.Empty,
         trailingTrivia ?? LexedCXTrivia.Empty,
         Flags: CXTokenFlags.Missing,
-        Value: value,
+        RawValue: rawValue,
         Diagnostics: [..diagnostics]
     );
 
@@ -144,10 +158,10 @@ public sealed record CXToken(
     public string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia)
         => (includeLeadingTrivia, includeTrailingTrivia) switch
         {
-            (false, false) => Value,
-            (true, true) => $"{LeadingTrivia}{Value}{TrailingTrivia}",
-            (false, true) => $"{Value}{TrailingTrivia}",
-            (true, false) => $"{LeadingTrivia}{Value}"
+            (false, false) => RawValue,
+            (true, true) => $"{LeadingTrivia}{RawValue}{TrailingTrivia}",
+            (false, true) => $"{RawValue}{TrailingTrivia}",
+            (true, false) => $"{LeadingTrivia}{RawValue}"
         };
 
     /// <inheritdoc/>
@@ -161,7 +175,6 @@ public sealed record CXToken(
     /// <inheritdoc/>
     public override int GetHashCode()
         => CXNodeEqualityComparer.Default.GetHashCode(this);
-
 
     /// <inheritdoc/>
     int ICXNode.GraphWidth => 0;

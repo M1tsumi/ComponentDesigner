@@ -11,13 +11,12 @@ using Discord.CX.Nodes.Components;
 
 namespace Discord.CX.Nodes;
 
-using RenderResult = Result<string>;
 using static Result<string>;
 using static DiagnosticInfo;
 
 public static class Renderers
 {
-    public static RenderResult DefaultRenderer(
+    public static Result<string> DefaultRenderer(
         IComponentContext context,
         IComponentPropertyValue value,
         PropertyRenderingOptions options
@@ -82,7 +81,7 @@ public static class Renderers
     {
         if (
             literal is { HasInterpolations: true, Tokens.Count: 1 } &&
-            literal.Document.TryGetInterpolationIndex(literal.Tokens[0], out var index)
+            literal.Document!.TryGetInterpolationIndex(literal.Tokens[0], out var index)
         )
         {
             info = context.GetInterpolationInfo(index);
@@ -131,7 +130,9 @@ public static class Renderers
                 );
 
                 // ensure we can convert it to a builder
-                var target = options.TypingContext?.ConformingType ?? ComponentBuilderKind.IMessageComponentBuilder;
+                var target = 
+                    options.TypingContext?.ConformingType ?? 
+                    ComponentBuilderKind.IMessageComponentBuilder;
 
                 var result = new Builder();
                 if (
@@ -191,7 +192,7 @@ public static class Renderers
         }
     }
 
-    public static RenderResult UnfurledMediaItem(
+    public static Result<string> UnfurledMediaItem(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
@@ -204,7 +205,7 @@ public static class Renderers
             }({x})"
         );
 
-    public static RenderResult Integer(
+    public static Result<string> Integer(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
@@ -220,7 +221,7 @@ public static class Renderers
 
             case CXValue.Multipart literal:
                 if (!literal.HasInterpolations)
-                    return FromText(literal, literal.Tokens.ToString().Trim());
+                    return FromText(literal, literal.Tokens.ToValueString().Trim());
 
                 if (IsLoneInterpolatedLiteral(context, literal, out var info))
                     return FromInterpolation(literal, info);
@@ -233,7 +234,7 @@ public static class Renderers
             default: return "default";
         }
 
-        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        Result<string> FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             if (info.Constant.Value is int || int.TryParse(info.Constant.Value?.ToString(), out _))
                 return info.Constant.Value!.ToString();
@@ -255,7 +256,7 @@ public static class Renderers
             );
         }
 
-        RenderResult FromText(ICXNode owner, string text)
+        Result<string> FromText(ICXNode owner, string text)
         {
             if (int.TryParse(text, out _)) return text;
 
@@ -267,7 +268,7 @@ public static class Renderers
         }
     }
 
-    public static RenderResult Boolean(
+    public static Result<string> Boolean(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
@@ -283,7 +284,7 @@ public static class Renderers
 
             case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToString().Trim().ToLowerInvariant());
+                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString().Trim().ToLowerInvariant());
 
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
@@ -300,7 +301,7 @@ public static class Renderers
             default: return "default";
         }
 
-        RenderResult FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
+        Result<string> FromInterpolation(ICXNode node, DesignerInterpolationInfo info)
         {
             if (info.Constant.Value is bool b) return b ? "true" : "false";
 
@@ -324,7 +325,7 @@ public static class Renderers
             );
         }
 
-        RenderResult FromText(ICXNode owner, string value)
+        Result<string> FromText(ICXNode owner, string value)
         {
             if (value is not "true" and not "false")
             {
@@ -372,7 +373,7 @@ public static class Renderers
         return _colorPresets.TryGetValue(value.ToLowerInvariant(), out fieldName);
     }
 
-    public static RenderResult Color(
+    public static Result<string> Color(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
@@ -392,7 +393,7 @@ public static class Renderers
             case CXValue.Multipart stringLiteral:
 
                 if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToString());
+                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString());
 
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
@@ -405,7 +406,7 @@ public static class Renderers
             default: return "default";
         }
 
-        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        Result<string> FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             if (
                 info.Symbol is not null &&
@@ -453,7 +454,7 @@ public static class Renderers
             );
         }
 
-        RenderResult FromText(ICXNode owner, string rawValue)
+        Result<string> FromText(ICXNode owner, string rawValue)
         {
             if (TryGetColorPreset(context, rawValue, out var presetName))
             {
@@ -502,13 +503,13 @@ public static class Renderers
         }
     }
 
-    public static RenderResult Snowflake(
+    public static Result<string> Snowflake(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
     ) => Snowflake(context, propertyValue.Value, options);
 
-    public static RenderResult Snowflake(IComponentContext context, CXValue? value, PropertyRenderingOptions options)
+    public static Result<string> Snowflake(IComponentContext context, CXValue? value, PropertyRenderingOptions options)
     {
         switch (value)
         {
@@ -520,7 +521,7 @@ public static class Renderers
 
             case CXValue.Multipart stringLiteral:
                 if (!stringLiteral.HasInterpolations)
-                    return FromText(stringLiteral, stringLiteral.Tokens.ToString().Trim());
+                    return FromText(stringLiteral, stringLiteral.Tokens.ToValueString().Trim());
 
                 if (IsLoneInterpolatedLiteral(context, stringLiteral, out var info))
                     return FromInterpolation(stringLiteral, info);
@@ -534,7 +535,7 @@ public static class Renderers
             default: return "default";
         }
 
-        RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+        Result<string> FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
         {
             var targetType = context.Compilation.GetSpecialType(SpecialType.System_UInt64);
 
@@ -556,7 +557,7 @@ public static class Renderers
             );
         }
 
-        RenderResult FromText(ICXNode owner, string text)
+        Result<string> FromText(ICXNode owner, string text)
         {
             if (ulong.TryParse(text, out _)) return text;
 
@@ -571,13 +572,13 @@ public static class Renderers
             => $"ulong.Parse({input})";
     }
 
-    public static RenderResult String(
+    public static Result<string> String(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
     ) => String(context, propertyValue.Value, options);
     
-    public static RenderResult String(
+    public static Result<string> String(
         IComponentContext context,
         CXValue? value,
         PropertyRenderingOptions options
@@ -594,7 +595,7 @@ public static class Renderers
                 return context.GetDesignerValue(interpolation);
             case CXValue.Multipart literal: return RenderStringLiteral(literal);
             case CXValue.Scalar scalar:
-                return ToCSharpString(scalar.FullValue);
+                return ToCSharpString(scalar.Value);
         }
     }
 
@@ -868,7 +869,7 @@ public static class Renderers
                     return FromInterpolation(interpolation, context.GetInterpolationInfo(interpolation));
                 case CXValue.Multipart literal:
                     if (!literal.HasInterpolations)
-                        return FromText(literal.Tokens.ToString().Trim().ToLowerInvariant(), literal);
+                        return FromText(literal.Tokens.ToValueString().Trim().ToLowerInvariant(), literal);
 
                     if (IsLoneInterpolatedLiteral(context, literal, out var info))
                         return FromInterpolation(literal, info);
@@ -878,7 +879,7 @@ public static class Renderers
                 default: return "default";
             }
 
-            RenderResult FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
+            Result<string> FromInterpolation(ICXNode owner, DesignerInterpolationInfo info)
             {
                 if (
                     context.Compilation.HasImplicitConversion(
@@ -902,7 +903,7 @@ public static class Renderers
                     $"global::System.Enum.Parse<{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>({context.GetDesignerValue(info)})";
             }
 
-            RenderResult FromText(string text, ICXNode owner)
+            Result<string> FromText(string text, ICXNode owner)
             {
                 if (variants.TryGetValue(text, out var name))
                     return $"{symbol!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{name}";
@@ -916,7 +917,7 @@ public static class Renderers
         };
     }
 
-    public static RenderResult Emoji(
+    public static Result<string> Emoji(
         IComponentContext context,
         IComponentPropertyValue propertyValue,
         PropertyRenderingOptions options
@@ -964,7 +965,7 @@ public static class Renderers
                 if (!stringLiteral.HasInterpolations)
                     LightlyValidateEmote(
                         ref builder,
-                        stringLiteral.Tokens.ToString(),
+                        stringLiteral.Tokens.ToValueString(),
                         stringLiteral.Tokens,
                         out isDiscordEmote,
                         out isEmoji

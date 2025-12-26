@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Threading;
 
 namespace Discord.CX.Parser;
@@ -10,7 +12,7 @@ namespace Discord.CX.Parser;
 /// <summary>
 ///     Represents a lexer that can lex the CX syntax.
 /// </summary>
-public sealed class CXLexer
+public sealed partial class CXLexer
 {
     /// <summary>
     ///     A <see langword="ref"/> <see langword="struct"/> containing the state for scanning tokens.
@@ -160,12 +162,47 @@ public sealed class CXLexer
     /// <summary>
     ///     An open parenthesis character.
     /// </summary>
-    public const char OPEN_PAREN = '(';
+    public const char OPEN_PAREN_CHAR = '(';
 
     /// <summary>
     ///     A close parenthesis character.
     /// </summary>
-    public const char CLOSE_PAREN = ')';
+    public const char CLOSE_PAREN_CHAR = ')';
+
+    /// <summary>
+    ///     An ampersand character.
+    /// </summary>
+    public const char AMPERSAND_CHAR = '&';
+
+    /// <summary>
+    ///     A hashtag character
+    /// </summary>
+    public const char HASHTAG_CHAR = '#';
+
+    /// <summary>
+    ///     A semicolon character.
+    /// </summary>
+    public const char SEMICOLON_CHAR = ';';
+
+    /// <summary>
+    ///     A space character.
+    /// </summary>
+    public const char SPACE_CHAR = ' ';
+
+    /// <summary>
+    ///     A tab character.
+    /// </summary>
+    public const char TAB_CHAR = '\t';
+
+    /// <summary>
+    ///     A vertical tab character.
+    /// </summary>
+    public const char VERTICAL_TAB_CHAR = '\v';
+
+    /// <summary>
+    ///     A form-feed character.
+    /// </summary>
+    public const char FORM_FEED_CHAR = '\f';
 
     /// <summary>
     ///     A singleton <see cref="CXTrivia.Token"/> representing the start of a comment.
@@ -369,8 +406,6 @@ public sealed class CXLexer
 
         var info = default(TokenInfo);
 
-
-        //GetTrivia(isTrailing: false, ref info.LeadingTriviaLength);
         var leading = LexLeadingTrivia();
 
         info.Start = Reader.Position;
@@ -379,17 +414,24 @@ public sealed class CXLexer
 
         var trailing = LexTrailingTrivia();
 
-        if (info.Text is null && !info.Kind.TryGetText(out info.Text))
+        if (!info.Kind.TryGetText(out var rawValue))
         {
-            info.Text = info.Start == info.End ? string.Empty : Reader[info.Start, info.End - info.Start];
+            var length = info.End - info.Start;
+
+            rawValue = length is 0
+                ? string.Empty
+                : Reader.GetInternedText(info.Start, info.End - info.Start);
         }
+
+        var value = info.Text ?? rawValue;
 
         var token = new CXToken(
             info.Kind,
             leading,
             trailing,
             info.Flags,
-            info.Text
+            rawValue,
+            value
         );
 
         if (info.Kind is CXTokenKind.Interpolation && InterpolationIndex.HasValue)
@@ -427,13 +469,13 @@ public sealed class CXLexer
         switch (Reader.Current)
         {
             // open parenthesis are only valid in attributes, they represent the start of an inline element value
-            case OPEN_PAREN when Mode == LexMode.Attribute:
+            case OPEN_PAREN_CHAR when Mode == LexMode.Attribute:
                 Reader.Advance();
                 info.Kind = CXTokenKind.OpenParenthesis;
                 return;
 
             // close parentheses mark the end of an inline element value, only valid in attributes
-            case CLOSE_PAREN when Mode == LexMode.Attribute:
+            case CLOSE_PAREN_CHAR when Mode == LexMode.Attribute:
                 Reader.Advance();
                 info.Kind = CXTokenKind.CloseParenthesis;
                 return;
@@ -512,38 +554,147 @@ public sealed class CXLexer
         var interpolationUpperBounds = InterpolationBoundary;
         var start = Reader.Position;
         var lastWordChar = start;
-        
-        for (; Reader.Position < interpolationUpperBounds; Reader.Advance())
+
+        int? valueEndIndex = null;
+        StringBuilder? value = null;
+
+        while (Reader.Position < interpolationUpperBounds)
         {
             CancellationToken.ThrowIfCancellationRequested();
 
             var current = Reader.Current;
-            
+
             // break out if we hit either a null char or the start of a tag 
             if (current is NULL_CHAR or LESS_THAN_CHAR)
                 break;
 
             if (!char.IsWhiteSpace(current) && !char.IsControl(current))
                 lastWordChar = Reader.Position;
+
+            // check for escape code
+            if (current is AMPERSAND_CHAR)
+            {
+                // exit early if the next char is whitespace
+                if (IsWhitespace(Reader.Next))
+                {
+                    Reader.Advance();
+                    continue;
+                }
+
+                // we'll process the escape sequence
+                Reader.Advance();
+                var escapeSequenceStart = Reader.Position;
+                var escapeSequenceLength = 0;
+
+                while (Reader.Position < interpolationUpperBounds)
+                {
+                    var ch = Reader.Current;
+
+                    // break out on EOF or semicolon
+                    if (ch is NULL_CHAR or SEMICOLON_CHAR) break;
+
+                    // only consume letters, digits, and hashtags
+                    if (
+                        !char.IsLetterOrDigit(ch) &&
+                        ch is not HASHTAG_CHAR
+                    ) break;
+
+                    Reader.Advance();
+                    escapeSequenceLength++;
+                }
+
+                // if there is no sequence, continue as if we just read an ampersand
+                if (escapeSequenceLength is 0)
+                {
+                    continue;
+                }
+
+                var escapeSequenceEnd = escapeSequenceStart + escapeSequenceLength;
+
+                // skip the semicolon if it's there
+                if (Reader.Current is SEMICOLON_CHAR)
+                {
+                    Reader.Advance();
+                    escapeSequenceEnd++;
+                }
+
+                // the actual sequence, without the ampersand and semicolon
+                var sequence = Reader[escapeSequenceStart, escapeSequenceLength];
+
+                if (TryParseEscapeSequence(sequence, out var sequenceChar))
+                {
+                    // if we haven't been using a builder, construct a new one and append what we've read up to this
+                    // point
+                    if (value is null)
+                    {
+                        value = new();
+
+                        if ((start != escapeSequenceStart - 1))
+                            value.Append(Reader[start, (escapeSequenceStart - start - 1)]);
+                    }
+
+                    // if the build is not null, we should have an index that points the builder to the ending char in
+                    // the source
+                    else if (valueEndIndex.HasValue)
+                    {
+                        // append up to this escape
+                        var delta = escapeSequenceStart - valueEndIndex.Value - 1;
+                        if (delta > 0)
+                            value.Append(Reader[valueEndIndex.Value, delta]);
+                    }
+                    else
+                    {
+                        // bad state, value is not null, but we didn't set an ending index
+                        throw new InvalidOperationException(
+                            "Missing text value end index"
+                        );
+                    }
+
+                    // append our char
+                    value.Append(sequenceChar);
+                    // update the value index
+                    valueEndIndex = escapeSequenceEnd;
+
+                    // also update the last word char
+                    lastWordChar = escapeSequenceEnd - 1;
+                    continue;
+                }
+            }
+
+            Reader.Advance();
         }
 
-        // did we actually read anything?
-        if (lastWordChar != start)
-        {
-            // we've read some raw text
-            info.Kind = CXTokenKind.Text;
+        var length = Reader.Position - start;
 
-            if (lastWordChar != Reader.Position)
-            {
-                // go back to the character after the last word character
-                Reader.Position = lastWordChar + 1;
-            }
-            
+        if (length is 0 && value is null)
+        {
+            // we've read nothing
+            return false;
+        }
+
+        info.Kind = CXTokenKind.Text;
+
+        if (lastWordChar + 1 != Reader.Position)
+        {
+            // go back to the character after the last word character
+            Reader.Position = lastWordChar + 1;
+        }
+
+        // did we read into the builder
+        if (value is not null)
+        {
+            if (valueEndIndex is null) throw new InvalidOperationException("Bad value state");
+
+            // slice in the remaining characters
+            value.Append(
+                Reader[valueEndIndex.Value, (Reader.Position - valueEndIndex.Value)]
+            );
+
+            info.Text = Reader.Intern(value);
             return true;
         }
 
-        // nothing was read
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -886,7 +1037,7 @@ public sealed class CXLexer
     ///     <see langword="true"/> if the reader is at the end of a comment; otherwise <see langword="false"/>.
     /// </returns>
     private bool IsCurrentlyAtCommentEnd()
-        => Reader.Current is '-' && IsCommentEnd(Reader.Peek(COMMENT_END.Length));
+        => Reader.Current is HYPHEN_CHAR && IsCommentEnd(Reader.Peek(COMMENT_END.Length));
 
     /// <summary>
     ///     Checks if the provided string is a comment end.
@@ -918,9 +1069,9 @@ public sealed class CXLexer
     /// </returns>
     public static bool IsWhitespace(char ch)
         => ch
-            is '\t'
-            or '\v'
-            or '\f'
+            is TAB_CHAR
+            or VERTICAL_TAB_CHAR
+            or FORM_FEED_CHAR
             or '\u001A'
-            or ' ';
+            or SPACE_CHAR;
 }

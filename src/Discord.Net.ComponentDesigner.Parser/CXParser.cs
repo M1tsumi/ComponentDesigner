@@ -282,7 +282,7 @@ public sealed partial class CXParser
              */
             var missingNamedClosing = identifier is null
                 ? elementEndIdent is not null
-                : elementEndIdent is null || identifier.Value != elementEndIdent.Value;
+                : elementEndIdent is null || identifier.RawValue != elementEndIdent.RawValue;
 
             if (
                 missingNamedClosing ||
@@ -295,7 +295,7 @@ public sealed partial class CXParser
                 // create the missing tokens for the element.
                 elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash);
                 elementEndIdent = identifier is not null
-                    ? CXToken.CreateMissing(CXTokenKind.Identifier, identifier.Value)
+                    ? CXToken.CreateMissing(CXTokenKind.Identifier, identifier.RawValue)
                     : null;
                 elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan);
 
@@ -589,7 +589,7 @@ public sealed partial class CXParser
          * since depending on the external context of the source, an escaped quote may be a valid starting token.
          * The lexer handles finding the end token based on that context, so we don't need to do anything extra here.
          */
-        Lexer.QuoteChar = stringLiteralStartToken.Value[stringLiteralStartToken.Value.Length - 1];
+        Lexer.QuoteChar = stringLiteralStartToken.RawValue[stringLiteralStartToken.RawValue.Length - 1];
 
         while (CurrentToken.Kind is not CXTokenKind.StringLiteralEnd)
         {
@@ -699,7 +699,7 @@ public sealed partial class CXParser
 
                 return CXToken.CreateMissing(
                     kinds[0],
-                    current.Value,
+                    current.RawValue,
                     current.LeadingTrivia,
                     current.TrailingTrivia,
                     CXDiagnosticDescriptor.UnexpectedToken(current, kinds.ToArray())
@@ -721,7 +721,7 @@ public sealed partial class CXParser
         {
             return CXToken.CreateMissing(
                 kind,
-                token.Value,
+                token.RawValue,
                 token.LeadingTrivia,
                 token.TrailingTrivia,
                 CXDiagnosticDescriptor.UnexpectedToken(token, kind)

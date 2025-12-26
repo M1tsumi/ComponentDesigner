@@ -52,7 +52,7 @@ public sealed class CXElement : CXNode
     /// <remarks>
     ///     If this element is a fragment, <see cref="string.Empty"/> is returned.
     /// </remarks>
-    public string Identifier => OpeningTag.IdentifierToken?.Value ?? string.Empty;
+    public string Identifier => OpeningTag.IdentifierToken?.RawValue ?? string.Empty;
 
     /// <summary>
     ///     Gets the opening tag of this <see cref="CXElement"/> .

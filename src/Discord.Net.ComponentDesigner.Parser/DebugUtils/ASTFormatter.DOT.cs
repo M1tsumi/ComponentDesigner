@@ -26,7 +26,7 @@ partial class ASTFormatter
                 {{string.Join(
                     $"{Environment.NewLine}  ",
                     tokens.Select(x =>
-                        $"{Array.IndexOf(flat, x)} [label=<<b>{x.Kind}</b><br/>{HtmlClean(x.Value)}>]"
+                        $"{Array.IndexOf(flat, x)} [label=<<b>{x.Kind}</b><br/>{HtmlClean(x.RawValue)}>]"
                     )
                 )}}
                 

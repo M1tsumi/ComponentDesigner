@@ -7,7 +7,7 @@ namespace Discord.CX.Parser;
 /// </summary>
 public sealed class CXAttribute : CXNode
 {
-    public string Identifier => IdentifierToken.Value;
+    public string Identifier => IdentifierToken.RawValue;
     
     /// <summary>
     ///     Gets the token containing the identifier for this <see cref="CXAttribute"/>.

@@ -7,6 +7,112 @@ namespace UnitTests.ParseTests;
 public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
 {
     [Fact]
+    public void HexEscapeSequence()
+    {
+        Parses(
+            """
+            <Foo>&#x3C0;</Foo>
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+
+                Node<CXValue.Scalar>();
+                {
+                    Token(CXTokenKind.Text, value: "π");
+                }
+                
+                Token(CXTokenKind.LessThanForwardSlash);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+            }
+        }
+    }
+    
+    [Fact]
+    public void DecimalEscapeSequence()
+    {
+        Parses(
+            """
+            <Foo>&#960;</Foo>
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+
+                Node<CXValue.Scalar>();
+                {
+                    Token(CXTokenKind.Text, value: "π");
+                }
+                
+                Token(CXTokenKind.LessThanForwardSlash);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+            }
+        }
+    }
+    
+    [Fact]
+    public void NamedEscapeSequences()
+    {
+        Parses(
+            """
+            <Foo>
+                This &lt;Element&gt; is escaped
+            </Foo>
+            """
+        );
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+
+                Node<CXValue.Scalar>();
+                {
+                    Token(CXTokenKind.Text, value: "This <Element> is escaped");
+                }
+                
+                Token(CXTokenKind.LessThanForwardSlash);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+            }
+        }
+    }
+    
+    [Fact]
+    public void SingleCharElementValue()
+    {
+        Parses("<Foo>A</Foo>");
+        {
+            Element();
+            {
+                Token(CXTokenKind.LessThan);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+
+                Node<CXValue.Scalar>();
+                {
+                    Token(CXTokenKind.Text, "A");
+                }
+                
+                Token(CXTokenKind.LessThanForwardSlash);
+                Identifier("Foo");
+                Token(CXTokenKind.GreaterThan);
+            }
+        }
+    }
+    
+    [Fact]
     public void SingleElements()
     {
         Parses("<Foo />");

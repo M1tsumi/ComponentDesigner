@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Discord.CX.Parser;
 
@@ -9,6 +10,33 @@ namespace Discord.CX.Parser;
 /// </summary>
 public static class CXNodeExtensions
 {
+    extension(IReadOnlyList<CXToken> tokens)
+    {
+        public string ToValueString(bool includeLeadingTrivia = false, bool includeTrailingTrivia = false)
+        {
+            if (tokens.Count is 0) return string.Empty;
+            
+            var sb = new StringBuilder();
+
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                var token = tokens[i];
+                var isFirst = i == 0;
+                var isLast = i == tokens.Count - 1;
+
+                if (includeLeadingTrivia || !isFirst)
+                    sb.Append(token.LeadingTrivia);
+
+                sb.Append(token.Value);
+
+                if (includeTrailingTrivia || !isLast)
+                    sb.Append(token.TrailingTrivia);
+            }
+
+            return sb.ToString();
+        }
+    }
+    
     extension(ICXNode node)
     {
         /// <summary>

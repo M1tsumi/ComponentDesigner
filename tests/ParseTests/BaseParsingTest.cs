@@ -9,6 +9,13 @@ namespace UnitTests.ParseTests;
 
 public abstract class BaseParsingTest(ITestOutputHelper output)
 {
+    public static readonly TimeSpan TestTimeout =
+#if DEBUG
+        TimeSpan.FromHours(1);
+#else
+        TimeSpan.FromSeconds(10);
+#endif
+
     protected CXDocument? Document { get; private set; }
     private IEnumerator<ICXNode>? _enumerator;
     private readonly Stack<CXDiagnostic> _diagnostics = [];
@@ -37,7 +44,7 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
 
     [MemberNotNull(nameof(Document))]
     protected void Parses(
-        string cx,
+        [StringSyntax("html")]string cx,
         Func<CXParser, IEnumerable<CXNode>>? parseFunc = null,
         TextSpan[]? interpolations = null,
         bool allowErrors = false
@@ -47,20 +54,20 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
 
         output.WriteLine($"Parsing:\n{cx}");
 
-        var token = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+        var token = new CancellationTokenSource(TestTimeout).Token;
 
         var parser = new CXParser(
             CXSourceText.From(cx).CreateReader(interpolations: interpolations),
             token
         );
-        
+
         var nodes = parseFunc(parser).ToList();
 
         Document = new CXDocument(parser, nodes);
 
         var structural = Document.ToStructuralFormat();
         var dot = Document.ToDOTFormat();
-        
+
         output.WriteLine($"AST:\n{structural}");
         output.WriteLine($"DOT:\n{dot}");
 
@@ -144,7 +151,7 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
     }
 
     protected CXToken Identifier(string content, CXTokenFlags? flags = null)
-        => Token(CXTokenKind.Identifier, content, flags);
+        => Token(CXTokenKind.Identifier, content, flags: flags);
 
     protected CXToken InterpolationToken(string? content = null, int? index = null)
     {
@@ -157,7 +164,7 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
         return token;
     }
 
-    protected CXToken Token(CXTokenKind kind, string? content = null, CXTokenFlags? flags = null)
+    protected CXToken Token(CXTokenKind kind, string? content = null, string? value = null, CXTokenFlags? flags = null)
     {
         var current = GetNextNode();
 
@@ -168,7 +175,10 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
         Assert.Equal(kind, token.Kind);
 
         if (content is not null)
-            Assert.Equal(content, token.ToString());
+            Assert.Equal(content, token.RawValue);
+        
+        if(value is not null)
+            Assert.Equal(value, token.Value);
 
         if (flags is not null) Assert.Equal(flags.Value, token.Flags);
 

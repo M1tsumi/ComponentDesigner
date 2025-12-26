@@ -60,7 +60,7 @@ public record ComponentState(
             diagnostics.Add(
                 Diagnostics.PropertyNotAllowed(
                     GraphNode?.Inner.Name ?? "Unknown",
-                    propertyValue.Attribute!.IdentifierToken.Value
+                    propertyValue.Attribute!.IdentifierToken.RawValue
                 ),
                 propertyValue.Attribute
             );

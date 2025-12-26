@@ -89,7 +89,7 @@ public static partial class ASTFormatter
                     if (options.IncludeTokenValue)
                     {
                         sb.Append(", ".Grey())
-                            .Append(token.Value.Aqua());
+                            .Append(token.RawValue.Aqua());
                     }
                     
                     sb.Append(")".Orange());
