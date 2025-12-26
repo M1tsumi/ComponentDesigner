@@ -26,6 +26,7 @@ public sealed class QuoteTextControlElement(
         typeof(UnderlineTextControlElement),
         typeof(SpoilerTextControlElement),
         typeof(LineBreakTextControlElement),
+        typeof(TimeTagTextControlElement),
     ];
     
     protected override Result<RenderedTextControlElement> Render(

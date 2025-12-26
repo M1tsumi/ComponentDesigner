@@ -27,6 +27,7 @@ public sealed class BoldTextControlElement(
         typeof(QuoteTextControlElement),
         typeof(SpoilerTextControlElement),
         typeof(LineBreakTextControlElement),
+        typeof(TimeTagTextControlElement),
     ];
 
     protected override Result<RenderedTextControlElement> Render(

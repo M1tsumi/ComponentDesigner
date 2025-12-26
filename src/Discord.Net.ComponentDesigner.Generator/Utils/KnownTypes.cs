@@ -19,6 +19,11 @@ public class KnownTypes
         Compilation = compilation;
     }
 
+    public INamedTypeSymbol? IApplicationCommandType
+        => GetOrResolveType("Discord.IApplicationCommand", ref _IApplicationCommand);
+    
+    public Optional<INamedTypeSymbol?> _IApplicationCommand;
+    
     public INamedTypeSymbol? TimestampTagStylesEnum
         => GetOrResolveType("Discord.TimestampTagStyles", ref _TimestampTagStyles);
     

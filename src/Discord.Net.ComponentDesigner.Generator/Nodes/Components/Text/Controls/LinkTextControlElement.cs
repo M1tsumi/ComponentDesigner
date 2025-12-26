@@ -24,6 +24,7 @@ public sealed class LinkTextControlElement(
         typeof(UnderlineTextControlElement),
         typeof(SpoilerTextControlElement),
         typeof(LineBreakTextControlElement),
+        typeof(TimeTagTextControlElement),
     ];
     
     protected override Result<RenderedTextControlElement> Render(

@@ -181,7 +181,11 @@ public abstract class TextControlElement(TextSpan span)
                             diagnostics,
                             tokens,
                             out var tag
-                        ):  return [tag];
+                        ): return [tag];
+
+                        case var _ when MentionTextControlElement.TryCreate(
+                            context, element, diagnostics,  tokens, out var mention
+                        ): return [mention];
 
                         case var identifier when Enum.TryParse<HeadingTextControlElementVariant>(
                             identifier,
@@ -240,7 +244,7 @@ public abstract class TextControlElement(TextSpan span)
             case CXValue.Multipart multipart: tokens.AddRange(multipart.Tokens); break;
         }
     }
-    
+
     public Result<string> RenderToCSharpString(IComponentContext context)
         => Render(context, TextControlRenderingOptions.Default with
             {

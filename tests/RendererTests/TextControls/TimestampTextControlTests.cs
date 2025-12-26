@@ -8,6 +8,17 @@ namespace UnitTests.RendererTests.TextControls;
 public sealed class TimestampTextControlTests(ITestOutputHelper output) : BaseTextControlTest(output)
 {
     [Fact]
+    public void ValueProperty()
+    {
+        Renders(
+            """
+            <time value="123" />
+            """,
+            "<t:123>"
+        );
+    }
+    
+    [Fact]
     public void SyntaxIndented()
     {
         Renders(

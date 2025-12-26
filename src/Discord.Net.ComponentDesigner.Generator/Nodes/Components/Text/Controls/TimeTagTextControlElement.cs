@@ -54,7 +54,17 @@ public sealed class TimeTagTextControlElement : TextControlElement
 
                     style = attribute.Value;
                     break;
-                case "value":
+                case "value" or "unix":
+                    if (value is not null)
+                    {
+                        // duplicate
+                        diagnostics.Add(
+                            Diagnostics.DuplicateProperty("value", "unix"),
+                            attribute
+                        );
+                        continue;
+                    }
+                    
                     if (attribute.Value is null or CXValue.Invalid)
                     {
                         diagnostics.Add(

@@ -26,6 +26,7 @@ public sealed class ListItemTextControlElement(
         typeof(QuoteTextControlElement),
         typeof(SpoilerTextControlElement),
         typeof(LineBreakTextControlElement),
+        typeof(TimeTagTextControlElement),
     ];
     
     protected override Result<RenderedTextControlElement> Render(

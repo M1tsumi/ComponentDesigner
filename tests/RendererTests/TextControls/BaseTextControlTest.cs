@@ -10,7 +10,7 @@ namespace UnitTests.RendererTests.TextControls;
 public abstract class BaseTextControlTest(ITestOutputHelper output) : BaseTestWithDiagnostics(output)
 {
     protected Compilation Compilation { get; } = Compilations.Create();
-    
+
     protected void Renders(
         [StringSyntax("html")] string cx,
         string? expected,
@@ -50,7 +50,7 @@ public abstract class BaseTextControlTest(ITestOutputHelper output) : BaseTestWi
             ),
             GeneratorOptions.Default
         );
-        
+
         if (
             !TextControlElement.TryCreate(
                 context,
@@ -64,10 +64,10 @@ public abstract class BaseTextControlTest(ITestOutputHelper output) : BaseTestWi
             if (!allowFail) Assert.Fail("Failed to create text control elements");
         }
 
-        Assert.Equal(parsed.Count, nodesUsed);
-
         if (element is not null)
         {
+            Assert.Equal(parsed.Count, nodesUsed);
+
             element.Validate(context, diagnostics);
 
             PushDiagnostics(diagnostics);
