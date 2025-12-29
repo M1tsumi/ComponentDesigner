@@ -567,10 +567,33 @@ public abstract class TextControlElement(TextSpan span)
         ) => new RenderedTextControlElement(
             token.LeadingTrivia,
             token.TrailingTrivia,
-            token.InterpolationIndex is null && token.Value.Contains("\n"),
-            token.InterpolationIndex is { } index
-                ? $"{options.StartInterpolation}{context.GetDesignerValue(index)}{options.EndInterpolation}"
-                : token.Value
+            Value: RenderToken(context, options, out var isMultiLine),
+            ValueHasNewLines: isMultiLine
         );
+
+        private string RenderToken(
+            IComponentContext context,
+            TextControlRenderingOptions options,
+            out bool hasMultiLine
+        )
+        {
+            if (token.InterpolationIndex is { } index)
+            {
+                var info = context.GetInterpolationInfo(index);
+
+                if (info.Constant.HasValue)
+                {
+                    var val = info.Constant.Value?.ToString() ?? string.Empty;
+                    hasMultiLine = val.Contains('\n');
+                    return val;
+                }
+
+                hasMultiLine = false;
+                return $"{options.StartInterpolation}{context.GetDesignerValue(index)}{options.EndInterpolation}";
+            }
+
+            hasMultiLine = token.Value.Contains('\n');
+            return token.Value;
+        }
     }
 }
