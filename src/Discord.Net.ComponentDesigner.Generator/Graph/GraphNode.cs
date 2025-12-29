@@ -71,10 +71,10 @@ public sealed class GraphNode : IEquatable<GraphNode>
         {
             children = new(_children.Count);
 
-            for (var i = 0; i < Children.Count; i++)
+            for (var i = 0; i < _children.Count; i++)
             {
-                var child = Children[i];
-                children[i] = child.UpdateState(context, diagnostics);
+                var child = _children[i];
+                children.Add(child.UpdateState(context, diagnostics));
                 recreate |= !ReferenceEquals(child, children[i]);
             }
         }
@@ -83,10 +83,10 @@ public sealed class GraphNode : IEquatable<GraphNode>
         {
             attrNodes = new(_attributeNodes.Count);
 
-            for (var i = 0; i < AttributeNodes.Count; i++)
+            for (var i = 0; i < _attributeNodes.Count; i++)
             {
-                var child = AttributeNodes[i];
-                attrNodes[i] = child.UpdateState(context, diagnostics);
+                var child = _attributeNodes[i];
+                attrNodes.Add(child.UpdateState(context, diagnostics));
                 recreate |= !ReferenceEquals(child, attrNodes[i]);
             }
         }
