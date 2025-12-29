@@ -404,12 +404,14 @@ public sealed class SourceGenerator : IIncrementalGenerator
             
             foreach (var argument in operation.Arguments)
             {
+                if(argument.ArgumentKind is ArgumentKind.DefaultValue) continue;
+                
                 switch (argument.Parameter?.Name)
                 {
-                    case "autoRows" when argument.Syntax is ArgumentSyntax{Expression: {} expression}:
+                    case "autoRows" when argument.Syntax is ArgumentSyntax {Expression: {} expression}:
                         enableAutoRows = GetConstantValue(expression);
                         break;
-                    case "autoTextDisplays"when argument.Syntax is ArgumentSyntax{Expression: {} expression}:
+                    case "autoTextDisplays"when argument.Syntax is ArgumentSyntax {Expression: {} expression}:
                         enableAutoTextDisplays = GetConstantValue(expression);
                         break;
                 }
