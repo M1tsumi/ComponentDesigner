@@ -35,7 +35,7 @@ public sealed record CXToken(
     ///     <see cref="RawValue"/> to access the raw, unaltered value from the source.
     /// </remarks>
     public string Value { get; init; } = Value ?? RawValue;
-    
+
     /// <summary>
     ///     Gets the interpolation index of this token.
     /// </summary>
@@ -49,9 +49,11 @@ public sealed record CXToken(
     /// <summary>
     ///     Gets the full character width of this token. 
     /// </summary>
-    public int Width => LeadingTrivia.CharacterLength + RawValue.Length + TrailingTrivia.CharacterLength;
+    public int Width => IsMissing
+        ? 0
+        : LeadingTrivia.CharacterLength + RawValue.Length + TrailingTrivia.CharacterLength;
 
-    public TextSpan Span => new(this.Offset + LeadingTrivia.CharacterLength, RawValue.Length);
+    public TextSpan Span => new(this.Offset + LeadingTrivia.CharacterLength, IsMissing ? 0 : RawValue.Length);
     public TextSpan FullSpan => new(this.Offset, Width);
 
     /// <inheritdoc/>
@@ -147,22 +149,21 @@ public sealed record CXToken(
     );
 
     /// <inheritdoc/>
-    public void ResetCachedState()
-    {
-    }
-
-    /// <inheritdoc/>
     public override string ToString() => ToString(false, false);
 
     /// <inheritdoc/>
     public string ToString(bool includeLeadingTrivia, bool includeTrailingTrivia)
-        => (includeLeadingTrivia, includeTrailingTrivia) switch
+    {
+        if (IsMissing) return string.Empty;
+        
+        return (includeLeadingTrivia, includeTrailingTrivia) switch
         {
             (false, false) => RawValue,
             (true, true) => $"{LeadingTrivia}{RawValue}{TrailingTrivia}",
             (false, true) => $"{RawValue}{TrailingTrivia}",
             (true, false) => $"{LeadingTrivia}{RawValue}"
         };
+    }
 
     /// <inheritdoc/>
     public bool Equals(CXToken? other)
@@ -188,5 +189,12 @@ public sealed record CXToken(
         init => Diagnostics = value;
     }
 
-    object ICloneable.Clone() => this with {};
+    object ICloneable.Clone() => this with { };
+
+    CXDiagnostic ICXNode.CreateDiagnostic(CXDiagnosticDescriptor descriptor)
+        => new(descriptor, Span);
+
+    void ICXNode.ResetCachedState()
+    {
+    }
 }

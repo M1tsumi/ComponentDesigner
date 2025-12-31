@@ -111,4 +111,19 @@ public sealed class CXElement : CXNode
             Slot(closingTagEndToken)
         );
     }
+
+    protected internal override CXDiagnostic CreateDiagnostic(CXDiagnosticDescriptor descriptor)
+    {
+        if (descriptor.Code is CXErrorCode.MissingElementClosingTag)
+        {
+            var span = OpeningTag.IdentifierToken?.Span ?? TextSpan.FromBounds(
+                OpeningTag.StartToken.Span.Start,
+                OpeningTag.EndToken.Span.End
+            );
+
+            return new(descriptor, span);
+        }
+
+        return base.CreateDiagnostic(descriptor);
+    }
 }

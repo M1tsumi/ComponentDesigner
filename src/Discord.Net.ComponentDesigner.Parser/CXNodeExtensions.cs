@@ -56,7 +56,7 @@ public static class CXNodeExtensions
         ///     Gets the diagnostics reported for this node.
         /// </summary>
         public IReadOnlyList<CXDiagnostic> Diagnostics
-            => [..node.DiagnosticDescriptors.Select(x => new CXDiagnostic(x, node.Span))];
+            => [..node.DiagnosticDescriptors.Select(node.CreateDiagnostic)];
 
         /// <summary>
         ///     Gets all diagnostics from this node and any descending nodes.

@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.ParseTests;
 
-public abstract class BaseParsingTest(ITestOutputHelper output)
+public abstract class BaseParsingTest(ITestOutputHelper output) : IDisposable
 {
     public static readonly TimeSpan TestTimeout =
 #if DEBUG
@@ -190,5 +190,10 @@ public abstract class BaseParsingTest(ITestOutputHelper output)
         Assert.NotNull(_enumerator);
         Assert.False(_enumerator.MoveNext());
         Assert.Empty(_diagnostics);
+    }
+
+    public void Dispose()
+    {
+        EOF();
     }
 }

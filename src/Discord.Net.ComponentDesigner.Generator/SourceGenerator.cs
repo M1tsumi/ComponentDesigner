@@ -213,6 +213,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
         target.CX
     );
 
+    
     public void Generate(
         SourceProductionContext context,
         (ImmutableArray<RenderedGraph> Renders, ImmutableArray<Glue> Glues) tuple
@@ -246,9 +247,14 @@ public sealed class SourceGenerator : IIncrementalGenerator
             foreach (var diagnostic in render.Diagnostics)
             {
                 // adjust the span to match the source
+                var start = glue.Location.TextSpan.Start + diagnostic.Span.Start;
+
+                if (diagnostic.Span.IsEmpty)
+                    start--;
+                
                 var diagnosticSpan = new TextSpan(
-                    glue.Location.TextSpan.Start + diagnostic.Span.Start,
-                    diagnostic.Span.Length
+                    start,
+                    Math.Max(1, diagnostic.Span.Length)
                 );
                 
                 context.ReportDiagnostic(

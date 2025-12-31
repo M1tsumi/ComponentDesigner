@@ -154,13 +154,6 @@ public abstract class CXNode : ICXNode
         _diagnostics = [];
         _slots = [];
     }
-    
-    /// <summary>
-    ///     Adds a diagnostic to the current <see cref="CXNode"/>.
-    /// </summary>
-    /// <param name="diagnostic">The diagnostic to add.</param>
-    public void AddDiagnostic(CXDiagnosticDescriptor diagnostic)
-        => _diagnostics.Add(diagnostic);
 
     /// <summary>
     ///     Attempts to get the root <see cref="CXDocument"/> by traversing up the AST tree.
@@ -295,6 +288,9 @@ public abstract class CXNode : ICXNode
             descendant.ResetCachedState();
     }
 
+    protected internal virtual CXDiagnostic CreateDiagnostic(CXDiagnosticDescriptor descriptor)
+        => new(descriptor, Span);
+
     /// <inheritdoc/>
     public bool Equals(ICXNode? other)
         => CXNodeEqualityComparer.Default.Equals(this, other);
@@ -356,4 +352,7 @@ public abstract class CXNode : ICXNode
     }
 
     object ICloneable.Clone() => Clone();
+    
+    CXDiagnostic ICXNode.CreateDiagnostic(CXDiagnosticDescriptor descriptor)
+        => CreateDiagnostic(descriptor);
 }

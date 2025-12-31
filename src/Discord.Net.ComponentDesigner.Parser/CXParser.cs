@@ -103,6 +103,8 @@ public sealed partial class CXParser
     /// </returns>
     internal IEnumerable<CXNode> ParseTopLevelNodes()
     {
+        using var _ = Lexer.SetMode(CXLexer.LexMode.ElementValue);
+
         while (CurrentToken.Kind is not CXTokenKind.EOF and not CXTokenKind.Invalid)
         {
             var node = ParseTopLevelNode();
@@ -120,19 +122,15 @@ public sealed partial class CXParser
     /// </returns>
     internal CXNode ParseTopLevelNode()
     {
-        using var _ = Lexer.SetMode(CXLexer.LexMode.Default);
-
         if (TryEatASTNode<CXNode>(out var node)) return node;
 
+        using var _ = Lexer.SetMode(CXLexer.LexMode.ElementValue);
         switch (CurrentToken.Kind)
         {
             case CXTokenKind.LessThan: return ParseElement();
             default:
-                using (Lexer.SetMode(CXLexer.LexMode.ElementValue))
-                {
-                    if (TryParseElementChild([], out var child))
-                        return child;
-                }
+                if (TryParseElementChild([], out var child))
+                    return child;
 
                 break;
         }
@@ -168,6 +166,18 @@ public sealed partial class CXParser
 
         var start = Expect(CXTokenKind.LessThan);
 
+        if (start.IsMissing)
+        {
+            // bail early, no starting token
+            return new CXElement(
+                start,
+                CXToken.CreateMissing(CXTokenKind.Identifier),
+                [],
+                CXToken.CreateMissing(CXTokenKind.ForwardSlashGreaterThan),
+                []
+            );
+        }
+
         CXToken? identifier;
         using (Lexer.SetMode(CXLexer.LexMode.Identifier))
         {
@@ -189,8 +199,30 @@ public sealed partial class CXParser
             else
             {
                 // just expect an identifier
-                identifier = Expect(CXTokenKind.Identifier);
+                identifier = Expect(CXTokenKind.Identifier, withDiagnostics: false);
             }
+        }
+
+        if (identifier is { IsMissing: true })
+        {
+            // bail early
+            return new CXElement(
+                start,
+                identifier,
+                [],
+                CXToken.CreateMissing(CXTokenKind.ForwardSlashGreaterThan),
+                []
+            )
+            {
+                DiagnosticDescriptors =
+                [
+                    new CXDiagnosticDescriptor(
+                        DiagnosticSeverity.Error,
+                        CXErrorCode.MissingElementIdentifier,
+                        "Missing identifier for element"
+                    )
+                ]
+            };
         }
 
         var attributes = ParseAttributes();
@@ -232,7 +264,10 @@ public sealed partial class CXParser
                     start,
                     identifier,
                     attributes,
-                    Expect(CXTokenKind.ForwardSlashGreaterThan),
+                    Expect(
+                        CXTokenKind.ForwardSlashGreaterThan,
+                        message: "expecting '>' or '/>' to close the element tag"
+                    ),
                     new()
                 );
         }
@@ -252,7 +287,7 @@ public sealed partial class CXParser
             var sentinel = _position;
 
             // we should see a '</' token
-            elementEndStart = Expect(CXTokenKind.LessThanForwardSlash);
+            elementEndStart = Expect(CXTokenKind.LessThanForwardSlash, withDiagnostics: false);
 
             if (identifier is null)
             {
@@ -262,11 +297,11 @@ public sealed partial class CXParser
             else
             {
                 // we should expect an identifier
-                elementEndIdent = ParseIdentifier();
+                elementEndIdent = ParseIdentifier(withDiagnostics: false);
             }
 
             // we finally should see a '>'
-            elementEndClose = Expect(CXTokenKind.GreaterThan);
+            elementEndClose = Expect(CXTokenKind.GreaterThan, withDiagnostics: false);
 
             // determine if any of the tokens are missing
             var missingStructure
@@ -291,13 +326,6 @@ public sealed partial class CXParser
             {
                 // add the diagnostic to the node
                 diagnostics.Add(CXDiagnosticDescriptor.MissingElementClosingTag(identifier));
-
-                // create the missing tokens for the element.
-                elementEndStart = CXToken.CreateMissing(CXTokenKind.LessThanForwardSlash);
-                elementEndIdent = identifier is not null
-                    ? CXToken.CreateMissing(CXTokenKind.Identifier, identifier.RawValue)
-                    : null;
-                elementEndClose = CXToken.CreateMissing(CXTokenKind.GreaterThan);
 
                 // rollback
                 _position = sentinel;
@@ -500,11 +528,18 @@ public sealed partial class CXParser
             // parse the attribute value
             var value = ParseAttributeValue();
 
+            var diagnostics = value is CXValue.Invalid
+                ? [CXDiagnosticDescriptor.MissingAttributeValue]
+                : Array.Empty<CXDiagnosticDescriptor>();
+
             return new CXAttribute(
                 identifier,
                 equalsToken,
                 value
-            );
+            )
+            {
+                DiagnosticDescriptors = diagnostics
+            };
         }
     }
 
@@ -546,13 +581,7 @@ public sealed partial class CXParser
 
                 // unsupported value
                 default:
-                    return new CXValue.Invalid()
-                    {
-                        DiagnosticDescriptors =
-                        [
-                            CXDiagnosticDescriptor.InvalidAttributeValue(CurrentToken)
-                        ]
-                    };
+                    return new CXValue.Invalid();
             }
         }
     }
@@ -627,17 +656,18 @@ public sealed partial class CXParser
     }
 
     /// <summary>
-    ///     Parses an identifier
+    ///     Parses an identifier.
     /// </summary>
+    /// <param name="withDiagnostics">Whether to include an unexpected token diagnostic.</param>
     /// <returns>
     ///     A <see cref="CXToken"/> representing the identifier, with the flags of the <see cref="CXToken"/> indicating
     ///     whether one was found. 
     /// </returns>
-    internal CXToken ParseIdentifier()
+    internal CXToken ParseIdentifier(bool withDiagnostics = true)
     {
         using (Lexer.SetMode(CXLexer.LexMode.Identifier))
         {
-            return Expect(CXTokenKind.Identifier);
+            return Expect(CXTokenKind.Identifier, withDiagnostics);
         }
     }
 
@@ -702,7 +732,7 @@ public sealed partial class CXParser
                     current.RawValue,
                     current.LeadingTrivia,
                     current.TrailingTrivia,
-                    CXDiagnosticDescriptor.UnexpectedToken(current, kinds.ToArray())
+                    CXDiagnosticDescriptor.UnexpectedToken(current, expected: kinds.ToArray())
                 );
         }
     }
@@ -713,7 +743,9 @@ public sealed partial class CXParser
     ///     the <see cref="CXTokenFlags.Missing"/> flag.
     /// </summary>
     /// <param name="kind">The <see cref="CXTokenKind"/> to expect.</param>
-    internal CXToken Expect(CXTokenKind kind)
+    /// <param name="withDiagnostics">Whether to include an unexpected token diagnostic.</param>
+    /// <param name="message">The message to use for the diagnostic.</param>
+    internal CXToken Expect(CXTokenKind kind, bool withDiagnostics = true, string? message = null)
     {
         var token = CurrentToken;
 
@@ -722,9 +754,9 @@ public sealed partial class CXParser
             return CXToken.CreateMissing(
                 kind,
                 token.RawValue,
-                token.LeadingTrivia,
-                token.TrailingTrivia,
-                CXDiagnosticDescriptor.UnexpectedToken(token, kind)
+                diagnostics: withDiagnostics
+                    ? [CXDiagnosticDescriptor.UnexpectedToken(token, message, kind)]
+                    : []
             );
         }
 

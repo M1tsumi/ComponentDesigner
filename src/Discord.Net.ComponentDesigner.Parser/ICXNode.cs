@@ -73,6 +73,8 @@ public interface ICXNode : IEquatable<ICXNode>, ICloneable
     ///     Gets a read-only list of diagnostic descriptors relating to this node.
     /// </summary>
     internal IReadOnlyList<CXDiagnosticDescriptor> DiagnosticDescriptors { get; init; }
+
+    internal CXDiagnostic CreateDiagnostic(CXDiagnosticDescriptor descriptor);
     
     /// <summary>
     ///     Resets any computations that this node has cached.

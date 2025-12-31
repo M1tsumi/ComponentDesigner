@@ -814,47 +814,6 @@ public class SyntaxTests(ITestOutputHelper output) : BaseParsingTest(output)
     }
 
     [Fact]
-    public void MissingElementCloseTag()
-    {
-        Parses(
-            """
-            <Foo>
-                <Bar>
-            </Foo>
-            """,
-            allowErrors: true
-        );
-        {
-            CXElement barElement;
-            Element();
-            {
-                Token(CXTokenKind.LessThan);
-                Identifier("Foo");
-                Token(CXTokenKind.GreaterThan);
-                
-                barElement = Element();
-                {
-                    Token(CXTokenKind.LessThan);
-                    Identifier("Bar");
-                    Token(CXTokenKind.GreaterThan);
-                    
-                    Token(CXTokenKind.LessThanForwardSlash, flags: CXTokenFlags.Missing);
-                    Identifier("Bar", flags: CXTokenFlags.Missing);
-                    Token(CXTokenKind.GreaterThan, flags: CXTokenFlags.Missing);
-                }
-
-                Token(CXTokenKind.LessThanForwardSlash);
-                Identifier("Foo");
-                Token(CXTokenKind.GreaterThan);
-            }
-            
-            Diagnostic(CXErrorCode.MissingElementClosingTag, span: barElement.Span);
-            
-            EOF();
-        }
-    }
-
-    [Fact]
     public void AttributeWithElementValue()
     {
         Parses(

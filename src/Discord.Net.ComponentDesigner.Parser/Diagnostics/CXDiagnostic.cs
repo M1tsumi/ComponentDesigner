@@ -65,43 +65,28 @@ public readonly record struct CXDiagnosticDescriptor(
         );
 
     /// <summary>
-    ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an invalid attribute value.
+    ///     A <see cref="CXDiagnosticDescriptor"/> for an invalid attribute value.
     /// </summary>
-    /// <param name="token">The token that caused this diagnostic to be produced.</param>
-    public static CXDiagnosticDescriptor InvalidAttributeValue(CXToken token)
-    {
-        if (
-            token.Kind is CXTokenKind.ForwardSlashGreaterThan
-            or CXTokenKind.GreaterThan
-            or CXTokenKind.EOF
-        )
-        {
-            return new(
-                DiagnosticSeverity.Error,
-                CXErrorCode.MissingAttributeValue,
-                "Missing attribute value"
-            );
-        }
-
-        return new CXDiagnosticDescriptor(
+    public static readonly CXDiagnosticDescriptor MissingAttributeValue = new(
             DiagnosticSeverity.Error,
-            CXErrorCode.InvalidAttributeValue,
-            $"'{token.Kind}' is not a valid attribute value token"
+            CXErrorCode.MissingAttributeValue,
+            "Missing attribute value"
         );
-    }
 
     /// <summary>
     ///     Constructs a new <see cref="CXDiagnosticDescriptor"/> for an unexpected token.
     /// </summary>
     /// <param name="token">The token that caused this diagnostic to be produced.</param>
+    /// <param name="message">The message to use for the diagnostic.</param>
     /// <param name="expected">The expected token kinds.</param>
     public static CXDiagnosticDescriptor UnexpectedToken(
         CXToken token,
+        string? message = null,
         params CXTokenKind[] expected
     ) => new(
         DiagnosticSeverity.Error,
         CXErrorCode.UnexpectedToken,
-        $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'"
+        message ?? $"Unexpected token; expected {FormatExpected(expected)}, but got '{token.Kind}'"
     );
 
     /// <summary>
