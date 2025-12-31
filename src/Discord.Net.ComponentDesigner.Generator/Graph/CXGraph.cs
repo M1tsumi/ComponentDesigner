@@ -210,6 +210,14 @@ public sealed class CXGraph : IEquatable<CXGraph>
 
     public RenderedGraph Render(IComponentContext? context = null, CancellationToken token = default)
     {
+        if (RootNodes.IsEmpty)
+            return new RenderedGraph(
+                Key,
+                _state.CX.Designer,
+                string.Empty,
+                Diagnostics
+            );
+        
         context ??= new ComponentContext(this);
 
         var diagnostics = new List<DiagnosticInfo>(Diagnostics);

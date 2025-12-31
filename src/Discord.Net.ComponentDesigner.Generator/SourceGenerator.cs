@@ -265,8 +265,14 @@ public sealed class SourceGenerator : IIncrementalGenerator
                 );
             }
 
-            if (string.IsNullOrWhiteSpace(render.EmittedSource)) continue;
-
+            var body = string.IsNullOrWhiteSpace(render.EmittedSource)
+                ? "global::Discord.CXMessageComponent.Empty"
+                : $"""
+                   new global::Discord.CXMessageComponent([
+                       {render.EmittedSource!.WithNewlinePadding(4)}
+                   ])
+                   """;
+            
             if (i > 0)
                 sb.AppendLine();
 
@@ -286,9 +292,7 @@ public sealed class SourceGenerator : IIncrementalGenerator
                       {{parameter}},
                       bool? autoRows = null,
                       bool? autoTextDisplays = null
-                  ) => new global::Discord.CXMessageComponent([
-                      {{render.EmittedSource!.WithNewlinePadding(4)}}
-                  ]);
+                  ) => {{body}};
                   """
             );
         }
