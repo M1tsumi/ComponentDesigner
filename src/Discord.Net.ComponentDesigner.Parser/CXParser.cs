@@ -27,6 +27,11 @@ public sealed partial class CXParser
     /// <summary>
     ///     Gets whether this parser is operating in an incremental mode.
     /// </summary>
+    /// <remarks>
+    ///     In incremental mode, the parser reuses unchanged AST nodes from a previous parse,
+    ///     dramatically improving performance for editor scenarios where only small regions change.
+    ///     When false, a complete reparse is performed from scratch.
+    /// </remarks>
     [MemberNotNullWhen(true, nameof(Blender), nameof(_blendedNodes))]
     public bool IsIncremental => Blender is not null && _blendedNodes is not null;
 

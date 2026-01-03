@@ -20,7 +20,13 @@ public abstract class CXNode : ICXNode
     /// <inheritdoc/>
     public CXNode? Parent { get; set; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    ///     Gets the number of child slots directly contained within this node.
+    /// </summary>
+    /// <remarks>
+    ///     Width counts only direct children (elements in the _slots collection).
+    ///     Use <see cref="GraphWidth"/> to count the entire descendant tree.
+    /// </remarks>
     public int Width { get; private set; }
 
     /// <inheritdoc/>

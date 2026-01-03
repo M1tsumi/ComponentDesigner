@@ -35,10 +35,10 @@ public static partial class Diagnostics
         true
     );
 
-    public static DiagnosticDescriptor OutOfRange(string a, string b) => new(
+    public static DiagnosticDescriptor OutOfRange(string property, string constraint) => new(
         "DC0003",
-        "Type mismatch",
-        "'{0}' must be {1}",
+        "Value out of range",
+        "Property '{0}' is out of range: {1}",
         "Components",
         DiagnosticSeverity.Error,
         true
