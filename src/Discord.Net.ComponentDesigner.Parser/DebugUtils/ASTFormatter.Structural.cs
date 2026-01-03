@@ -53,7 +53,7 @@ public static partial class ASTFormatter
                             .Append(": ".Grey());
                     }
                     
-                    var spacer = "".PadLeft((depth + 1) * padding);
+                    var spacer = string.Empty.PadLeft((depth + 1) * padding);
 
                     sb.AppendLine("[").Append(spacer);
 
@@ -162,7 +162,7 @@ public static partial class ASTFormatter
 
                         var startPos = sb.Length;
 
-                        sb.Append("".PadLeft((depth + 1) * padding)).Append($"{name}: ");
+                        sb.Append(string.Empty.PadLeft((depth + 1) * padding)).Append($"{name}: ");
 
                         var preValuePos = sb.Length;
                 
@@ -174,7 +174,7 @@ public static partial class ASTFormatter
                             sb.AppendLine(",");
                     }
 
-                    sb.Append("".PadLeft(depth * padding)).Append("}");
+                    sb.Append(string.Empty.PadLeft(depth * padding)).Append("}");
                     break;
                 }
             }
@@ -236,7 +236,7 @@ public static partial class ASTFormatter
                             .Append(": ".Grey());
                     }
                     
-                    var spacer = "".PadLeft((depth + 1) * padding);
+                    var spacer = string.Empty.PadLeft((depth + 1) * padding);
 
                     sb.AppendLine("[").Append(spacer);
 
